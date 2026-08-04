@@ -95,10 +95,18 @@ data class FleetAgent(
 
 @Serializable
 data class AlertsResponse(
-    val alerts: List<FuelAlert> = emptyList(),
-)
+    val alerts: List<String> = emptyList(),
+) {
+    fun toFuelAlerts(): List<FuelAlert> = alerts.map { raw ->
+        val severity = when {
+            raw.startsWith("CRITICAL", ignoreCase = true) -> "critical"
+            raw.startsWith("WARNING", ignoreCase = true) -> "warning"
+            else -> "info"
+        }
+        FuelAlert(message = raw, severity = severity)
+    }
+}
 
-@Serializable
 data class FuelAlert(
     val message: String = "",
     val severity: String = "info",

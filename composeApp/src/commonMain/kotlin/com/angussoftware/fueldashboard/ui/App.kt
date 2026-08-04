@@ -233,7 +233,7 @@ private fun DashboardContent(
 
             AgentFleetPanel(agents = state.agents.agents)
 
-            AlertsPanel(alerts = state.alerts.alerts)
+            AlertsPanel(alerts = state.alerts.toFuelAlerts())
         }
     }
 }

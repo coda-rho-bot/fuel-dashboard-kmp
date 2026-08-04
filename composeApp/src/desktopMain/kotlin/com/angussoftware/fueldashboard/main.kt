@@ -26,10 +26,7 @@ fun main() = application {
         title = "Fuel Dashboard — Angus Software",
         state = windowState,
     ) {
-        DashboardTheme(
-            colorTheme = themeController.colorTheme,
-            themeMode = themeController.themeMode,
-        ) {
+        DashboardTheme {
             FuelDashboardApp(
                 viewModel = viewModel,
                 themeController = themeController,
