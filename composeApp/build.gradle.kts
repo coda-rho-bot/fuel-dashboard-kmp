@@ -75,6 +75,8 @@ kotlin {
             implementation(compose.animation)
             implementation(compose.materialIconsExtended)
 
+            implementation(libs.angusSoftware.theming.compose)
+
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.json)
