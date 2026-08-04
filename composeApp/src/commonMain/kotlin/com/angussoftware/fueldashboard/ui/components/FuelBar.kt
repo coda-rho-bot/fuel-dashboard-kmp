@@ -1,6 +1,7 @@
 package com.angussoftware.fueldashboard.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -29,8 +30,14 @@ fun FuelBar(
 ) {
     val animatedColor by animateColorAsState(
         targetValue = fuelColor(remainingPct),
-        animationSpec = tween(300),
+        animationSpec = tween(400),
         label = "fuelColor",
+    )
+
+    val animatedFraction by animateFloatAsState(
+        targetValue = remainingPct.coerceIn(0, 100) / 100f,
+        animationSpec = tween(600),
+        label = "fuelWidth",
     )
 
     val barHeight = if (compact) 6.dp else 10.dp
@@ -63,10 +70,10 @@ fun FuelBar(
                 .clip(RoundedCornerShape(barHeight / 2))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            // Filled portion
+            // Filled portion (animated width)
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(remainingPct.coerceIn(0, 100) / 100f)
+                    .fillMaxWidth(animatedFraction)
                     .height(barHeight)
                     .clip(RoundedCornerShape(barHeight / 2))
                     .background(animatedColor),

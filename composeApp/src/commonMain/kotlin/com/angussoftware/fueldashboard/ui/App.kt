@@ -1,5 +1,9 @@
 package com.angussoftware.fueldashboard.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +44,7 @@ import com.angussoftware.fueldashboard.model.Provider
 import com.angussoftware.fueldashboard.model.Window
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
+import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.formatCountdown
@@ -83,28 +88,55 @@ private fun DashboardContent(
 ) {
     val fuel = state.fuel
 
+    // --- Loading state ---
     if (state.isLoading && fuel == null) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Connecting to fuel orchestrator...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         return
     }
 
+    // --- Error state (no data yet) ---
     if (state.error != null && fuel == null) {
         Column(
             modifier = modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("Connection Error", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Connection Error",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
             Spacer(Modifier.height(8.dp))
-            Text(state.error, color = MaterialTheme.colorScheme.error)
+            Text(
+                state.error,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Spacer(Modifier.height(16.dp))
-            Text("Is the fuel orchestrator running on $DEFAULT_URL?")
+            Text(
+                "Is the fuel orchestrator running on $DEFAULT_URL?",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = { /* Parent handles refresh */ }) {
+                Text("Retry")
+            }
         }
         return
     }
 
+    // --- Main content ---
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(20.dp),
@@ -120,19 +152,42 @@ private fun DashboardContent(
                 )
             }
 
-            // Last updated
+            // Last updated timestamp
             item {
-                Text(
-                    text = formatLastUpdated(state.lastUpdated),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = formatLastUpdated(state.lastUpdated),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Show stale-data indicator if last refresh failed but we have cached data
+                    if (state.error != null) {
+                        Text(
+                            text = "⚠ stale",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
 
             // Provider cards
             items(it.providers.entries.toList(), key = { e -> e.key }) { entry ->
                 ProviderSection(name = entry.key, provider = entry.value)
                 HorizontalDivider()
+            }
+        }
+
+        // Decision history panel
+        val decisions = state.decisions.decisions
+        if (decisions.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(8.dp))
+                DecisionLog(decisions = decisions)
             }
         }
 
