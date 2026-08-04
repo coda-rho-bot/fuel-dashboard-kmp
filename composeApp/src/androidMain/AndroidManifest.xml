@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
+        android:name=".FuelDashboardApplication"
         android:label="Fuel Dashboard"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">

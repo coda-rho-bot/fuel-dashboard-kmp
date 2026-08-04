@@ -25,16 +25,18 @@ data class DashboardState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val lastUpdated: Long = 0L,
+    val baseUrl: String = "http://127.0.0.1:8321",
 )
 
 class FuelViewModel(
-    private val apiClient: FuelApiClient = FuelApiClient(),
+    initialBaseUrl: String = "http://127.0.0.1:8321",
     private val pollIntervalMs: Long = 30_000L,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
+    private var apiClient = FuelApiClient(initialBaseUrl)
 
-    private val _state = MutableStateFlow(DashboardState())
+    private val _state = MutableStateFlow(DashboardState(baseUrl = initialBaseUrl))
     val state: StateFlow<DashboardState> = _state.asStateFlow()
 
     fun startPolling() {
@@ -54,6 +56,26 @@ class FuelViewModel(
 
     fun refreshNow() {
         scope.launch { refresh() }
+    }
+
+    fun updateBaseUrl(url: String) {
+        val trimmed = url.trim()
+        if (trimmed == _state.value.baseUrl) return
+
+        stopPolling()
+        apiClient.close()
+        apiClient = FuelApiClient(trimmed)
+
+        _state.value = _state.value.copy(
+            baseUrl = trimmed,
+            isLoading = true,
+            fuel = null,
+            decisions = DecisionsResponse(),
+            agents = AgentsResponse(),
+            alerts = AlertsResponse(),
+            error = null,
+        )
+        startPolling()
     }
 
     private suspend fun refresh() {

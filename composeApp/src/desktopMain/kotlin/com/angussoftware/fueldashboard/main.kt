@@ -1,19 +1,21 @@
 package com.angussoftware.fueldashboard
 
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
+import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.FuelDashboardApp
 import com.angussoftware.fueldashboard.ui.theme.DashboardTheme
 
 fun main() = application {
     val viewModel = FuelViewModel()
+    val themeController = ThemeController
 
     val windowState = rememberWindowState(
-        width = 480.dp,
-        height = 720.dp,
+        width = 1200.dp,
+        height = 800.dp,
     )
 
     Window(
@@ -24,8 +26,14 @@ fun main() = application {
         title = "Fuel Dashboard — Angus Software",
         state = windowState,
     ) {
-        DashboardTheme {
-            FuelDashboardApp(viewModel = viewModel)
+        DashboardTheme(
+            colorTheme = themeController.colorTheme,
+            themeMode = themeController.themeMode,
+        ) {
+            FuelDashboardApp(
+                viewModel = viewModel,
+                themeController = themeController,
+            )
         }
     }
 }
