@@ -6,7 +6,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +27,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsApplications
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -180,6 +180,10 @@ private fun ThemeModeChip(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Color Theme Picker — mode-aware with separate light/dark sections
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun ColorThemePicker(themeController: ThemeController) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -207,7 +211,7 @@ private fun ColorThemePicker(themeController: ThemeController) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = currentThemeDisplayName(themeController.colorTheme),
+                text = activeThemeSummary(themeController),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
@@ -225,17 +229,100 @@ private fun ColorThemePicker(themeController: ThemeController) {
         enter = expandVertically(),
         exit = shrinkVertically(),
     ) {
+        when (themeController.themeMode) {
+            ThemeMode.LIGHT -> ThemeOptionList(
+                label = "Light Themes",
+                options = ColorTheme.lightOptions,
+                selected = themeController.lightColorTheme,
+                showWarningIfMismatch = false,
+                isForLightMode = true,
+                onSelect = { themeController.updateLightColorTheme(it) },
+            )
+
+            ThemeMode.DARK -> ThemeOptionList(
+                label = "Dark Themes",
+                options = ColorTheme.darkOptions,
+                selected = themeController.darkColorTheme,
+                showWarningIfMismatch = false,
+                isForLightMode = false,
+                onSelect = { themeController.updateDarkColorTheme(it) },
+            )
+
+            ThemeMode.SYSTEM -> Column {
+                ThemeOptionList(
+                    label = "Light Themes",
+                    options = ColorTheme.allWithNames,
+                    selected = themeController.lightColorTheme,
+                    showWarningIfMismatch = true,
+                    isForLightMode = true,
+                    onSelect = { themeController.updateLightColorTheme(it) },
+                )
+                Spacer(Modifier.height(8.dp))
+                ThemeOptionList(
+                    label = "Dark Themes",
+                    options = ColorTheme.allWithNames,
+                    selected = themeController.darkColorTheme,
+                    showWarningIfMismatch = true,
+                    isForLightMode = false,
+                    onSelect = { themeController.updateDarkColorTheme(it) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A labelled list of theme options with the selected theme highlighted.
+ *
+ * When [showWarningIfMismatch] is true, a warning indicator is shown if the selected
+ * theme doesn't match the section's intended mode (e.g., a dark theme selected in the
+ * "Light Themes" section).
+ */
+@Composable
+private fun ThemeOptionList(
+    label: String,
+    options: List<Pair<ColorTheme, String>>,
+    selected: ColorTheme,
+    showWarningIfMismatch: Boolean,
+    isForLightMode: Boolean,
+    onSelect: (ColorTheme) -> Unit,
+) {
+    val hasMismatch = showWarningIfMismatch && selected.let {
+        if (isForLightMode) !it.isLightTheme else !it.isDarkTheme
+    }
+
+    Column(modifier = Modifier
+        .fillMaxWidth()
+        .padding(top = 4.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (hasMismatch) {
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Theme mismatch warning",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp)
-                .height(240.dp),
+                .height(200.dp),
         ) {
-            items(ColorTheme.allWithNames) { (theme, name) ->
+            items(options) { (theme, name) ->
                 ColorThemeRow(
                     name = name,
-                    isSelected = theme == themeController.colorTheme,
-                    onClick = { themeController.updateColorTheme(theme) },
+                    isSelected = theme == selected,
+                    onClick = { onSelect(theme) },
                 )
             }
         }
@@ -345,6 +432,16 @@ private fun ApiUrlSection(
     }
 }
 
-private fun currentThemeDisplayName(theme: ColorTheme): String {
+private fun activeThemeSummary(controller: ThemeController): String {
+    val lightName = themeDisplayName(controller.lightColorTheme)
+    val darkName = themeDisplayName(controller.darkColorTheme)
+    return if (controller.lightColorTheme == controller.darkColorTheme) {
+        lightName
+    } else {
+        "$lightName / $darkName"
+    }
+}
+
+private fun themeDisplayName(theme: ColorTheme): String {
     return ColorTheme.allWithNames.find { it.first == theme }?.second ?: theme.name
 }

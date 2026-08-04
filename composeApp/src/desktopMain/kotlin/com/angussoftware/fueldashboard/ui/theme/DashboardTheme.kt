@@ -19,7 +19,7 @@ actual fun DashboardTheme(
     AngusTheme(
         darkTheme = darkTheme,
         dynamicColor = false,
-        colorTheme = ThemeController.colorTheme,
+        colorTheme = ThemeController.activeColorTheme,
         content = content,
     )
 }

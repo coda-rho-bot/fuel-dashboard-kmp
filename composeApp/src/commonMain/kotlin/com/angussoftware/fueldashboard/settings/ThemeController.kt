@@ -9,18 +9,31 @@ import com.angussoftware.theming.compose.ui.theme.initializeThemeMode
 
 /**
  * Global theme state controller with persistence.
- * Holds the selected [ColorTheme] and [ThemeMode], persisting to platform storage.
+ *
+ * Stores separate [lightColorTheme] and [darkColorTheme] selections so the user can
+ * pick different color schemes for light and dark modes (matching the AngusSoftwareApp
+ * pattern). The [activeColorTheme] property resolves which one to use based on the
+ * current [themeMode].
  */
 object ThemeController {
 
-    private const val KEY_COLOR_THEME = "colorTheme"
+    private const val KEY_LIGHT_COLOR_THEME = "lightColorTheme"
+    private const val KEY_DARK_COLOR_THEME = "darkColorTheme"
     private const val KEY_THEME_MODE = "themeMode"
 
     /**
-     * Selected color theme. Persists on change.
+     * Color theme to use when the app is in light mode. Persists on change.
      */
-    var colorTheme: ColorTheme by mutableStateOf(
-        loadColorTheme()
+    var lightColorTheme: ColorTheme by mutableStateOf(
+        loadColorTheme(KEY_LIGHT_COLOR_THEME, ColorTheme.Angus)
+    )
+        private set
+
+    /**
+     * Color theme to use when the app is in dark mode. Persists on change.
+     */
+    var darkColorTheme: ColorTheme by mutableStateOf(
+        loadColorTheme(KEY_DARK_COLOR_THEME, ColorTheme.AngusDark)
     )
         private set
 
@@ -37,9 +50,29 @@ object ThemeController {
         initializeThemeMode(themeMode)
     }
 
-    fun updateColorTheme(theme: ColorTheme) {
-        colorTheme = theme
-        saveStringSetting(KEY_COLOR_THEME, theme.name)
+    /**
+     * The color theme that should actually be applied, resolved from [lightColorTheme]
+     * or [darkColorTheme] based on the current [themeMode].
+     *
+     * - LIGHT → [lightColorTheme]
+     * - DARK → [darkColorTheme]
+     * - SYSTEM → [darkColorTheme] (the actual light/dark resolution happens at render time)
+     */
+    val activeColorTheme: ColorTheme
+        get() = when (themeMode) {
+            ThemeMode.LIGHT -> lightColorTheme
+            ThemeMode.DARK -> darkColorTheme
+            ThemeMode.SYSTEM -> darkColorTheme
+        }
+
+    fun updateLightColorTheme(theme: ColorTheme) {
+        lightColorTheme = theme
+        saveStringSetting(KEY_LIGHT_COLOR_THEME, theme.name)
+    }
+
+    fun updateDarkColorTheme(theme: ColorTheme) {
+        darkColorTheme = theme
+        saveStringSetting(KEY_DARK_COLOR_THEME, theme.name)
     }
 
     fun updateThemeMode(mode: ThemeMode) {
@@ -47,9 +80,9 @@ object ThemeController {
         saveStringSetting(KEY_THEME_MODE, mode.name)
     }
 
-    private fun loadColorTheme(): ColorTheme {
-        val name = loadStringSetting(KEY_COLOR_THEME, ColorTheme.Angus.name)
-        return runCatching { ColorTheme.valueOf(name) }.getOrDefault(ColorTheme.Angus)
+    private fun loadColorTheme(key: String, default: ColorTheme): ColorTheme {
+        val name = loadStringSetting(key, default.name)
+        return runCatching { ColorTheme.valueOf(name) }.getOrDefault(default)
     }
 
     private fun loadThemeMode(): ThemeMode {

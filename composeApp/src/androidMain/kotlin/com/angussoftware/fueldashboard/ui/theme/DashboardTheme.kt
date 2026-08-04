@@ -17,11 +17,11 @@ actual fun DashboardTheme(
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
-    val dynamicColor = ThemeController.colorTheme == ColorTheme.Angus && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val dynamicColor = ThemeController.activeColorTheme == ColorTheme.Angus && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     AngusTheme(
         darkTheme = darkTheme,
         dynamicColor = dynamicColor,
-        colorTheme = ThemeController.colorTheme,
+        colorTheme = ThemeController.activeColorTheme,
         content = content,
     )
 }
