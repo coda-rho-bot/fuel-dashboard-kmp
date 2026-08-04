@@ -1,5 +1,6 @@
 package com.angussoftware.fueldashboard
 
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -10,7 +11,7 @@ import com.angussoftware.fueldashboard.ui.FuelDashboardApp
 import com.angussoftware.fueldashboard.ui.theme.DashboardTheme
 
 fun main() = application {
-    val viewModel = FuelViewModel()
+    val viewModel = remember { FuelViewModel() }
     val themeController = ThemeController
 
     val windowState = rememberWindowState(
