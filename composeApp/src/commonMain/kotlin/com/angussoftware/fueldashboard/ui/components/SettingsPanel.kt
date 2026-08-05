@@ -397,7 +397,21 @@ private fun AddProviderDialog(
 
             Spacer(Modifier.height(12.dp))
 
-            // API key — the only field most providers need
+            // Display name — defaults to provider name, override for multiple accounts
+            OutlinedTextField(
+                value = displayName,
+                onValueChange = { displayName = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Name (e.g. ${selectedKind.displayName} (Work))") },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall,
+                placeholder = {
+                    Text(selectedKind.displayName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                },
+            )
+            Spacer(Modifier.height(4.dp))
+
+            // API key — required for most providers, optional for Connected API
             if (selectedKind != ProviderKind.CONNECTED_API) {
                 OutlinedTextField(
                     value = apiKey,
@@ -417,21 +431,29 @@ private fun AddProviderDialog(
                 Spacer(Modifier.height(4.dp))
             }
 
-            // Server URL — only for Connected API
-            if (selectedKind == ProviderKind.CONNECTED_API) {
-                OutlinedTextField(
-                    value = serverUrl,
-                    onValueChange = { serverUrl = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Orchestrator URL") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    placeholder = {
-                        Text("http://127.0.0.1:8321", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    },
-                )
+            // Server URL — pre-filled with default, override for self-hosted/regional
+            val defaultUrl = when (selectedKind) {
+                ProviderKind.ZAI -> "https://api.z.ai"
+                ProviderKind.LETTA_CLOUD -> "https://api.letta.com"
+                ProviderKind.OPENAI -> "https://api.openai.com"
+                ProviderKind.ANTHROPIC -> "https://api.anthropic.com"
+                ProviderKind.DEEPSEEK -> "https://api.deepseek.com"
+                ProviderKind.GROQ -> "https://api.groq.com/openai"
+                ProviderKind.MISTRAL -> "https://api.mistral.ai"
+                ProviderKind.CONNECTED_API -> "http://127.0.0.1:8321"
             }
+            OutlinedTextField(
+                value = serverUrl,
+                onValueChange = { serverUrl = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(if (selectedKind == ProviderKind.CONNECTED_API) "Orchestrator URL" else "Server URL (override for self-hosted)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                placeholder = {
+                    Text(defaultUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                },
+            )
 
             Spacer(Modifier.height(16.dp))
 
