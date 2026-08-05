@@ -12,6 +12,10 @@ enum class ProviderKind(val displayName: String) {
     ZAI("z.ai"),
     LETTA_CLOUD("Letta Cloud"),
     OPENAI("OpenAI"),
+    ANTHROPIC("Anthropic"),
+    DEEPSEEK("DeepSeek"),
+    GROQ("Groq"),
+    MISTRAL("Mistral AI"),
 }
 
 /**
@@ -41,6 +45,10 @@ data class ProviderConfig(
         ProviderKind.ZAI -> serverUrl.ifBlank { "https://api.z.ai" }
         ProviderKind.LETTA_CLOUD -> serverUrl.ifBlank { "https://api.letta.com" }
         ProviderKind.OPENAI -> serverUrl.ifBlank { "https://api.openai.com" }
+        ProviderKind.ANTHROPIC -> serverUrl.ifBlank { "https://api.anthropic.com" }
+        ProviderKind.DEEPSEEK -> serverUrl.ifBlank { "https://api.deepseek.com" }
+        ProviderKind.GROQ -> serverUrl.ifBlank { "https://api.groq.com/openai" }
+        ProviderKind.MISTRAL -> serverUrl.ifBlank { "https://api.mistral.ai" }
     }
 
     /**

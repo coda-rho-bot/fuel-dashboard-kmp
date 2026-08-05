@@ -12,7 +12,11 @@ import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.network.FuelApiClient
+import com.angussoftware.fueldashboard.network.AnthropicProviderAdapter
+import com.angussoftware.fueldashboard.network.DeepSeekProviderAdapter
+import com.angussoftware.fueldashboard.network.GroqProviderAdapter
 import com.angussoftware.fueldashboard.network.LettaCloudProviderAdapter
+import com.angussoftware.fueldashboard.network.MistralProviderAdapter
 import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
 import com.angussoftware.fueldashboard.network.OrchestratorFuelSource
 import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
@@ -202,6 +206,32 @@ class FuelViewModel {
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.OPENAI -> OpenAIProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                monthlyBudgetUsd = null, // user-configurable in settings (see TODO)
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.ANTHROPIC -> AnthropicProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                monthlyBudgetUsd = null,
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.DEEPSEEK -> DeepSeekProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.GROQ -> GroqProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.MISTRAL -> MistralProviderAdapter(
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),

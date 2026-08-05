@@ -210,6 +210,10 @@ private fun ProviderConfigRow(
                         ProviderKind.ZAI -> Icons.Default.Cloud
                         ProviderKind.LETTA_CLOUD -> Icons.Default.Cloud
                         ProviderKind.OPENAI -> Icons.Default.Api
+                        ProviderKind.ANTHROPIC -> Icons.Default.Api
+                        ProviderKind.DEEPSEEK -> Icons.Default.Api
+                        ProviderKind.GROQ -> Icons.Default.Api
+                        ProviderKind.MISTRAL -> Icons.Default.Api
                     },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
@@ -436,6 +440,10 @@ private fun AddProviderDialog(
                             ProviderKind.ZAI -> "https://api.z.ai"
                             ProviderKind.LETTA_CLOUD -> "https://api.letta.com"
                             ProviderKind.OPENAI -> "https://api.openai.com"
+                            ProviderKind.ANTHROPIC -> "https://api.anthropic.com"
+                            ProviderKind.DEEPSEEK -> "https://api.deepseek.com"
+                            ProviderKind.GROQ -> "https://api.groq.com/openai"
+                            ProviderKind.MISTRAL -> "https://api.mistral.ai"
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
