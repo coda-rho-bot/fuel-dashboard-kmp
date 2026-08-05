@@ -6,6 +6,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,8 +39,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -409,21 +408,26 @@ private fun AddProviderDialog(
             )
             Spacer(Modifier.height(12.dp))
 
-            // Provider type dropdown
+            // Provider type dropdown — simple clickable field with dropdown menu
             var menuExpanded by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(
-                expanded = menuExpanded,
-                onExpandedChange = { menuExpanded = it },
-            ) {
+            Box {
                 OutlinedTextField(
                     value = selectedKind.displayName,
                     onValueChange = {},
                     readOnly = true,
-                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    modifier = Modifier.fillMaxWidth().clickable { menuExpanded = true },
                     label = { Text("Provider Type") },
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.bodySmall,
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuExpanded) },
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer { rotationZ = if (menuExpanded) 90f else 0f },
+                        )
+                    },
                 )
                 DropdownMenu(
                     expanded = menuExpanded,
@@ -431,7 +435,7 @@ private fun AddProviderDialog(
                 ) {
                     ProviderKind.entries.forEach { kind ->
                         DropdownMenuItem(
-                            text = { Text(kind.displayName, style = MaterialTheme.typography.bodySmall) },
+                            text = { Text(kind.displayName, style = MaterialTheme.typography.bodyMedium) },
                             onClick = {
                                 selectedKind = kind
                                 menuExpanded = false
