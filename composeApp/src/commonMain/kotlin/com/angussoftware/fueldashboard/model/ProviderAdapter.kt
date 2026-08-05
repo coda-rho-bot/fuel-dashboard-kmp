@@ -33,6 +33,11 @@ data class ProviderReport(
     val available: Boolean = true,
     val windows: List<ReportWindow> = emptyList(),
     val rawDisplay: String = "",
+    // Credit-based tracking (Letta Cloud, etc.)
+    val creditsUsed: Int? = null,
+    val creditsLimit: Int? = null,
+    val creditsTotal: Int? = null,
+    val creditsLow: Boolean = false,
 )
 
 /**

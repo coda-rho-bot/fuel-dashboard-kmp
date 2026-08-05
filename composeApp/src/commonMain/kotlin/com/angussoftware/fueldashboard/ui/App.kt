@@ -430,6 +430,26 @@ private fun ProviderSection(
                         ReportWindowRow(window = window)
                     }
                 }
+
+                // Credit info (Letta Cloud, etc.)
+                if (report.creditsUsed != null || report.creditsTotal != null) {
+                    Spacer(Modifier.height(4.dp))
+                    val used = report.creditsUsed ?: 0
+                    val total = report.creditsTotal ?: 0
+                    val limit = report.creditsLimit
+                    val remaining = (total - used).coerceAtLeast(0)
+                    Text(
+                        text = buildString {
+                            append("$used credits used")
+                            if (limit != null) append(" of $limit limit")
+                            if (total > 0) append(" · $remaining remaining of $total total")
+                            if (report.creditsLow) append(" · LOW")
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (report.creditsLow) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         // Raw debug display removed — not user-facing

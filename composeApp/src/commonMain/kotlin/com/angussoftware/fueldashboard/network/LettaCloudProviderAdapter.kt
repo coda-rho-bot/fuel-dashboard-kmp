@@ -235,9 +235,13 @@ class LettaCloudProviderAdapter(
             remainingPct = overallRemaining,
             resetsAt = windowEnd ?: dailyWindowEnd,
             windowHours = SHORT_WINDOW_HOURS,
-            available = true, // quota exhaustion ≠ blocked — pay-as-you-go credits or BYOK may still serve
+            available = true,
             windows = windows,
             rawDisplay = rawDisplay,
+            creditsUsed = billing?.used,
+            creditsLimit = billing?.limit,
+            creditsTotal = billing?.totalCredits,
+            creditsLow = billing?.isLow == true,
         )
     }
 
