@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -148,7 +149,9 @@ private fun ProvidersSection(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = if (isCollapsed) "Expand" else "Collapse",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer { rotationZ = if (isCollapsed) 0f else 90f },
             )
             Spacer(Modifier.width(4.dp))
             Text(
@@ -248,11 +251,24 @@ private fun ProviderConfigRow(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                     )
-                    Text(
-                        text = config.kind.displayName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    // Show provider type in subdued text (especially useful when custom name is set)
+                    if (config.displayName.isNotBlank() && config.displayName != config.kind.displayName) {
+                        Text(
+                            text = config.kind.displayName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    // Show non-default server URL
+                    val defaultUrl = config.resolvedServerUrl()
+                    if (config.serverUrl.isNotBlank() && config.serverUrl != defaultUrl) {
+                        Text(
+                            text = config.serverUrl,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
                 }
                 if (config.isConfigured) {
                     Icon(
@@ -634,7 +650,9 @@ private fun ColorThemePicker(themeController: ThemeController) {
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = if (isExpanded) "Collapse" else "Expand",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier
+                .size(20.dp)
+                .graphicsLayer { rotationZ = if (isExpanded) 90f else 0f },
         )
     }
 

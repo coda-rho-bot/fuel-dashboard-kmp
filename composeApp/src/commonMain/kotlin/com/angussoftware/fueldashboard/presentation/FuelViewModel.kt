@@ -240,12 +240,11 @@ class FuelViewModel {
     }
 
     /**
-     * Poll interval: 30s if any connected API is active, 5 min otherwise.
+     * Poll interval: 30s for all providers.
+     * Connected API was previously 30s, direct providers 5min.
+     * Unified to 30s for responsive UX — provider APIs can handle it.
      */
-    private fun pollIntervalMs(): Long {
-        val hasConnected = _state.value.hasConnectedApi
-        return if (hasConnected) 30_000L else 300_000L
-    }
+    private fun pollIntervalMs(): Long = 30_000L
 
     private suspend fun refresh() {
         if (adapters.isEmpty()) {
