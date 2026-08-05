@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,11 +52,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.angussoftware.fueldashboard.model.FuelProvider
-import com.angussoftware.fueldashboard.model.FuelSettings
-import com.angussoftware.fueldashboard.model.FuelSourceMode
-import com.angussoftware.fueldashboard.model.Provider
-import com.angussoftware.fueldashboard.model.Window
+import com.angussoftware.fueldashboard.model.MultiProviderSettings
+import com.angussoftware.fueldashboard.model.ProviderConfig
+import com.angussoftware.fueldashboard.model.ProviderKind
+import com.angussoftware.fueldashboard.model.ProviderReport
+import com.angussoftware.fueldashboard.model.ProviderType
+import com.angussoftware.fueldashboard.model.ReportWindow
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
@@ -105,8 +108,7 @@ fun FuelDashboardApp(
         DashboardContent(
             state = state,
             themeController = themeController,
-            onSettingsChange = { viewModel.updateSettings(it) },
-            onRetry = { viewModel.refreshNow() },
+            viewModel = viewModel,
             modifier = Modifier.padding(padding),
         )
     }
@@ -119,12 +121,10 @@ fun FuelDashboardApp(
 @Composable
 private fun SetupScreen(
     viewModel: FuelViewModel,
-    initialSettings: FuelSettings,
+    initialSettings: MultiProviderSettings,
 ) {
-    var mode by remember { mutableStateOf(FuelSourceMode.DIRECT) }
-    var provider by remember { mutableStateOf(FuelProvider.ZAI) }
+    var selectedKind by remember { mutableStateOf(ProviderKind.ZAI) }
     var apiKey by remember { mutableStateOf("") }
-    var orchestratorUrl by remember { mutableStateOf(initialSettings.orchestratorUrl) }
     var showKey by remember { mutableStateOf(false) }
 
     Column(
@@ -141,121 +141,60 @@ private fun SetupScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = when (mode) {
-                FuelSourceMode.DIRECT -> "Enter your provider API key to get started."
-                FuelSourceMode.CONNECTED -> "Enter your orchestrator URL to get started."
-            },
+            text = "Add a fuel provider to get started. You can add more later.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Spacer(Modifier.height(32.dp))
 
-        // Mode toggle
+        // Provider type selector
         Row(
             modifier = Modifier.fillMaxWidth(0.5f),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SetupModeChip(
-                label = "Direct (Provider API)",
-                isSelected = mode == FuelSourceMode.DIRECT,
-                onClick = { mode = FuelSourceMode.DIRECT },
-                modifier = Modifier.weight(1f),
-            )
-            SetupModeChip(
-                label = "Connected (Orchestrator)",
-                isSelected = mode == FuelSourceMode.CONNECTED,
-                onClick = { mode = FuelSourceMode.CONNECTED },
-                modifier = Modifier.weight(1f),
-            )
+            ProviderKind.entries.forEach { kind ->
+                SetupKindChip(
+                    label = kind.displayName,
+                    isSelected = selectedKind == kind,
+                    onClick = { selectedKind = kind },
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
+        Spacer(Modifier.height(16.dp))
 
+        // API key
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = { apiKey = it },
+            modifier = Modifier.fillMaxWidth(0.5f),
+            label = { Text("${selectedKind.displayName} API Key") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            trailingIcon = {
+                TextButton(onClick = { showKey = !showKey }) {
+                    Text(if (showKey) "Hide" else "Show")
+                }
+            },
+        )
         Spacer(Modifier.height(24.dp))
 
-        when (mode) {
-            FuelSourceMode.DIRECT -> {
-                // Provider selector
-                Row(
-                    modifier = Modifier.fillMaxWidth(0.5f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FuelProvider.entries.forEach { p ->
-                        SetupModeChip(
-                            label = p.displayName,
-                            isSelected = provider == p,
-                            onClick = { provider = p },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-
-                // API key
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    modifier = Modifier.fillMaxWidth(0.5f),
-                    label = { Text("${provider.displayName} API Key") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    trailingIcon = {
-                        TextButton(onClick = { showKey = !showKey }) {
-                            Text(if (showKey) "Hide" else "Show")
-                        }
-                    },
-                )
-                Spacer(Modifier.height(24.dp))
-
-                Button(
-                    onClick = {
-                        viewModel.updateSettings(
-                            initialSettings.copy(
-                                mode = FuelSourceMode.DIRECT,
-                                provider = provider,
-                                providerApiKey = apiKey.trim(),
-                            ),
-                        )
-                    },
-                    enabled = apiKey.isNotBlank(),
-                ) {
-                    Text("Connect")
-                }
-            }
-
-            FuelSourceMode.CONNECTED -> {
-                OutlinedTextField(
-                    value = orchestratorUrl,
-                    onValueChange = { orchestratorUrl = it },
-                    modifier = Modifier.fillMaxWidth(0.5f),
-                    label = { Text("Orchestrator URL") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                )
-                Spacer(Modifier.height(24.dp))
-
-                Button(
-                    onClick = {
-                        viewModel.updateSettings(
-                            initialSettings.copy(
-                                mode = FuelSourceMode.CONNECTED,
-                                orchestratorUrl = orchestratorUrl.trim(),
-                            ),
-                        )
-                    },
-                    enabled = orchestratorUrl.isNotBlank(),
-                ) {
-                    Text("Connect")
-                }
-            }
+        Button(
+            onClick = {
+                viewModel.addProvider(selectedKind, apiKey.trim())
+            },
+            enabled = apiKey.isNotBlank(),
+        ) {
+            Text("Connect")
         }
     }
 }
 
 @Composable
-private fun SetupModeChip(
+private fun SetupKindChip(
     label: String,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -275,10 +214,7 @@ private fun SetupModeChip(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceVariant
-            )
+            .background(containerColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.Center,
@@ -301,32 +237,23 @@ private fun SetupModeChip(
 private fun DashboardContent(
     state: DashboardState,
     themeController: ThemeController,
-    onSettingsChange: (FuelSettings) -> Unit,
-    onRetry: () -> Unit,
+    viewModel: FuelViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val fuel = state.fuel
-
     // --- Loading state ---
-    if (state.isLoading && fuel == null) {
+    if (state.isLoading && state.providerReports.isEmpty() && state.fuel == null) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator()
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = when (state.settings.mode) {
-                        FuelSourceMode.DIRECT -> "Connecting to ${state.settings.provider.displayName}..."
-                        FuelSourceMode.CONNECTED -> "Connecting to fuel orchestrator..."
-                    },
+                    text = "Connecting to providers...",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = when (state.settings.mode) {
-                        FuelSourceMode.DIRECT -> state.settings.provider.displayName
-                        FuelSourceMode.CONNECTED -> state.baseUrl
-                    },
+                    text = state.activeProviders.joinToString(", ") { it.resolvedDisplayName() },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -335,8 +262,11 @@ private fun DashboardContent(
         return
     }
 
-    // --- Error state (no data yet) ---
-    if (state.error != null && fuel == null) {
+    // --- Error state (no data at all) ---
+    val allFailed = state.providerReports.isEmpty() &&
+        state.providerErrors.isNotEmpty() &&
+        state.fuel == null
+    if (allFailed) {
         Column(
             modifier = modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -348,22 +278,15 @@ private fun DashboardContent(
                 color = MaterialTheme.colorScheme.error,
             )
             Spacer(Modifier.height(8.dp))
-            Text(
-                state.error,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            state.providerErrors.values.firstOrNull()?.let { msg ->
+                Text(
+                    msg,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             Spacer(Modifier.height(16.dp))
-            Text(
-                text = when (state.settings.mode) {
-                    FuelSourceMode.DIRECT -> "Is your ${state.settings.provider.displayName} API key valid?"
-                    FuelSourceMode.CONNECTED -> "Is the fuel orchestrator running on ${state.baseUrl}?"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = onRetry) {
+            Button(onClick = { viewModel.refreshNow() }) {
                 Text("Retry")
             }
         }
@@ -375,59 +298,79 @@ private fun DashboardContent(
         modifier = modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        // Left column: fuel data, providers, decisions
+        // Left column: provider sections, recommendations, decisions
         LazyColumn(
             modifier = Modifier.weight(1.5f).fillMaxHeight(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            fuel?.let {
+            // Orchestrator fuel data (if connected)
+            state.fuel?.let { fuel ->
                 item {
                     RecommendationBanner(
-                        recommendedModel = it.recommendedModel,
-                        burnRate = it.burnRatePctPerHr,
-                        surplusAlert = it.surplusAlert,
+                        recommendedModel = fuel.recommendedModel,
+                        burnRate = fuel.burnRatePctPerHr,
+                        surplusAlert = fuel.surplusAlert,
                     )
                 }
+            }
 
-                // Burn rate status (direct mode)
-                if (state.settings.mode == FuelSourceMode.DIRECT) {
-                    item {
-                        BurnRateStatus(
-                            burnRate = state.burnRate,
-                            dataPoints = state.dataPointCount,
-                        )
-                    }
-                }
+            // Burn rate status
+            item {
+                BurnRateStatus(
+                    burnRate = state.burnRate,
+                    dataPoints = state.dataPointCount,
+                )
+            }
 
-                // Last updated timestamp
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+            // Last updated timestamp
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = formatLastUpdated(state.lastUpdated),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    val totalErrors = state.providerErrors.size
+                    if (totalErrors > 0) {
                         Text(
-                            text = formatLastUpdated(state.lastUpdated),
+                            text = "\u26A0 $totalErrors error${if (totalErrors > 1) "s" else ""}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.error,
                         )
-                        if (state.error != null) {
-                            Text(
-                                text = "\u26A0 stale",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
                     }
                 }
+            }
 
-                items(it.providers.entries.toList(), key = { e -> e.key }) { entry ->
-                    ProviderSection(name = entry.key, provider = entry.value)
+            // Provider sections — one per active adapter
+            items(state.activeProviders, key = { it.id }) { config ->
+                val report = state.providerReports[config.id]
+                val error = state.providerErrors[config.id]
+
+                ProviderSection(
+                    config = config,
+                    report = report,
+                    error = error,
+                )
+                HorizontalDivider()
+            }
+
+            // Orchestrator provider data (if connected)
+            state.fuel?.let { fuel ->
+                items(fuel.providers.entries.toList(), key = { e -> "orch-${e.key}" }) { entry ->
+                    ProviderSection(
+                        displayName = entry.key,
+                        provider = entry.value,
+                    )
                     HorizontalDivider()
                 }
             }
 
+            // Decisions (orchestrator only)
             val decisions = state.decisions.decisions
             if (decisions.isNotEmpty()) {
                 item {
@@ -435,19 +378,9 @@ private fun DashboardContent(
                     DecisionLog(decisions = decisions)
                 }
             }
-
-            if (state.error != null && fuel != null) {
-                item {
-                    Text(
-                        "\u26A0 Last refresh failed: ${state.error}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
         }
 
-        // Right column: agents, alerts, settings
+        // Right column: settings, agents, alerts
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -459,10 +392,10 @@ private fun DashboardContent(
             SettingsPanel(
                 themeController = themeController,
                 settings = state.settings,
-                onSettingsChange = onSettingsChange,
+                viewModel = viewModel,
             )
 
-            if (state.settings.mode == FuelSourceMode.CONNECTED) {
+            if (state.isOrchestratorConnected) {
                 AgentFleetPanel(agents = state.agents.agents)
                 AlertsPanel(alerts = state.alerts.toFuelAlerts())
             }
@@ -471,7 +404,7 @@ private fun DashboardContent(
 }
 
 // ---------------------------------------------------------------------------
-// Burn Rate Status (direct mode only)
+// Burn Rate Status
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -496,10 +429,15 @@ private fun BurnRateStatus(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Provider Section (multi-provider)
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun ProviderSection(
-    name: String,
-    provider: Provider,
+    config: ProviderConfig,
+    report: ProviderReport?,
+    error: String?,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -508,7 +446,127 @@ private fun ProviderSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = name,
+                text = config.resolvedDisplayName(),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (error != null) {
+                Text(
+                    "\u26A0 Error",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            } else if (report != null && !report.available) {
+                Text(
+                    "UNAVAILABLE",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+
+        if (error != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            return@Column
+        }
+
+        if (report == null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Connecting...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@Column
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Overall fuel bar
+        val pct = report.remainingPct
+        if (pct != null) {
+            FuelBar(remainingPct = pct, label = "Overall")
+        } else {
+            Text(
+                "No usage data",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // Individual windows
+        if (report.windows.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            report.windows.forEach { window ->
+                ReportWindowRow(window = window)
+            }
+        }
+
+        // Raw debug display
+        if (report.rawDisplay.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = report.rawDisplay,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.Monospace,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportWindowRow(window: ReportWindow) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = window.name,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            window.remainingPct?.let { pct ->
+                FuelBar(remainingPct = pct, compact = true)
+            } ?: Text(
+                "\u2014",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        window.resetsAt?.let { resetTime ->
+            Text(
+                text = formatCountdown(resetTime),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Legacy Provider Section (orchestrator providers — uses old model)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ProviderSection(
+    displayName: String,
+    provider: com.angussoftware.fueldashboard.model.Provider,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = displayName,
                 style = MaterialTheme.typography.titleMedium,
             )
             if (!provider.available) {
@@ -536,16 +594,16 @@ private fun ProviderSection(
         if (provider.windows.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             provider.windows.forEach { (windowName, window) ->
-                WindowRow(windowName = windowName, window = window)
+                LegacyWindowRow(windowName = windowName, window = window)
             }
         }
     }
 }
 
 @Composable
-private fun WindowRow(
+private fun LegacyWindowRow(
     windowName: String,
-    window: Window,
+    window: com.angussoftware.fueldashboard.model.Window,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -582,5 +640,3 @@ private fun formatLastUpdated(epochMs: Long): String {
     val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
     return "Updated ${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}:${local.second.toString().padStart(2, '0')}"
 }
-
-
