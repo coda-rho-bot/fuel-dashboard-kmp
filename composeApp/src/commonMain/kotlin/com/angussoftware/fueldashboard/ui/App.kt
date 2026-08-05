@@ -431,23 +431,27 @@ private fun ProviderSection(
                 }
 
                 // Credit balance (Letta Cloud, etc.)
-                // totalCredits = current credit balance (what you have left to spend)
+                // Credit balance (Letta Cloud)
+                // totalCredits = purchased credits remaining in account
                 // used = credits consumed this billing period
-                // limit = monthly credit allowance on your plan
+                // limit = monthly included quota on your plan (Pro = 10,000)
+                // Going over limit is fine — you pay-as-you-go for the extra
                 if (report.creditsTotal != null && report.creditsTotal > 0) {
                     Spacer(Modifier.height(8.dp))
-                    // Credit balance is the real "how much fuel you have" number
                     FuelBar(
-                        remainingPct = 100, // balance is already the remaining amount — show full bar
+                        remainingPct = 100,
                         label = "Credit balance: ${report.creditsTotal}",
                     )
-                    // Monthly usage vs allowance
                     if (report.creditsUsed != null && report.creditsLimit != null) {
                         Spacer(Modifier.height(4.dp))
                         val usagePct = (report.creditsUsed.toDouble() / report.creditsLimit * 100).roundToInt()
                         val overLimit = report.creditsUsed > report.creditsLimit
                         Text(
-                            text = "${report.creditsUsed} / ${report.creditsLimit} used this period (${usagePct}%)",
+                            text = if (overLimit) {
+                                "${report.creditsUsed} credits used (${report.creditsLimit} included monthly, rest pay-as-you-go)"
+                            } else {
+                                "${report.creditsUsed} / ${report.creditsLimit} credits used this month"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = if (overLimit) MaterialTheme.colorScheme.error
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
