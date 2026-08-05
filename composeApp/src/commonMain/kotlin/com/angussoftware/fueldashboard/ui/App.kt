@@ -430,17 +430,29 @@ private fun ProviderSection(
                     )
                 }
 
-                // Credit balance gauge (Letta Cloud, etc.)
-                if (report.creditsUsed != null && report.creditsTotal != null && report.creditsTotal > 0) {
+                // Credit balance (Letta Cloud, etc.)
+                // totalCredits = current credit balance (what you have left to spend)
+                // used = credits consumed this billing period
+                // limit = monthly credit allowance on your plan
+                if (report.creditsTotal != null && report.creditsTotal > 0) {
                     Spacer(Modifier.height(8.dp))
-                    val used = report.creditsUsed
-                    val total = report.creditsTotal
-                    val remaining = (total - used).coerceAtLeast(0)
-                    val remainingPct = (remaining.toDouble() / total * 100).roundToInt()
+                    // Credit balance is the real "how much fuel you have" number
                     FuelBar(
-                        remainingPct = remainingPct,
-                        label = "Credits ($remaining / $total)",
+                        remainingPct = 100, // balance is already the remaining amount — show full bar
+                        label = "Credit balance: ${report.creditsTotal}",
                     )
+                    // Monthly usage vs allowance
+                    if (report.creditsUsed != null && report.creditsLimit != null) {
+                        Spacer(Modifier.height(4.dp))
+                        val usagePct = (report.creditsUsed.toDouble() / report.creditsLimit * 100).roundToInt()
+                        val overLimit = report.creditsUsed > report.creditsLimit
+                        Text(
+                            text = "${report.creditsUsed} / ${report.creditsLimit} used this period (${usagePct}%)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (overLimit) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     if (report.creditsLow) {
                         Text(
                             "LOW",
