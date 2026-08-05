@@ -14,9 +14,11 @@ internal expect fun saveStringSetting(key: String, value: String)
 // ---------------------------------------------------------------------------
 
 internal object FuelSettingsKeys {
+    // Legacy keys — kept for one-time migration only
     const val MODE = "fuelSourceMode"           // DIRECT | CONNECTED (legacy)
     const val PROVIDER = "fuelProvider"          // zai (legacy)
     const val PROVIDER_KEY = "fuelProviderKey"   // z.ai API key (legacy)
     const val ORCHESTRATOR_URL = "orchestratorUrl"
+    // Active settings
     const val MULTI_PROVIDER = "multiProviderSettings" // JSON: MultiProviderSettings
 }

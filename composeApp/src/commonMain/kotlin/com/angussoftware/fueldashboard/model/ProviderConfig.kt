@@ -16,6 +16,7 @@ enum class ProviderKind(val displayName: String) {
     DEEPSEEK("DeepSeek"),
     GROQ("Groq"),
     MISTRAL("Mistral AI"),
+    CONNECTED_API("Connected API"),
 }
 
 /**
@@ -49,12 +50,18 @@ data class ProviderConfig(
         ProviderKind.DEEPSEEK -> serverUrl.ifBlank { "https://api.deepseek.com" }
         ProviderKind.GROQ -> serverUrl.ifBlank { "https://api.groq.com/openai" }
         ProviderKind.MISTRAL -> serverUrl.ifBlank { "https://api.mistral.ai" }
+        ProviderKind.CONNECTED_API -> serverUrl.ifBlank { "http://127.0.0.1:8321" }
     }
 
     /**
      * True if this config has enough info to poll.
+     * Most providers need an API key. CONNECTED_API needs a server URL.
      */
-    val isConfigured: Boolean get() = apiKey.isNotBlank()
+    val isConfigured: Boolean
+        get() = when (kind) {
+            ProviderKind.CONNECTED_API -> resolvedServerUrl().isNotBlank()
+            else -> apiKey.isNotBlank()
+        }
 }
 
 /**
@@ -66,12 +73,7 @@ data class ProviderConfig(
 data class MultiProviderSettings(
     @SerialName("providers")
     val providers: List<ProviderConfig> = emptyList(),
-    /** Whether the orchestrator (connected mode) is also enabled. */
-    @SerialName("orchestrator_enabled")
-    val orchestratorEnabled: Boolean = false,
-    @SerialName("orchestrator_url")
-    val orchestratorUrl: String = "http://127.0.0.1:8321",
 ) {
     val hasConfiguredProvider: Boolean get() = providers.any { it.isConfigured }
-    val hasAnyConfig: Boolean get() = hasConfiguredProvider || (orchestratorEnabled && orchestratorUrl.isNotBlank())
+    val hasAnyConfig: Boolean get() = hasConfiguredProvider
 }

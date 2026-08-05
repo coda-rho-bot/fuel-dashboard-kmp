@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Api
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
@@ -97,14 +98,6 @@ fun SettingsPanel(
 
             // --- Providers section ---
             ProvidersSection(
-                settings = settings,
-                viewModel = viewModel,
-            )
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-            // --- Orchestrator section ---
-            OrchestratorSection(
                 settings = settings,
                 viewModel = viewModel,
             )
@@ -214,6 +207,7 @@ private fun ProviderConfigRow(
                         ProviderKind.DEEPSEEK -> Icons.Default.Api
                         ProviderKind.GROQ -> Icons.Default.Api
                         ProviderKind.MISTRAL -> Icons.Default.Api
+                        ProviderKind.CONNECTED_API -> Icons.Default.Hub
                     },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
@@ -331,7 +325,11 @@ private fun ProviderConfigRow(
                 }
             } else if (!config.isConfigured) {
                 Text(
-                    text = "API key required",
+                    text = if (config.kind == ProviderKind.CONNECTED_API) {
+                        "Server URL required"
+                    } else {
+                        "API key required"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -413,7 +411,13 @@ private fun AddProviderDialog(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("${selectedKind.displayName} API Key") },
+                label = { 
+                    Text(if (selectedKind == ProviderKind.CONNECTED_API) {
+                        "API Key (optional)"
+                    } else {
+                        "${selectedKind.displayName} API Key"
+                    }) 
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -444,6 +448,7 @@ private fun AddProviderDialog(
                             ProviderKind.DEEPSEEK -> "https://api.deepseek.com"
                             ProviderKind.GROQ -> "https://api.groq.com/openai"
                             ProviderKind.MISTRAL -> "https://api.mistral.ai"
+                            ProviderKind.CONNECTED_API -> "http://127.0.0.1:8321"
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -463,126 +468,14 @@ private fun AddProviderDialog(
                 Spacer(Modifier.width(8.dp))
                 TextButton(
                     onClick = { onAdd(selectedKind, apiKey.trim(), displayName.trim(), serverUrl.trim()) },
-                    enabled = apiKey.isNotBlank(),
+                    enabled = if (selectedKind == ProviderKind.CONNECTED_API) {
+                        serverUrl.isNotBlank()
+                    } else {
+                        apiKey.isNotBlank()
+                    },
                 ) {
                     Text("Add Provider")
                 }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Orchestrator Section
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun OrchestratorSection(
-    settings: MultiProviderSettings,
-    viewModel: FuelViewModel,
-) {
-    var isEditing by remember(settings.orchestratorUrl) { mutableStateOf(false) }
-    var localUrl by remember(settings.orchestratorUrl) { mutableStateOf(settings.orchestratorUrl) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Orchestrator",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = if (settings.orchestratorEnabled) "Connected" else "Disabled",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (settings.orchestratorEnabled)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // Toggle
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(
-                    if (settings.orchestratorEnabled) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant,
-                )
-                .clickable {
-                    viewModel.updateSettings(settings.copy(orchestratorEnabled = !settings.orchestratorEnabled))
-                }
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = if (settings.orchestratorEnabled) "ON" else "OFF",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (settings.orchestratorEnabled)
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-    }
-
-    if (settings.orchestratorEnabled) {
-        Spacer(Modifier.height(8.dp))
-        if (isEditing) {
-            OutlinedTextField(
-                value = localUrl,
-                onValueChange = { localUrl = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                trailingIcon = {
-                    Row {
-                        TextButton(onClick = {
-                            viewModel.updateSettings(settings.copy(orchestratorUrl = localUrl.trim()))
-                            isEditing = false
-                        }) { Text("Save") }
-                    }
-                },
-            )
-            TextButton(onClick = {
-                localUrl = settings.orchestratorUrl
-                isEditing = false
-            }) { Text("Cancel", style = MaterialTheme.typography.labelSmall) }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { isEditing = true }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Tune,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = settings.orchestratorUrl,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "Edit",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                )
             }
         }
     }

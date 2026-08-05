@@ -1,7 +1,5 @@
 package com.angussoftware.fueldashboard.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,10 +25,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,14 +37,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.ProviderReport
@@ -85,15 +72,6 @@ fun FuelDashboardApp(
         viewModel.startPolling()
     }
 
-    // --- First-run setup ---
-    if (state.needsSetup) {
-        SetupScreen(
-            viewModel = viewModel,
-            initialSettings = state.settings,
-        )
-        return
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -116,121 +94,6 @@ fun FuelDashboardApp(
 }
 
 // ---------------------------------------------------------------------------
-// First-Run Setup Screen
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun SetupScreen(
-    viewModel: FuelViewModel,
-    initialSettings: MultiProviderSettings,
-) {
-    var selectedKind by remember { mutableStateOf(ProviderKind.ZAI) }
-    var apiKey by remember { mutableStateOf("") }
-    var showKey by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = "Welcome to Fuel Dashboard",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Add a fuel provider to get started. You can add more later.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        // Provider type selector
-        Row(
-            modifier = Modifier.fillMaxWidth(0.5f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ProviderKind.entries.forEach { kind ->
-                SetupKindChip(
-                    label = kind.displayName,
-                    isSelected = selectedKind == kind,
-                    onClick = { selectedKind = kind },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-
-        // API key
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = { apiKey = it },
-            modifier = Modifier.fillMaxWidth(0.5f),
-            label = { Text("${selectedKind.displayName} API Key") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-            trailingIcon = {
-                TextButton(onClick = { showKey = !showKey }) {
-                    Text(if (showKey) "Hide" else "Show")
-                }
-            },
-        )
-        Spacer(Modifier.height(24.dp))
-
-        Button(
-            onClick = {
-                viewModel.addProvider(selectedKind, apiKey.trim())
-            },
-            enabled = apiKey.isNotBlank(),
-        ) {
-            Text("Connect")
-        }
-    }
-}
-
-@Composable
-private fun SetupKindChip(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val contentColor = if (isSelected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(containerColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Main Dashboard Content
 // ---------------------------------------------------------------------------
 
@@ -241,6 +104,12 @@ private fun DashboardContent(
     viewModel: FuelViewModel,
     modifier: Modifier = Modifier,
 ) {
+    // --- Empty state (no providers configured) ---
+    if (state.settings.providers.isEmpty()) {
+        EmptyState(modifier = modifier)
+        return
+    }
+
     // --- Loading state ---
     if (state.isLoading && state.providerReports.isEmpty() && state.fuel == null) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -360,18 +229,7 @@ private fun DashboardContent(
                 HorizontalDivider()
             }
 
-            // Orchestrator provider data (if connected)
-            state.fuel?.let { fuel ->
-                items(fuel.providers.entries.toList(), key = { e -> "orch-${e.key}" }) { entry ->
-                    ProviderSection(
-                        displayName = entry.key,
-                        provider = entry.value,
-                    )
-                    HorizontalDivider()
-                }
-            }
-
-            // Decisions (orchestrator only)
+            // Decisions (from connected API only)
             val decisions = state.decisions.decisions
             if (decisions.isNotEmpty()) {
                 item {
@@ -396,10 +254,39 @@ private fun DashboardContent(
                 viewModel = viewModel,
             )
 
-            if (state.isOrchestratorConnected) {
+            if (state.hasConnectedApi) {
                 AgentFleetPanel(agents = state.agents.agents)
                 AlertsPanel(alerts = state.alerts.toFuelAlerts())
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Empty State
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun EmptyState(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = "No providers configured",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Add a provider in Settings \u2192",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -532,7 +419,7 @@ private fun ProviderSection(
             }
 
             ProviderType.WINDOW_CREDIT -> {
-                // Standard fuel-bar rendering for z.ai / Letta Cloud
+                // Standard fuel-bar rendering for z.ai / Letta Cloud / Connected API
                 val pct = report.remainingPct
                 if (pct != null) {
                     FuelBar(remainingPct = pct, label = "Overall")
@@ -575,90 +462,6 @@ private fun ReportWindowRow(window: ReportWindow) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = window.name,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            window.remainingPct?.let { pct ->
-                FuelBar(remainingPct = pct, compact = true)
-            } ?: Text(
-                "\u2014",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        window.resetsAt?.let { resetTime ->
-            Text(
-                text = formatCountdown(resetTime),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Legacy Provider Section (orchestrator providers — uses old model)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun ProviderSection(
-    displayName: String,
-    provider: com.angussoftware.fueldashboard.model.Provider,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = displayName,
-                style = MaterialTheme.typography.titleMedium,
-            )
-            if (!provider.available) {
-                Text(
-                    "UNAVAILABLE",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        val pct = provider.remainingPct
-        if (pct != null) {
-            FuelBar(remainingPct = pct, label = "Overall")
-        } else {
-            Text(
-                "No usage data (unlimited or static)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (provider.windows.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            provider.windows.forEach { (windowName, window) ->
-                LegacyWindowRow(windowName = windowName, window = window)
-            }
-        }
-    }
-}
-
-@Composable
-private fun LegacyWindowRow(
-    windowName: String,
-    window: com.angussoftware.fueldashboard.model.Window,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = windowName,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

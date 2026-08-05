@@ -11,14 +11,14 @@ import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
-import com.angussoftware.fueldashboard.network.FuelApiClient
+import com.angussoftware.fueldashboard.model.ReportWindow
 import com.angussoftware.fueldashboard.network.AnthropicProviderAdapter
+import com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter
 import com.angussoftware.fueldashboard.network.DeepSeekProviderAdapter
 import com.angussoftware.fueldashboard.network.GroqProviderAdapter
 import com.angussoftware.fueldashboard.network.LettaCloudProviderAdapter
 import com.angussoftware.fueldashboard.network.MistralProviderAdapter
 import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
-import com.angussoftware.fueldashboard.network.OrchestratorFuelSource
 import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
 import com.angussoftware.fueldashboard.settings.FuelSettingsStore
 import com.angussoftware.fueldashboard.storage.BurnRateCalculator
@@ -53,16 +53,13 @@ data class DashboardState(
     val burnRate: Double? = null,
     val dataPointCount: Int = 0,
 ) {
-    /** True if no providers are configured yet (first-run). */
-    val needsSetup: Boolean get() = !settings.hasAnyConfig
-
-    /** All configured providers that have API keys. */
+    /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
         get() = settings.providers.filter { it.isConfigured }
 
-    /** Whether orchestrator (connected mode) data is available. */
-    val isOrchestratorConnected: Boolean
-        get() = settings.orchestratorEnabled && settings.orchestratorUrl.isNotBlank()
+    /** Whether any connected API (orchestrator) is active — used for agents/alerts panel visibility. */
+    val hasConnectedApi: Boolean
+        get() = settings.providers.any { it.kind == ProviderKind.CONNECTED_API && it.isConfigured }
 }
 
 class FuelViewModel {
@@ -71,8 +68,6 @@ class FuelViewModel {
     private var pollJob: Job? = null
 
     private val adapters = mutableMapOf<String, ProviderAdapter>()
-    private var apiClient: FuelApiClient? = null
-    private var orchestratorFuelSource: OrchestratorFuelSource? = null
 
     private val _state = MutableStateFlow(DashboardState(isLoading = false))
     val state: StateFlow<DashboardState> = _state.asStateFlow()
@@ -177,17 +172,10 @@ class FuelViewModel {
     // --- Internals ---
 
     private fun activateAdapters(settings: MultiProviderSettings) {
-        // Create provider adapters
         for (config in settings.providers) {
             if (!config.isConfigured) continue
             val adapter = createAdapter(config) ?: continue
             adapters[config.id] = adapter
-        }
-
-        // Create orchestrator client if enabled
-        if (settings.orchestratorEnabled && settings.orchestratorUrl.isNotBlank()) {
-            apiClient = FuelApiClient(settings.orchestratorUrl)
-            orchestratorFuelSource = OrchestratorFuelSource(apiClient!!)
         }
     }
 
@@ -209,7 +197,7 @@ class FuelViewModel {
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
-                monthlyBudgetUsd = null, // user-configurable in settings (see TODO)
+                monthlyBudgetUsd = null,
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.ANTHROPIC -> AnthropicProviderAdapter(
@@ -235,7 +223,12 @@ class FuelViewModel {
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
-                monthlyBudgetUsd = null, // user-configurable in settings (see TODO)
+                monthlyBudgetUsd = null,
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.CONNECTED_API -> ConnectedApiProviderAdapter(
+                providerId = config.id,
+                baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
             )
         }
@@ -244,21 +237,18 @@ class FuelViewModel {
     private fun closeAdapters() {
         adapters.values.forEach { runCatching { it.close() } }
         adapters.clear()
-        apiClient?.close()
-        apiClient = null
-        orchestratorFuelSource = null
     }
 
     /**
-     * Poll interval: 5 minutes for direct providers, 30s if orchestrator is connected.
+     * Poll interval: 30s if any connected API is active, 5 min otherwise.
      */
     private fun pollIntervalMs(): Long {
-        val hasOrchestrator = _state.value.isOrchestratorConnected
-        return if (hasOrchestrator) 30_000L else 300_000L
+        val hasConnected = _state.value.hasConnectedApi
+        return if (hasConnected) 30_000L else 300_000L
     }
 
     private suspend fun refresh() {
-        if (adapters.isEmpty() && orchestratorFuelSource == null) {
+        if (adapters.isEmpty()) {
             _state.value = _state.value.copy(
                 isLoading = false,
                 providerErrors = mapOf("global" to "No providers configured"),
@@ -288,27 +278,24 @@ class FuelViewModel {
                 .onFailure { errors[providerId] = it.message ?: "Unknown error" }
         }
 
-        // Fetch orchestrator data if connected
+        // Extract orchestrator data from any connected API adapter
         var fuel: FuelResponse? = null
         var decisions = DecisionsResponse()
         var agents = AgentsResponse()
         var alerts = AlertsResponse()
 
-        val orchSource = orchestratorFuelSource
-        val orchClient = apiClient
-        if (_state.value.isOrchestratorConnected && orchSource != null && orchClient != null) {
-            try {
-                fuel = orchSource.getFuel()
-                decisions = runCatching { orchClient.getDecisions(20) }.getOrElse { DecisionsResponse() }
-                agents = runCatching { orchClient.getAgents() }.getOrElse { AgentsResponse() }
-                alerts = runCatching { orchClient.getAlerts() }.getOrElse { AlertsResponse() }
-            } catch (e: Exception) {
-                // Orchestrator error — keep provider reports, just mark orch as failing
-                errors["orchestrator"] = e.message ?: "Orchestrator connection error"
+        for ((providerId, _) in reports) {
+            val adapter = adapters[providerId]
+            if (adapter is ConnectedApiProviderAdapter) {
+                fuel = adapter.lastFuel
+                decisions = adapter.lastDecisions
+                agents = adapter.lastAgents
+                alerts = adapter.lastAlerts
+                break
             }
         }
 
-        // Update burn rate history from direct-mode provider reports
+        // Update burn rate history from provider reports
         var burnRate: Double? = null
         var dataPoints = 0
         for ((providerId, report) in reports) {
