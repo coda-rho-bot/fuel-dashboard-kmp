@@ -58,7 +58,7 @@ fun AlertsPanel(
                 )
                 Text(
                     text = "No active alerts — all systems nominal",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -106,14 +106,14 @@ private fun AlertCard(alert: FuelAlert) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = alert.message,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
             alert.timestamp?.let { ts ->
                 if (ts > 0) {
                     Text(
                         text = formatAlertTime(ts),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

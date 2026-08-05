@@ -49,12 +49,12 @@ fun RecommendationBanner(
         ) {
             Text(
                 text = "Recommended Model",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = onBannerColor,
             )
             Text(
                 text = "${burnRate.format(1)}% / hr",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = onBannerColor,
                 fontWeight = FontWeight.Bold,
             )
@@ -70,7 +70,7 @@ fun RecommendationBanner(
             Spacer(Modifier.height(4.dp))
             Text(
                 text = "Surplus capacity available",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = onBannerColor,
             )
         }

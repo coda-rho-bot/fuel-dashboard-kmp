@@ -64,7 +64,8 @@ fun BudgetBar(
                 Spacer(Modifier.size(4.dp))
                 Text(
                     text = "Monthly Spend",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -74,7 +75,7 @@ fun BudgetBar(
                 } else {
                     "$%.2f used".format(usedDollars)
                 },
-                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 fontWeight = FontWeight.Medium,
                 color = budgetTextColor(usedDollars, limitDollars),
             )
@@ -115,7 +116,7 @@ fun BudgetBar(
             // No limit set — show subtle hint
             Text(
                 text = "No budget limit configured",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Normal,
             )
@@ -201,12 +202,12 @@ private fun RateLimitMetric(
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = formatCompact(remaining),
-                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 color = animatedColor,
                 fontWeight = FontWeight.Medium,
             )

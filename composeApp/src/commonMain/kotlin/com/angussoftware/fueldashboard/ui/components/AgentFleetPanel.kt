@@ -38,7 +38,7 @@ fun AgentFleetPanel(
         if (agents.isEmpty()) {
             Text(
                 text = "No agents registered",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             return
@@ -72,7 +72,7 @@ private fun AgentRow(agent: FleetAgent) {
                     Text(
                         text = agent.name,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Medium,
                     )
                     if (agent.activeSubagents > 0) {
                         Spacer(Modifier.width(6.dp))
@@ -81,7 +81,7 @@ private fun AgentRow(agent: FleetAgent) {
                 }
                 Text(
                     text = agent.currentModel.ifBlank { "—" },
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -92,7 +92,7 @@ private fun AgentRow(agent: FleetAgent) {
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = agent.lastTaskComplexity.ifBlank { "—" },
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -109,7 +109,7 @@ private fun SubagentBadge(count: Int) {
     ) {
         Text(
             text = "x$count",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.tertiary,
             fontWeight = FontWeight.Bold,
         )
@@ -125,7 +125,7 @@ private fun FuelAllocationBadge(allocation: Int) {
     }
     Text(
         text = "$allocation%",
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.bodySmall,
         color = color,
         fontWeight = FontWeight.Bold,
     )

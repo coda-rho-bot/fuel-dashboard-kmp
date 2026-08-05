@@ -57,18 +57,18 @@ private fun DecisionRow(decision: Decision) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = formatTimestamp(decision.timestamp),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = shortAgentName(decision.agentId),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
             Text(
                 text = decision.modelHandle,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -80,7 +80,7 @@ private fun DecisionRow(decision: Decision) {
             Spacer(Modifier.height(2.dp))
             Text(
                 text = decision.reason,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

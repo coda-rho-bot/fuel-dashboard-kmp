@@ -79,7 +79,13 @@ fun FuelDashboardApp(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fuel Dashboard") },
+                title = {
+                    Text(
+                        "Fuel Dashboard",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
                 actions = {
                     IconButton(onClick = { viewModel.refreshNow() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -158,7 +164,7 @@ private fun DashboardContent(
                     }
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = { viewModel.refreshNow() }) {
-                        Text("Retry")
+                        Text("Retry", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -197,14 +203,14 @@ private fun DashboardContent(
                         ) {
                             Text(
                                 text = formatLastUpdated(state.lastUpdated),
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             val totalErrors = state.providerErrors.size
                             if (totalErrors > 0) {
                                 Text(
                                     text = "\u26A0 $totalErrors error${if (totalErrors > 1) "s" else ""}",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error,
                                 )
                             }
@@ -301,13 +307,13 @@ private fun BurnRateStatus(
         if (burnRate == null || dataPoints < 3) {
             Text(
                 text = "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             Text(
                 text = "Burn rate: ${"%.1f".format(burnRate)}% / hour ($dataPoints samples)",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -333,6 +339,7 @@ private fun ProviderSection(
             Text(
                 text = config.resolvedDisplayName(),
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
             )
             if (error != null) {
                 Text(
@@ -465,6 +472,7 @@ private fun ProviderSection(
                             Text(
                                 text = "credits remaining",
                                 style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
                                 color = if (criticallyLow)
                                     MaterialTheme.colorScheme.onErrorContainer
                                 else
@@ -510,7 +518,7 @@ private fun ReportWindowRow(window: ReportWindow) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = window.name,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             window.remainingPct?.let { pct ->
@@ -552,7 +560,7 @@ private fun RateLimitWindowRow(window: ReportWindow) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = window.name,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             window.remainingPct?.let { pct ->

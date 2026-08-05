@@ -255,7 +255,7 @@ private fun ProviderConfigRow(
                     if (config.displayName.isNotBlank() && config.displayName != config.kind.displayName) {
                         Text(
                             text = config.kind.displayName,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -264,7 +264,7 @@ private fun ProviderConfigRow(
                     if (config.serverUrl.isNotBlank() && config.serverUrl != defaultUrl) {
                         Text(
                             text = config.serverUrl,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontFamily = FontFamily.Monospace,
                         )
@@ -374,7 +374,7 @@ private fun ProviderConfigRow(
                     } else {
                         "API key required"
                     },
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -508,7 +508,7 @@ private fun AddProviderDialog(
                 horizontalArrangement = Arrangement.End,
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text("Cancel", style = MaterialTheme.typography.labelSmall)
                 }
                 Spacer(Modifier.width(8.dp))
                 TextButton(
@@ -519,7 +519,7 @@ private fun AddProviderDialog(
                         apiKey.isNotBlank()
                     },
                 ) {
-                    Text("Add Provider")
+                    Text("Add Provider", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -723,7 +723,7 @@ private fun ThemeOptionList(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
             )
