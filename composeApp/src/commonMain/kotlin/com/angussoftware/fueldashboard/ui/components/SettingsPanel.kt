@@ -35,6 +35,11 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -125,17 +130,34 @@ private fun ProvidersSection(
     viewModel: FuelViewModel,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var isCollapsed by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "Providers",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { isCollapsed = !isCollapsed }
+                .padding(end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = if (isCollapsed) "Expand" else "Collapse",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "Providers (${settings.providers.size})",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
         TextButton(onClick = { showAddDialog = true }) {
             Icon(Icons.Default.Add, contentDescription = "Add provider", modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
@@ -143,22 +165,28 @@ private fun ProvidersSection(
         }
     }
 
-    Spacer(Modifier.height(8.dp))
-
-    if (settings.providers.isEmpty()) {
-        Text(
-            text = "No providers configured. Click \"+ Add\" to set up a fuel provider.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else {
-        settings.providers.forEach { config ->
-            ProviderConfigRow(
-                config = config,
-                onUpdate = { viewModel.updateProvider(it) },
-                onRemove = { viewModel.removeProvider(config.id) },
-            )
-            Spacer(Modifier.height(4.dp))
+    AnimatedVisibility(
+        visible = !isCollapsed,
+        enter = expandVertically(),
+        exit = shrinkVertically(),
+    ) {
+        Column(modifier = Modifier.padding(top = 8.dp)) {
+            if (settings.providers.isEmpty()) {
+                Text(
+                    text = "No providers configured. Click \"+ Add\" to set up a fuel provider.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                settings.providers.forEach { config ->
+                    ProviderConfigRow(
+                        config = config,
+                        onUpdate = { viewModel.updateProvider(it) },
+                        onRemove = { viewModel.removeProvider(config.id) },
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
         }
     }
 
@@ -338,6 +366,7 @@ private fun ProviderConfigRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddProviderDialog(
     onDismiss: () -> Unit,
@@ -364,32 +393,33 @@ private fun AddProviderDialog(
             )
             Spacer(Modifier.height(12.dp))
 
-            // Provider type selector
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            // Provider type dropdown
+            var menuExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = menuExpanded,
+                onExpandedChange = { menuExpanded = it },
             ) {
-                ProviderKind.entries.forEach { kind ->
-                    val isSelected = selectedKind == kind
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                            )
-                            .clickable { selectedKind = kind }
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = kind.displayName,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                OutlinedTextField(
+                    value = selectedKind.displayName,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    label = { Text("Provider Type") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuExpanded) },
+                )
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    ProviderKind.entries.forEach { kind ->
+                        DropdownMenuItem(
+                            text = { Text(kind.displayName, style = MaterialTheme.typography.bodySmall) },
+                            onClick = {
+                                selectedKind = kind
+                                menuExpanded = false
+                            },
                         )
                     }
                 }
