@@ -415,10 +415,10 @@ private fun ProviderSection(
                 // Standard fuel-bar rendering for z.ai / Letta Cloud / Connected API
                 val pct = report.remainingPct
                 if (pct != null) {
-                    FuelBar(remainingPct = pct, label = "Overall")
+                    FuelBar(remainingPct = pct, label = "Remaining")
                 } else {
                     Text(
-                        "No usage data",
+                        "No usage data (unlimited or static)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -432,17 +432,7 @@ private fun ProviderSection(
                 }
             }
         }
-
-        // Raw debug display
-        if (report.rawDisplay.isNotBlank()) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = report.rawDisplay,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = FontFamily.Monospace,
-            )
-        }
+        // Raw debug display removed — not user-facing
     }
 }
 
@@ -459,7 +449,7 @@ private fun ReportWindowRow(window: ReportWindow) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             window.remainingPct?.let { pct ->
-                FuelBar(remainingPct = pct, compact = true)
+                FuelBar(remainingPct = pct, compact = true, label = window.name)
             } ?: Text(
                 "\u2014",
                 style = MaterialTheme.typography.labelSmall,
