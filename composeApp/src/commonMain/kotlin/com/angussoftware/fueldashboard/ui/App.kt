@@ -436,14 +436,14 @@ private fun ProviderSection(
                 // Credit balance (Letta Cloud) — prominent display
                 if (report.creditsTotal != null && report.creditsTotal > 0) {
                     Spacer(Modifier.height(12.dp))
-                    val overLimit = report.creditsUsed != null && report.creditsLimit != null &&
-                        report.creditsUsed > report.creditsLimit
+                    // Only show red if credits are critically low (under 1000), not just over monthly quota
+                    val criticallyLow = report.creditsTotal < 1000
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (report.creditsLow || overLimit)
+                                if (criticallyLow)
                                     MaterialTheme.colorScheme.errorContainer
                                 else
                                     MaterialTheme.colorScheme.surfaceVariant
@@ -457,15 +457,15 @@ private fun ProviderSection(
                                 text = "${report.creditsTotal}",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (report.creditsLow || overLimit)
+                                color = if (criticallyLow)
                                     MaterialTheme.colorScheme.onErrorContainer
                                 else
                                     MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
                                 text = "credits remaining",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (report.creditsLow || overLimit)
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (criticallyLow)
                                     MaterialTheme.colorScheme.onErrorContainer
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant,
@@ -473,26 +473,23 @@ private fun ProviderSection(
                             // Monthly usage
                             if (report.creditsUsed != null && report.creditsLimit != null) {
                                 Spacer(Modifier.height(6.dp))
+                                val overLimit = report.creditsUsed > report.creditsLimit
                                 Text(
                                     text = if (overLimit) {
                                         "${report.creditsUsed} used (${report.creditsLimit} included monthly, rest pay-as-you-go)"
                                     } else {
                                         "${report.creditsUsed} / ${report.creditsLimit} used this month"
                                     },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (overLimit) MaterialTheme.colorScheme.onErrorContainer
-                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                             // Reset date
                             if (report.creditsResetAt != null) {
                                 Text(
                                     text = "Quota resets ${formatCountdown(report.creditsResetAt)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (report.creditsLow || overLimit)
-                                        MaterialTheme.colorScheme.onErrorContainer
-                                    else
-                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }

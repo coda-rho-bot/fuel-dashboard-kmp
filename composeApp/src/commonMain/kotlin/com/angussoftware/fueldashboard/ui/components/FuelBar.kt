@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -40,7 +41,7 @@ fun FuelBar(
         label = "fuelWidth",
     )
 
-    val barHeight = if (compact) 6.dp else 10.dp
+    val barHeight = if (compact) 8.dp else 12.dp
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (label != null) {
@@ -50,16 +51,18 @@ fun FuelBar(
             ) {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = "$remainingPct%",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
                     color = animatedColor,
                 )
             }
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(3.dp))
         }
 
         // Background track
