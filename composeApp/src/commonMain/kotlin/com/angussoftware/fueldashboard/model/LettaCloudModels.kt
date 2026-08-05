@@ -48,6 +48,10 @@ data class LettaBillingResponse(
     val billingTier: String? = null,
     @SerialName("subscriptionStatus")
     val subscriptionStatus: String? = null,
+    @SerialName("billingPeriodStart")
+    val billingPeriodStart: String? = null,
+    @SerialName("billingPeriodEnd")
+    val billingPeriodEnd: String? = null,
 )
 
 @Serializable

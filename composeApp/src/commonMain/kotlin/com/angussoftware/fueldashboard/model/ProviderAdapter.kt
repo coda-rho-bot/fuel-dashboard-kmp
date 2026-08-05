@@ -38,6 +38,7 @@ data class ProviderReport(
     val creditsLimit: Int? = null,
     val creditsTotal: Int? = null,
     val creditsLow: Boolean = false,
+    val creditsResetAt: Long? = null, // when monthly quota refreshes (epoch ms)
 )
 
 /**

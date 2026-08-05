@@ -122,6 +122,7 @@ class LettaCloudProviderAdapter(
                 limit = detail?.limit,
                 totalCredits = billingResponse.totalCredits,
                 isLow = detail?.isLow,
+                billingPeriodEnd = billingResponse.billingPeriodEnd,
             )
         } catch (e: Exception) {
             null
@@ -134,6 +135,7 @@ class LettaCloudProviderAdapter(
         val limit: Int?,
         val totalCredits: Int?,
         val isLow: Boolean?,
+        val billingPeriodEnd: String?,
     )
 
     /**
@@ -242,6 +244,7 @@ class LettaCloudProviderAdapter(
             creditsLimit = billing?.limit,
             creditsTotal = billing?.totalCredits,
             creditsLow = billing?.isLow == true,
+            creditsResetAt = billing?.billingPeriodEnd?.let { parseIsoToEpochMs(it) },
         )
     }
 

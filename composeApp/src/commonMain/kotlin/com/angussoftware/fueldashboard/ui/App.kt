@@ -455,6 +455,13 @@ private fun ProviderSection(
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    if (report.creditsResetAt != null) {
+                        Text(
+                            text = "Monthly quota resets ${formatCountdown(report.creditsResetAt)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     if (report.creditsLow) {
                         Text(
                             "LOW",
