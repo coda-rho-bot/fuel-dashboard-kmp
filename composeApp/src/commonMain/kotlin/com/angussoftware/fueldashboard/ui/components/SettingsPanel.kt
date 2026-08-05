@@ -20,8 +20,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Api
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
@@ -47,7 +50,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.angussoftware.fueldashboard.model.FuelProvider
+import com.angussoftware.fueldashboard.model.FuelSettings
+import com.angussoftware.fueldashboard.model.FuelSourceMode
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.theming.compose.ui.theme.ColorTheme
 import com.angussoftware.theming.compose.ui.theme.ThemeMode
@@ -55,8 +63,8 @@ import com.angussoftware.theming.compose.ui.theme.ThemeMode
 @Composable
 fun SettingsPanel(
     themeController: ThemeController,
-    currentApiUrl: String,
-    onApiUrlChange: (String) -> Unit,
+    settings: FuelSettings,
+    onSettingsChange: (FuelSettings) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -84,6 +92,24 @@ fun SettingsPanel(
 
             Spacer(Modifier.height(12.dp))
 
+            // --- Fuel Source Mode ---
+            FuelSourceModeSection(settings, onSettingsChange)
+
+            Spacer(Modifier.height(12.dp))
+
+            // --- Mode-specific config ---
+            when (settings.mode) {
+                FuelSourceMode.DIRECT -> DirectModeSection(settings, onSettingsChange)
+                FuelSourceMode.CONNECTED -> ApiUrlSection(
+                    currentApiUrl = settings.orchestratorUrl,
+                    onApiUrlChange = { url ->
+                        onSettingsChange(settings.copy(orchestratorUrl = url))
+                    },
+                )
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
             // --- Theme mode toggle ---
             ThemeModeSection(themeController)
 
@@ -91,14 +117,235 @@ fun SettingsPanel(
 
             // --- Color theme picker ---
             ColorThemePicker(themeController)
-
-            Spacer(Modifier.height(12.dp))
-
-            // --- API URL ---
-            ApiUrlSection(currentApiUrl = currentApiUrl, onApiUrlChange = onApiUrlChange)
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Fuel Source Mode Selector
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun FuelSourceModeSection(
+    settings: FuelSettings,
+    onSettingsChange: (FuelSettings) -> Unit,
+) {
+    Text(
+        text = "Fuel Source",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FuelSourceChip(
+            label = "Direct",
+            icon = Icons.Default.Key,
+            isSelected = settings.mode == FuelSourceMode.DIRECT,
+            onClick = { onSettingsChange(settings.copy(mode = FuelSourceMode.DIRECT)) },
+            modifier = Modifier.weight(1f),
+        )
+        FuelSourceChip(
+            label = "Connected",
+            icon = Icons.Default.Cloud,
+            isSelected = settings.mode == FuelSourceMode.CONNECTED,
+            onClick = { onSettingsChange(settings.copy(mode = FuelSourceMode.CONNECTED)) },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun FuelSourceChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(containerColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Direct Mode Config
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun DirectModeSection(
+    settings: FuelSettings,
+    onSettingsChange: (FuelSettings) -> Unit,
+) {
+    // Provider selector (only z.ai for now, but structured for expansion)
+    Text(
+        text = "Provider",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(4.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FuelProvider.entries.forEach { provider ->
+            val isSelected = settings.provider == provider
+            val containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            }
+            val contentColor = if (isSelected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(containerColor)
+                    .clickable { onSettingsChange(settings.copy(provider = provider)) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = provider.displayName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentColor,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+
+    // API key input
+    ApiKeySection(
+        currentKey = settings.providerApiKey,
+        onKeyChange = { key -> onSettingsChange(settings.copy(providerApiKey = key)) },
+    )
+}
+
+@Composable
+private fun ApiKeySection(
+    currentKey: String,
+    onKeyChange: (String) -> Unit,
+) {
+    var localKey by remember(currentKey) { mutableStateOf(currentKey) }
+    var isEditing by remember { mutableStateOf(false) }
+    var showKey by remember { mutableStateOf(false) }
+
+    Text(
+        text = "Provider API Key",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(4.dp))
+
+    if (isEditing) {
+        OutlinedTextField(
+            value = localKey,
+            onValueChange = { localKey = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                Row {
+                    TextButton(onClick = { showKey = !showKey }) {
+                        Text(if (showKey) "Hide" else "Show", style = MaterialTheme.typography.labelSmall)
+                    }
+                    TextButton(onClick = {
+                        onKeyChange(localKey)
+                        isEditing = false
+                    }) {
+                        Text("Save")
+                    }
+                }
+            },
+        )
+        TextButton(onClick = {
+            localKey = currentKey
+            isEditing = false
+        }) {
+            Text("Cancel", style = MaterialTheme.typography.labelSmall)
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { isEditing = true }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Api,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = if (currentKey.isBlank()) "Not set" else "\u2022".repeat(12),
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = if (currentKey.isBlank()) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "Edit",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Theme sections (unchanged from original)
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun ThemeModeSection(themeController: ThemeController) {
@@ -365,7 +612,7 @@ private fun ApiUrlSection(
     currentApiUrl: String,
     onApiUrlChange: (String) -> Unit,
 ) {
-    var localUrl by remember { mutableStateOf(currentApiUrl) }
+    var localUrl by remember(currentApiUrl) { mutableStateOf(currentApiUrl) }
     var isEditing by remember { mutableStateOf(false) }
 
     Text(

@@ -1,5 +1,7 @@
 package com.angussoftware.fueldashboard.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -25,16 +29,30 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.angussoftware.fueldashboard.model.FuelProvider
+import com.angussoftware.fueldashboard.model.FuelSettings
+import com.angussoftware.fueldashboard.model.FuelSourceMode
 import com.angussoftware.fueldashboard.model.Provider
 import com.angussoftware.fueldashboard.model.Window
 import com.angussoftware.fueldashboard.presentation.DashboardState
@@ -63,10 +81,26 @@ fun FuelDashboardApp(
         viewModel.startPolling()
     }
 
+    // --- First-run setup ---
+    if (state.needsSetup) {
+        SetupScreen(
+            viewModel = viewModel,
+            initialSettings = state.settings,
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fuel Dashboard for Letta") },
+                title = {
+                    Text(
+                        when (state.settings.mode) {
+                            FuelSourceMode.DIRECT -> "Fuel Dashboard"
+                            FuelSourceMode.CONNECTED -> "Fuel Dashboard for Letta"
+                        }
+                    )
+                },
                 actions = {
                     IconButton(onClick = { viewModel.refreshNow() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -78,18 +112,203 @@ fun FuelDashboardApp(
         DashboardContent(
             state = state,
             themeController = themeController,
-            onApiUrlChange = { viewModel.updateBaseUrl(it) },
+            onSettingsChange = { viewModel.updateSettings(it) },
             onRetry = { viewModel.refreshNow() },
             modifier = Modifier.padding(padding),
         )
     }
 }
 
+// ---------------------------------------------------------------------------
+// First-Run Setup Screen
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun SetupScreen(
+    viewModel: FuelViewModel,
+    initialSettings: FuelSettings,
+) {
+    var mode by remember { mutableStateOf(FuelSourceMode.DIRECT) }
+    var provider by remember { mutableStateOf(FuelProvider.ZAI) }
+    var apiKey by remember { mutableStateOf("") }
+    var orchestratorUrl by remember { mutableStateOf(initialSettings.orchestratorUrl) }
+    var showKey by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Welcome to Fuel Dashboard",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = when (mode) {
+                FuelSourceMode.DIRECT -> "Enter your provider API key to get started."
+                FuelSourceMode.CONNECTED -> "Enter your orchestrator URL to get started."
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(32.dp))
+
+        // Mode toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(0.5f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SetupModeChip(
+                label = "Direct (Provider API)",
+                isSelected = mode == FuelSourceMode.DIRECT,
+                onClick = { mode = FuelSourceMode.DIRECT },
+                modifier = Modifier.weight(1f),
+            )
+            SetupModeChip(
+                label = "Connected (Orchestrator)",
+                isSelected = mode == FuelSourceMode.CONNECTED,
+                onClick = { mode = FuelSourceMode.CONNECTED },
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        when (mode) {
+            FuelSourceMode.DIRECT -> {
+                // Provider selector
+                Row(
+                    modifier = Modifier.fillMaxWidth(0.5f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FuelProvider.entries.forEach { p ->
+                        SetupModeChip(
+                            label = p.displayName,
+                            isSelected = provider == p,
+                            onClick = { provider = p },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+
+                // API key
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    modifier = Modifier.fillMaxWidth(0.5f),
+                    label = { Text("${provider.displayName} API Key") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    trailingIcon = {
+                        TextButton(onClick = { showKey = !showKey }) {
+                            Text(if (showKey) "Hide" else "Show")
+                        }
+                    },
+                )
+                Spacer(Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.updateSettings(
+                            initialSettings.copy(
+                                mode = FuelSourceMode.DIRECT,
+                                provider = provider,
+                                providerApiKey = apiKey.trim(),
+                            ),
+                        )
+                    },
+                    enabled = apiKey.isNotBlank(),
+                ) {
+                    Text("Connect")
+                }
+            }
+
+            FuelSourceMode.CONNECTED -> {
+                OutlinedTextField(
+                    value = orchestratorUrl,
+                    onValueChange = { orchestratorUrl = it },
+                    modifier = Modifier.fillMaxWidth(0.5f),
+                    label = { Text("Orchestrator URL") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                )
+                Spacer(Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.updateSettings(
+                            initialSettings.copy(
+                                mode = FuelSourceMode.CONNECTED,
+                                orchestratorUrl = orchestratorUrl.trim(),
+                            ),
+                        )
+                    },
+                    enabled = orchestratorUrl.isNotBlank(),
+                ) {
+                    Text("Connect")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupModeChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Main Dashboard Content
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun DashboardContent(
     state: DashboardState,
     themeController: ThemeController,
-    onApiUrlChange: (String) -> Unit,
+    onSettingsChange: (FuelSettings) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -102,13 +321,19 @@ private fun DashboardContent(
                 CircularProgressIndicator()
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = "Connecting to fuel orchestrator...",
+                    text = when (state.settings.mode) {
+                        FuelSourceMode.DIRECT -> "Connecting to ${state.settings.provider.displayName}..."
+                        FuelSourceMode.CONNECTED -> "Connecting to fuel orchestrator..."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = state.baseUrl,
+                    text = when (state.settings.mode) {
+                        FuelSourceMode.DIRECT -> state.settings.provider.displayName
+                        FuelSourceMode.CONNECTED -> state.baseUrl
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -137,7 +362,10 @@ private fun DashboardContent(
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "Is the fuel orchestrator running on ${state.baseUrl}?",
+                text = when (state.settings.mode) {
+                    FuelSourceMode.DIRECT -> "Is your ${state.settings.provider.displayName} API key valid?"
+                    FuelSourceMode.CONNECTED -> "Is the fuel orchestrator running on ${state.baseUrl}?"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -167,6 +395,16 @@ private fun DashboardContent(
                         burnRate = it.burnRatePctPerHr,
                         surplusAlert = it.surplusAlert,
                     )
+                }
+
+                // Burn rate status (direct mode)
+                if (state.settings.mode == FuelSourceMode.DIRECT) {
+                    item {
+                        BurnRateStatus(
+                            burnRate = state.burnRate,
+                            dataPoints = state.dataPointCount,
+                        )
+                    }
                 }
 
                 // Last updated timestamp
@@ -227,13 +465,40 @@ private fun DashboardContent(
         ) {
             SettingsPanel(
                 themeController = themeController,
-                currentApiUrl = state.baseUrl,
-                onApiUrlChange = onApiUrlChange,
+                settings = state.settings,
+                onSettingsChange = onSettingsChange,
             )
 
-            AgentFleetPanel(agents = state.agents.agents)
+            if (state.settings.mode == FuelSourceMode.CONNECTED) {
+                AgentFleetPanel(agents = state.agents.agents)
+                AlertsPanel(alerts = state.alerts.toFuelAlerts())
+            }
+        }
+    }
+}
 
-            AlertsPanel(alerts = state.alerts.toFuelAlerts())
+// ---------------------------------------------------------------------------
+// Burn Rate Status (direct mode only)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun BurnRateStatus(
+    burnRate: Double?,
+    dataPoints: Int,
+) {
+    Column {
+        if (burnRate == null || dataPoints < 3) {
+            Text(
+                text = "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Text(
+                text = "Burn rate: ${"%.1f".format(burnRate)}% / hour ($dataPoints samples)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
