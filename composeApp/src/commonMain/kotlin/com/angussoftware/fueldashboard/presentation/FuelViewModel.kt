@@ -13,6 +13,7 @@ import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.network.FuelApiClient
 import com.angussoftware.fueldashboard.network.LettaCloudProviderAdapter
+import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
 import com.angussoftware.fueldashboard.network.OrchestratorFuelSource
 import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
 import com.angussoftware.fueldashboard.settings.FuelSettingsStore
@@ -198,6 +199,13 @@ class FuelViewModel {
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.OPENAI -> OpenAIProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                monthlyBudgetUsd = null, // user-configurable in settings (see TODO)
                 customDisplayName = config.resolvedDisplayName(),
             )
         }

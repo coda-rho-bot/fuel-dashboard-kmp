@@ -209,6 +209,7 @@ private fun ProviderConfigRow(
                     imageVector = when (config.kind) {
                         ProviderKind.ZAI -> Icons.Default.Cloud
                         ProviderKind.LETTA_CLOUD -> Icons.Default.Cloud
+                        ProviderKind.OPENAI -> Icons.Default.Api
                     },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
@@ -434,6 +435,7 @@ private fun AddProviderDialog(
                         when (selectedKind) {
                             ProviderKind.ZAI -> "https://api.z.ai"
                             ProviderKind.LETTA_CLOUD -> "https://api.letta.com"
+                            ProviderKind.OPENAI -> "https://api.openai.com"
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

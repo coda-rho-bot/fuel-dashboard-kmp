@@ -63,6 +63,7 @@ import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.components.AgentFleetPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
+import com.angussoftware.fueldashboard.ui.components.BudgetBar
 import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
@@ -486,23 +487,69 @@ private fun ProviderSection(
 
         Spacer(Modifier.height(8.dp))
 
-        // Overall fuel bar
-        val pct = report.remainingPct
-        if (pct != null) {
-            FuelBar(remainingPct = pct, label = "Overall")
-        } else {
-            Text(
-                "No usage data",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        when (report.type) {
+            ProviderType.SPEND_BUDGET -> {
+                // Budget bar (dollar-based)
+                val used = report.usedDollars
+                val limit = report.limitDollars
+                if (used != null) {
+                    BudgetBar(
+                        usedDollars = used,
+                        limitDollars = limit,
+                    )
+                } else {
+                    Text(
+                        "No spend data (requires admin key for costs API)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
-        // Individual windows
-        if (report.windows.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            report.windows.forEach { window ->
-                ReportWindowRow(window = window)
+                // Rate-limit windows rendered as compact bars
+                val rateLimitWindows = report.windows.filter {
+                    it.name == "Requests/min" || it.name == "Tokens/min"
+                }
+                if (rateLimitWindows.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    rateLimitWindows.forEach { window ->
+                        RateLimitWindowRow(window = window)
+                    }
+                }
+
+                // Budget-remaining window (if present)
+                val budgetWindow = report.windows.firstOrNull { it.name == "Monthly Budget" }
+                if (budgetWindow != null) {
+                    Spacer(Modifier.height(8.dp))
+                    ReportWindowRow(window = budgetWindow)
+                }
+            }
+
+            ProviderType.RATE_LIMIT -> {
+                // Rate limit only (no budget)
+                report.windows.forEach { window ->
+                    ReportWindowRow(window = window)
+                }
+            }
+
+            ProviderType.WINDOW_CREDIT -> {
+                // Standard fuel-bar rendering for z.ai / Letta Cloud
+                val pct = report.remainingPct
+                if (pct != null) {
+                    FuelBar(remainingPct = pct, label = "Overall")
+                } else {
+                    Text(
+                        "No usage data",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (report.windows.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    report.windows.forEach { window ->
+                        ReportWindowRow(window = window)
+                    }
+                }
             }
         }
 
@@ -639,4 +686,39 @@ private fun formatLastUpdated(epochMs: Long): String {
     val instant = Instant.fromEpochMilliseconds(epochMs)
     val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
     return "Updated ${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}:${local.second.toString().padStart(2, '0')}"
+}
+
+/**
+ * Rate-limit window row — compact bar with label, percentage, and reset countdown.
+ * Uses FuelBar styling since the windows already carry remainingPct.
+ */
+@Composable
+private fun RateLimitWindowRow(window: ReportWindow) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = window.name,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            window.remainingPct?.let { pct ->
+                FuelBar(remainingPct = pct, compact = true)
+            } ?: Text(
+                "\u2014",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        window.resetsAt?.let { resetTime ->
+            Text(
+                text = formatCountdown(resetTime),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }

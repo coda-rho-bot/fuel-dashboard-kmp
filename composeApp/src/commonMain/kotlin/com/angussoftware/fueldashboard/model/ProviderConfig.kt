@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 enum class ProviderKind(val displayName: String) {
     ZAI("z.ai"),
     LETTA_CLOUD("Letta Cloud"),
+    OPENAI("OpenAI"),
 }
 
 /**
@@ -39,6 +40,7 @@ data class ProviderConfig(
     fun resolvedServerUrl(): String = when (kind) {
         ProviderKind.ZAI -> serverUrl.ifBlank { "https://api.z.ai" }
         ProviderKind.LETTA_CLOUD -> serverUrl.ifBlank { "https://api.letta.com" }
+        ProviderKind.OPENAI -> serverUrl.ifBlank { "https://api.openai.com" }
     }
 
     /**
