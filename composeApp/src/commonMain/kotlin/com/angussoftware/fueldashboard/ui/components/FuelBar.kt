@@ -41,7 +41,7 @@ fun FuelBar(
         label = "fuelWidth",
     )
 
-    val barHeight = if (compact) 8.dp else 12.dp
+    val barHeight = if (compact) 10.dp else 14.dp
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (label != null) {
@@ -51,13 +51,13 @@ fun FuelBar(
             ) {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = "$remainingPct%",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = animatedColor,
                 )

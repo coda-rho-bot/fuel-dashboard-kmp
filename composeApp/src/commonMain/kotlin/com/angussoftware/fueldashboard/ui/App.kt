@@ -338,7 +338,7 @@ private fun ProviderSection(
         ) {
             Text(
                 text = config.resolvedDisplayName(),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
             if (error != null) {
@@ -462,7 +462,7 @@ private fun ProviderSection(
                             // Balance — big and prominent
                             Text(
                                 text = "${report.creditsTotal}",
-                                style = MaterialTheme.typography.headlineMedium,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = if (criticallyLow)
                                     MaterialTheme.colorScheme.onErrorContainer
@@ -488,7 +488,7 @@ private fun ProviderSection(
                                     } else {
                                         "${report.creditsUsed} / ${report.creditsLimit} used this month"
                                     },
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -496,7 +496,7 @@ private fun ProviderSection(
                             if (report.creditsResetAt != null) {
                                 Text(
                                     text = "Quota resets ${formatCountdown(report.creditsResetAt)}",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
