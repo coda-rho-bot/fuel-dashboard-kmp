@@ -66,7 +66,7 @@ fun FuelDashboardApp(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fuel Dashboard") },
+                title = { Text("Fuel Dashboard for Letta") },
                 actions = {
                     IconButton(onClick = { viewModel.refreshNow() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")

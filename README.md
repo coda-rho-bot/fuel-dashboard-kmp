@@ -1,6 +1,7 @@
-# Fuel Dashboard (KMP)
+# Fuel Dashboard for Letta (KMP)
 
-Cross-platform dashboard for monitoring AI provider fuel/quota status.
+Cross-platform dashboard for monitoring AI provider fuel/quota status for a
+[Letta Code](https://letta.com) multi-agent fleet.
 Consumes the [fuel orchestrator API](https://git.angussoftware.dev/coda/fuel-orchestrator) at `http://127.0.0.1:8321`.
 
 ## Targets
@@ -15,7 +16,7 @@ Consumes the [fuel orchestrator API](https://git.angussoftware.dev/coda/fuel-orc
 
 - **Compose Multiplatform** 1.9.0 — shared UI
 - **Ktor Client** 3.4.3 — HTTP polling (30s interval)
-- **Angus-Software-Theming** 0.10.3 — Angus brand theme + community color schemes
+- **Angus-Software-Theming** 0.10.4 — Angus brand theme + 17 community color schemes
 - **angus-gradle-tools** 0.3.0 — Gradle convention plugins, coverage tooling
 - **Kotlin** 2.3.21
 
