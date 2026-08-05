@@ -1,5 +1,6 @@
 package com.angussoftware.fueldashboard.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -430,45 +433,69 @@ private fun ProviderSection(
                     )
                 }
 
-                // Credit balance (Letta Cloud, etc.)
-                // Credit balance (Letta Cloud) — raw numbers, not a gauge
-                // totalCredits = purchased credits remaining in account
-                // used = credits consumed this billing period
-                // limit = monthly included quota on your plan (Pro = 10,000)
+                // Credit balance (Letta Cloud) — prominent display
                 if (report.creditsTotal != null && report.creditsTotal > 0) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "Credit balance: ${report.creditsTotal}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    if (report.creditsUsed != null && report.creditsLimit != null) {
-                        val overLimit = report.creditsUsed > report.creditsLimit
-                        Text(
-                            text = if (overLimit) {
-                                "${report.creditsUsed} credits used (${report.creditsLimit} included monthly, rest pay-as-you-go)"
-                            } else {
-                                "${report.creditsUsed} / ${report.creditsLimit} credits used this month"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (overLimit) MaterialTheme.colorScheme.error
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (report.creditsResetAt != null) {
-                        Text(
-                            text = "Monthly quota resets ${formatCountdown(report.creditsResetAt)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (report.creditsLow) {
-                        Text(
-                            "LOW",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold,
-                        )
+                    Spacer(Modifier.height(12.dp))
+                    val overLimit = report.creditsUsed != null && report.creditsLimit != null &&
+                        report.creditsUsed > report.creditsLimit
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (report.creditsLow || overLimit)
+                                    MaterialTheme.colorScheme.errorContainer
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            // Balance — big and prominent
+                            Text(
+                                text = "${report.creditsTotal}",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (report.creditsLow || overLimit)
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                else
+                                    MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "credits remaining",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (report.creditsLow || overLimit)
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            // Monthly usage
+                            if (report.creditsUsed != null && report.creditsLimit != null) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = if (overLimit) {
+                                        "${report.creditsUsed} used (${report.creditsLimit} included monthly, rest pay-as-you-go)"
+                                    } else {
+                                        "${report.creditsUsed} / ${report.creditsLimit} used this month"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (overLimit) MaterialTheme.colorScheme.onErrorContainer
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            // Reset date
+                            if (report.creditsResetAt != null) {
+                                Text(
+                                    text = "Quota resets ${formatCountdown(report.creditsResetAt)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (report.creditsLow || overLimit)
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
             }
