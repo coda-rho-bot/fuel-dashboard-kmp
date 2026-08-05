@@ -431,20 +431,18 @@ private fun ProviderSection(
                 }
 
                 // Credit balance (Letta Cloud, etc.)
-                // Credit balance (Letta Cloud)
+                // Credit balance (Letta Cloud) — raw numbers, not a gauge
                 // totalCredits = purchased credits remaining in account
                 // used = credits consumed this billing period
                 // limit = monthly included quota on your plan (Pro = 10,000)
-                // Going over limit is fine — you pay-as-you-go for the extra
                 if (report.creditsTotal != null && report.creditsTotal > 0) {
                     Spacer(Modifier.height(8.dp))
-                    FuelBar(
-                        remainingPct = 100,
-                        label = "Credit balance: ${report.creditsTotal}",
+                    Text(
+                        text = "Credit balance: ${report.creditsTotal}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
                     )
                     if (report.creditsUsed != null && report.creditsLimit != null) {
-                        Spacer(Modifier.height(4.dp))
-                        val usagePct = (report.creditsUsed.toDouble() / report.creditsLimit * 100).roundToInt()
                         val overLimit = report.creditsUsed > report.creditsLimit
                         Text(
                             text = if (overLimit) {
