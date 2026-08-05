@@ -24,7 +24,7 @@ fun main() = application {
             viewModel.close()
             exitApplication()
         },
-        title = "Fuel Dashboard for Letta",
+        title = "Fuel Dashboard",
         state = windowState,
     ) {
         DashboardTheme {

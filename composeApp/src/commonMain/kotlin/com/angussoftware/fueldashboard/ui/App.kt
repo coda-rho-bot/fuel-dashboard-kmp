@@ -93,14 +93,7 @@ fun FuelDashboardApp(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        when (state.settings.mode) {
-                            FuelSourceMode.DIRECT -> "Fuel Dashboard"
-                            FuelSourceMode.CONNECTED -> "Fuel Dashboard for Letta"
-                        }
-                    )
-                },
+                title = { Text("Fuel Dashboard") },
                 actions = {
                     IconButton(onClick = { viewModel.refreshNow() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")

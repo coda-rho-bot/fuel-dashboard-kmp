@@ -145,7 +145,7 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm,
             )
-            packageName = "fuel-dashboard-for-letta"
+            packageName = "fuel-dashboard"
             packageVersion = project.version.toString()
             description = "Fuel Dashboard for Letta — AI provider fuel monitoring"
             vendor = "Angus Software"
