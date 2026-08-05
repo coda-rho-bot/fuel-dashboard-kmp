@@ -93,34 +93,48 @@ class LettaCloudProviderAdapter(
             throw RuntimeException("Letta Cloud quota API error: ${e.message}", e)
         }
 
-        // 2. Query billing endpoint for exact percentages (supplementary — overrides categorical)
-        val exactUsedPct: Double? = fetchExactUsage()
+        // 2. Query billing endpoint for exact percentages + credit numbers
+        val billing = fetchExactUsage()
 
         // 3. Build report from quota data, using exact percentage when available
-        return buildReport(quotaResponse, exactUsedPct)
+        return buildReport(quotaResponse, billing)
     }
 
     /**
-     * Queries the billing-info endpoint for exact quota usage percentages.
+     * Queries the billing-info endpoint for exact quota usage and credit numbers.
      * Returns null if billing data is unavailable or the letta-tier entry isn't found.
      *
      * Ported from orchestrator's `fetchBillingInfo()` + `parseLetta()` billing logic.
      */
-    private suspend fun fetchExactUsage(): Double? {
+    private suspend fun fetchExactUsage(): BillingData? {
         return try {
             val billingResponse: LettaBillingResponse =
                 client.get("$baseUrl$BILLING_PATH") {
                     header(HttpHeaders.Authorization, "Bearer $apiKey")
                 }.body()
 
-            billingResponse.quotaDetails
+            val detail = billingResponse.quotaDetails
                 ?.firstOrNull { it.tier == "letta-tier" }
-                ?.percentUsed
+
+            BillingData(
+                percentUsed = detail?.percentUsed,
+                used = detail?.used,
+                limit = detail?.limit,
+                totalCredits = billingResponse.totalCredits,
+                isLow = detail?.isLow,
+            )
         } catch (e: Exception) {
-            // Billing endpoint is supplementary — if it fails, fall back to categorical buckets
             null
         }
     }
+
+    private data class BillingData(
+        val percentUsed: Double?,
+        val used: Int?,
+        val limit: Int?,
+        val totalCredits: Int?,
+        val isLow: Boolean?,
+    )
 
     /**
      * Builds the ProviderReport from quota + billing data.
@@ -132,7 +146,7 @@ class LettaCloudProviderAdapter(
      */
     private fun buildReport(
         quotaResponse: LettaQuotaResponse,
-        exactUsedPct: Double?,
+        billing: BillingData?,
     ): ProviderReport {
         val lettaTier: LettaTierInfo? = quotaResponse.lettaTier
 
@@ -143,6 +157,7 @@ class LettaCloudProviderAdapter(
         val windows = mutableListOf<ReportWindow>()
 
         // Exact percentage overrides categorical when available
+        val exactUsedPct = billing?.percentUsed
         val exactRemaining = exactUsedPct?.let { (100.0 - it).coerceIn(0.0, 100.0).roundToInt() }
 
         if (lettaTier != null) {
@@ -200,7 +215,16 @@ class LettaCloudProviderAdapter(
             append("/")
             append(lettaTier?.dailyBucket ?: "?")
             if (exactUsedPct != null) {
-                append(" exact:${exactUsedPct.roundToInt()}%")
+                append(" used:${exactUsedPct.roundToInt()}%")
+            }
+            if (billing?.used != null && billing.limit != null) {
+                append(" credits:${billing.used}/${billing.limit}")
+            }
+            if (billing?.totalCredits != null) {
+                append(" total:${billing.totalCredits}")
+            }
+            if (billing?.isLow == true) {
+                append(" LOW")
             }
         }
 

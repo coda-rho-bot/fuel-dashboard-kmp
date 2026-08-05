@@ -44,6 +44,10 @@ data class LettaBillingResponse(
     val quotaDetails: List<LettaQuotaDetail>? = null,
     @SerialName("totalCredits")
     val totalCredits: Int? = null,
+    @SerialName("billingTier")
+    val billingTier: String? = null,
+    @SerialName("subscriptionStatus")
+    val subscriptionStatus: String? = null,
 )
 
 @Serializable
@@ -51,4 +55,8 @@ data class LettaQuotaDetail(
     val tier: String? = null,
     @SerialName("percentUsed")
     val percentUsed: Double? = null,
+    val used: Int? = null,
+    val limit: Int? = null,
+    @SerialName("isLow")
+    val isLow: Boolean? = null,
 )
