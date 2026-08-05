@@ -397,64 +397,41 @@ private fun AddProviderDialog(
 
             Spacer(Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = displayName,
-                onValueChange = { displayName = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Display Name (optional)") },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall,
-            )
-            Spacer(Modifier.height(4.dp))
+            // API key — the only field most providers need
+            if (selectedKind != ProviderKind.CONNECTED_API) {
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("${selectedKind.displayName} API Key") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        TextButton(onClick = { showKey = !showKey }) {
+                            Text(if (showKey) "Hide" else "Show", style = MaterialTheme.typography.labelSmall)
+                        }
+                    },
+                )
+                Spacer(Modifier.height(4.dp))
+            }
 
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { 
-                    Text(if (selectedKind == ProviderKind.CONNECTED_API) {
-                        "API Key (optional)"
-                    } else {
-                        "${selectedKind.displayName} API Key"
-                    }) 
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    TextButton(onClick = { showKey = !showKey }) {
-                        Text(if (showKey) "Hide" else "Show", style = MaterialTheme.typography.labelSmall)
-                    }
-                },
-            )
-            Spacer(Modifier.height(4.dp))
-
-            OutlinedTextField(
-                value = serverUrl,
-                onValueChange = { serverUrl = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Server URL (optional)") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                placeholder = {
-                    Text(
-                        when (selectedKind) {
-                            ProviderKind.ZAI -> "https://api.z.ai"
-                            ProviderKind.LETTA_CLOUD -> "https://api.letta.com"
-                            ProviderKind.OPENAI -> "https://api.openai.com"
-                            ProviderKind.ANTHROPIC -> "https://api.anthropic.com"
-                            ProviderKind.DEEPSEEK -> "https://api.deepseek.com"
-                            ProviderKind.GROQ -> "https://api.groq.com/openai"
-                            ProviderKind.MISTRAL -> "https://api.mistral.ai"
-                            ProviderKind.CONNECTED_API -> "http://127.0.0.1:8321"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-            )
+            // Server URL — only for Connected API
+            if (selectedKind == ProviderKind.CONNECTED_API) {
+                OutlinedTextField(
+                    value = serverUrl,
+                    onValueChange = { serverUrl = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Orchestrator URL") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    placeholder = {
+                        Text("http://127.0.0.1:8321", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    },
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
 
