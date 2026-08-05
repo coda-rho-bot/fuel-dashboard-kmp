@@ -59,6 +59,7 @@ import com.angussoftware.fueldashboard.ui.components.formatCountdown
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -412,10 +413,15 @@ private fun ProviderSection(
             }
 
             ProviderType.WINDOW_CREDIT -> {
-                // Standard fuel-bar rendering for z.ai / Letta Cloud / Connected API
-                val pct = report.remainingPct
-                if (pct != null) {
-                    FuelBar(remainingPct = pct, label = "Remaining")
+                // Window-credit rendering for z.ai / Letta Cloud / Connected API
+                if (report.windows.isNotEmpty()) {
+                    // Sub-window gauges are the primary fuel indicators
+                    report.windows.forEach { window ->
+                        ReportWindowRow(window = window)
+                    }
+                } else if (report.remainingPct != null) {
+                    // No sub-windows — show a single overall gauge
+                    FuelBar(remainingPct = report.remainingPct, label = "Remaining")
                 } else {
                     Text(
                         "No usage data (unlimited or static)",
@@ -424,31 +430,25 @@ private fun ProviderSection(
                     )
                 }
 
-                if (report.windows.isNotEmpty()) {
+                // Credit balance gauge (Letta Cloud, etc.)
+                if (report.creditsUsed != null && report.creditsTotal != null && report.creditsTotal > 0) {
                     Spacer(Modifier.height(8.dp))
-                    report.windows.forEach { window ->
-                        ReportWindowRow(window = window)
-                    }
-                }
-
-                // Credit info (Letta Cloud, etc.)
-                if (report.creditsUsed != null || report.creditsTotal != null) {
-                    Spacer(Modifier.height(4.dp))
-                    val used = report.creditsUsed ?: 0
-                    val total = report.creditsTotal ?: 0
-                    val limit = report.creditsLimit
+                    val used = report.creditsUsed
+                    val total = report.creditsTotal
                     val remaining = (total - used).coerceAtLeast(0)
-                    Text(
-                        text = buildString {
-                            append("$used credits used")
-                            if (limit != null) append(" of $limit limit")
-                            if (total > 0) append(" · $remaining remaining of $total total")
-                            if (report.creditsLow) append(" · LOW")
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (report.creditsLow) MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                    val remainingPct = (remaining.toDouble() / total * 100).roundToInt()
+                    FuelBar(
+                        remainingPct = remainingPct,
+                        label = "Credits ($remaining / $total)",
                     )
+                    if (report.creditsLow) {
+                        Text(
+                            "LOW",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
         }
