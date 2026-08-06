@@ -99,18 +99,16 @@ internal class FuelMcpServer(
             val command = args?.get("command")?.jsonPrimitive?.content
 
             val baseId = name.lowercase().replace("\\s+".toRegex(), "-")
-            val id = if (baseId.isNotBlank() && !registeredAgents.containsKey(baseId)) {
-                baseId
-            } else {
-                "agent-${agentIdCounter.incrementAndGet()}"
-            }
+            // Check if already registered by name (case-insensitive) — update instead of duplicate
+            val existing = registeredAgents.values.find { it.name.equals(name, ignoreCase = true) }
+            val id = existing?.id ?: baseId.ifBlank { "agent-${agentIdCounter.incrementAndGet()}" }
             val agent = RegisteredAgent(
                 id = id,
                 name = name,
-                model = model,
-                framework = framework,
-                command = command,
-                registeredAt = System.currentTimeMillis(),
+                model = model ?: existing?.model,
+                framework = framework ?: existing?.framework,
+                command = command ?: existing?.command,
+                registeredAt = existing?.registeredAt ?: System.currentTimeMillis(),
             )
             registeredAgents[id] = agent
             println("[MCP] Agent registered: ${agent.name} ($id)")

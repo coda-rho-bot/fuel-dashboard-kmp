@@ -168,11 +168,9 @@ class EmbeddedServer(
             post("/agents/register") {
                 val req = call.receive<RegisterAgentRequest>()
                 val baseId = req.name.lowercase().replace("\\s+".toRegex(), "-")
-                val id = if (baseId.isNotBlank() && !registeredAgents.containsKey(baseId)) {
-                    baseId
-                } else {
-                    "agent-${agentIdCounter.incrementAndGet()}"
-                }
+                // Dedup by name — update existing instead of creating duplicate
+                val existing = registeredAgents.values.find { it.name.equals(req.name, ignoreCase = true) }
+                val id = existing?.id ?: baseId.ifBlank { "agent-${agentIdCounter.incrementAndGet()}" }
                 val agent = RegisteredAgent(
                     id = id,
                     name = req.name,
