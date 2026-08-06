@@ -52,7 +52,7 @@ import com.angussoftware.fueldashboard.model.ReportWindow
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
-import com.angussoftware.fueldashboard.ui.components.AgentFleetPanel
+import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
 import com.angussoftware.fueldashboard.ui.components.DecisionLog
@@ -161,8 +161,17 @@ private fun DesktopLayout(
                 viewModel = viewModel,
             )
 
+            AgentPanel(
+                agents = state.acpAgents,
+                onModelChange = { agentId, model ->
+                    viewModel.onAgentModelChange?.invoke(agentId, model)
+                },
+                onModeChange = { agentId, mode ->
+                    viewModel.onAgentModeChange?.invoke(agentId, mode)
+                },
+            )
+
             if (state.hasConnectedApi) {
-                AgentFleetPanel(agents = state.agents.agents)
                 AlertsPanel(alerts = state.alerts.toFuelAlerts())
             }
         }

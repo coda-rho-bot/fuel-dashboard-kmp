@@ -48,7 +48,7 @@ import com.angussoftware.fueldashboard.model.ReportWindow
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
-import com.angussoftware.fueldashboard.ui.components.AgentFleetPanel
+import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
 import com.angussoftware.fueldashboard.ui.components.DecisionLog
@@ -92,6 +92,12 @@ fun MobileDashboard(
                 AgentsTabContent(
                     state = state,
                     onGoToSettings = { selectedTab = MobileTab.SETTINGS.ordinal },
+                    onModelChange = { agentId, model ->
+                        viewModel.onAgentModelChange?.invoke(agentId, model)
+                    },
+                    onModeChange = { agentId, mode ->
+                        viewModel.onAgentModeChange?.invoke(agentId, mode)
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -572,27 +578,28 @@ private fun MobileCreditBalance(report: ProviderReport) {
 private fun AgentsTabContent(
     state: DashboardState,
     onGoToSettings: () -> Unit,
+    onModelChange: (agentId: String, model: String) -> Unit,
+    onModeChange: (agentId: String, mode: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (!state.hasConnectedApi) {
-        MobileFleetEmptyState(
-            onGoToSettings = onGoToSettings,
-            modifier = modifier,
-        )
-        return
-    }
-
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        AgentFleetPanel(agents = state.agents.agents)
-        AlertsPanel(alerts = state.alerts.toFuelAlerts())
+        AgentPanel(
+            agents = state.acpAgents,
+            onModelChange = onModelChange,
+            onModeChange = onModeChange,
+        )
 
-        // Show decision history on agents tab too
-        val decisions = state.decisions.decisions
-        if (decisions.isNotEmpty()) {
-            DecisionLog(decisions = decisions)
+        if (state.hasConnectedApi) {
+            AlertsPanel(alerts = state.alerts.toFuelAlerts())
+
+            // Show decision history on agents tab too
+            val decisions = state.decisions.decisions
+            if (decisions.isNotEmpty()) {
+                DecisionLog(decisions = decisions)
+            }
         }
     }
 }

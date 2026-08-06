@@ -23,6 +23,7 @@ import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
 import com.angussoftware.fueldashboard.settings.FuelSettingsStore
 import com.angussoftware.fueldashboard.storage.BurnRateCalculator
 import com.angussoftware.fueldashboard.storage.FuelHistoryStore
+import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import com.angussoftware.fueldashboard.util.epochMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +53,7 @@ data class DashboardState(
     val lastUpdated: Long = 0L,
     val burnRate: Double? = null,
     val dataPointCount: Int = 0,
+    val acpAgents: List<AcpAgentDisplay> = emptyList(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -102,6 +104,23 @@ class FuelViewModel {
 
     fun refreshNow() {
         scope.launch { refresh() }
+    }
+
+    // --- ACP agent state (set from desktop main.kt) ---
+
+    /**
+     * Callbacks for ACP agent model/mode changes. Set from main.kt where the
+     * AcpAgentManager lives. Null on platforms without ACP support (Android).
+     */
+    var onAgentModelChange: ((agentId: String, model: String) -> Unit)? = null
+    var onAgentModeChange: ((agentId: String, mode: String) -> Unit)? = null
+
+    /**
+     * Push ACP agent display data into dashboard state. Called from main.kt
+     * when the AcpAgentManager StateFlow emits updates.
+     */
+    fun updateAcpAgents(agents: List<AcpAgentDisplay>) {
+        _state.value = _state.value.copy(acpAgents = agents)
     }
 
     // --- Settings updates ---
