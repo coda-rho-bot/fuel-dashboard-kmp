@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.kover)
     alias(libs.plugins.angusGradleTools.coverage)
+    alias(libs.plugins.sqldelight)
 }
 
 val appId = "com.angussoftware.fueldashboard"
@@ -102,6 +103,8 @@ kotlin {
             implementation(libs.ktor.server.cio)
             implementation(libs.ktor.server.content.negotiation)
             implementation(libs.ktor.server.cors)
+
+            implementation(libs.sqldelight.jvm)
         }
 
         androidMain.dependencies {
@@ -109,6 +112,8 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.zxing.android.embedded)
+
+            implementation(libs.sqldelight.android)
         }
 
         commonTest.dependencies {
@@ -162,6 +167,14 @@ compose.desktop {
                 menuGroup = "Angus Software"
                 upgradeUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
             }
+        }
+    }
+}
+
+sqldelight {
+    databases {
+        create("FuelDatabase") {
+            packageName.set("com.angussoftware.fueldashboard.database")
         }
     }
 }

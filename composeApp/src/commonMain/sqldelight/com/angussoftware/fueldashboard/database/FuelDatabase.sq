@@ -1,0 +1,19 @@
+CREATE TABLE decisions (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    model_handle TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    tier TEXT NOT NULL,
+    complexity TEXT NOT NULL,
+    utilization_ratio REAL NOT NULL,
+    headroom INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    timestamp INTEGER NOT NULL
+);
+
+insertDecision:
+INSERT INTO decisions (agent_id, model_handle, provider, tier, complexity, utilization_ratio, headroom, reason, timestamp)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectRecentDecisions:
+SELECT * FROM decisions ORDER BY timestamp DESC LIMIT :limit;
