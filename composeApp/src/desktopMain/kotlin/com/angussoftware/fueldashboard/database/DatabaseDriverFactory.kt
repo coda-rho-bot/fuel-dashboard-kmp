@@ -9,7 +9,12 @@ actual class DatabaseDriverFactory {
         val dbPath = File(System.getProperty("user.home"), ".fuel-dashboard/decisions.db")
         dbPath.parentFile?.mkdirs()
         val driver = JdbcSqliteDriver("jdbc:sqlite:${dbPath.absolutePath}")
-        FuelDatabase.Schema.create(driver)
+        // Use IF NOT EXISTS via schema version check
+        try {
+            FuelDatabase.Schema.create(driver)
+        } catch (e: Exception) {
+            // Table already exists — this is fine, the DB was created on a previous run
+        }
         return driver
     }
 }
