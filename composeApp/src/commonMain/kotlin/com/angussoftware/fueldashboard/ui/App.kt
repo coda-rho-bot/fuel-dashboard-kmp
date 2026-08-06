@@ -99,7 +99,8 @@ fun FuelDashboardApp(
             state = state,
             themeController = themeController,
             viewModel = viewModel,
-            modifier = Modifier.padding(padding),
+            // Only apply top padding (for TopAppBar) — bottom is handled by mobile nav bar
+            modifier = Modifier.padding(top = padding.calculateTopPadding()),
         )
     }
 }
