@@ -17,3 +17,26 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectRecentDecisions:
 SELECT * FROM decisions ORDER BY timestamp DESC LIMIT :limit;
+
+CREATE TABLE registered_agents (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    model TEXT,
+    framework TEXT,
+    command TEXT,
+    status TEXT NOT NULL DEFAULT 'registered',
+    registered_at INTEGER NOT NULL
+);
+
+upsertAgent:
+INSERT OR REPLACE INTO registered_agents (id, name, model, framework, command, status, registered_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+deleteAgent:
+DELETE FROM registered_agents WHERE id = ?;
+
+selectAllAgents:
+SELECT * FROM registered_agents;
+
+deleteAllAgents:
+DELETE FROM registered_agents;

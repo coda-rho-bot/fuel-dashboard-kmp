@@ -2,6 +2,7 @@ package com.angussoftware.fueldashboard.server
 
 import com.angussoftware.fueldashboard.database.DecisionRepository
 import com.angussoftware.fueldashboard.mcp.FuelMcpServer
+import com.angussoftware.fueldashboard.database.AgentRegistry
 import com.angussoftware.fueldashboard.model.AgentsResponse
 import com.angussoftware.fueldashboard.model.AlertsResponse
 import com.angussoftware.fueldashboard.model.Decision
@@ -41,6 +42,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class EmbeddedServer(
     private val repository: DecisionRepository? = null,
+    private val agentRegistry: AgentRegistry? = null,
     private val port: Int = DEFAULT_PORT,
     private val host: String = DEFAULT_HOST,
 ) {
@@ -57,6 +59,21 @@ class EmbeddedServer(
     /** Thread-safe registry of agents that self-registered via POST /agents/register or MCP register_agent. */
     internal val registeredAgents = ConcurrentHashMap<String, RegisteredAgent>()
     internal val agentIdCounter = AtomicLong(0)
+
+    init {
+        // Load persisted agents from SQLite on startup
+        agentRegistry?.all()?.forEach { record ->
+            registeredAgents[record.id] = RegisteredAgent(
+                id = record.id,
+                name = record.name,
+                model = record.model,
+                framework = record.framework,
+                command = record.command,
+                status = record.status,
+                registeredAt = record.registeredAt,
+            )
+        }
+    }
 
     @Volatile var fuelState: FuelResponse? = null
     @Volatile var agents: List<FleetAgent> = emptyList()
@@ -126,6 +143,7 @@ class EmbeddedServer(
             registeredAgents = registeredAgents,
             agentIdCounter = agentIdCounter,
             fuelStateProvider = { fuelState },
+            agentRegistry = agentRegistry,
         ).createServer()
 
         routing {
@@ -180,6 +198,8 @@ class EmbeddedServer(
                     registeredAt = System.currentTimeMillis(),
                 )
                 registeredAgents[id] = agent
+                // Persist to SQLite
+                agentRegistry?.upsert(id, agent.name, agent.model, agent.framework, agent.command, agent.status)
                 println("[EmbeddedServer] Agent registered: ${agent.name} ($id)")
                 call.respond(RegisterAgentResponse("registered", id))
             }
@@ -201,6 +221,7 @@ class EmbeddedServer(
                 val id = call.parameters["id"] ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing agent id"))
                 val removed = registeredAgents.remove(id)
                 if (removed != null) {
+                    agentRegistry?.remove(id)
                     println("[EmbeddedServer] Agent removed: ${removed.name} ($id)")
                     call.respond(StateUpdateResponse("removed"))
                 } else {

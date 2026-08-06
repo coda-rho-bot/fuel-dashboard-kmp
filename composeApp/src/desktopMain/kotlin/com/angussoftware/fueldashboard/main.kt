@@ -9,6 +9,7 @@ import com.angussoftware.fueldashboard.acp.AcpAgentConfig
 import com.angussoftware.fueldashboard.acp.AcpAgentInfo
 import com.angussoftware.fueldashboard.acp.AcpAgentManager
 import com.angussoftware.fueldashboard.acp.AcpAgentStatus
+import com.angussoftware.fueldashboard.database.AgentRegistry
 import com.angussoftware.fueldashboard.database.DatabaseDriverFactory
 import com.angussoftware.fueldashboard.database.DecisionRepository
 import com.angussoftware.fueldashboard.model.AgentConfig
@@ -29,12 +30,14 @@ fun main() = application {
     val viewModel = remember { FuelViewModel() }
     val themeController = ThemeController
 
-    // ── Database (decision history) ──────────────────────────────────────
-    val repository = remember { DecisionRepository(DatabaseDriverFactory().createDriver()) }
+    // ── Database (decision history + agent registry) ─────────────────────
+    val dbDriver = remember { DatabaseDriverFactory().createDriver() }
+    val repository = remember { DecisionRepository(dbDriver) }
+    val agentRegistry = remember { AgentRegistry(dbDriver) }
 
     // ── Embedded HTTP server for LAN access (mobile devices) ──────────────
     val serverScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-    val embeddedServer = remember { EmbeddedServer(repository = repository) }
+    val embeddedServer = remember { EmbeddedServer(repository = repository, agentRegistry = agentRegistry) }
 
     // Push ViewModel state → server volatile fields whenever they change
     serverScope.launch {

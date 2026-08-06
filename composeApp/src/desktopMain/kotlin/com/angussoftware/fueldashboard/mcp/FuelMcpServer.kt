@@ -1,5 +1,6 @@
 package com.angussoftware.fueldashboard.mcp
 
+import com.angussoftware.fueldashboard.database.AgentRegistry
 import com.angussoftware.fueldashboard.model.FuelResponse
 import com.angussoftware.fueldashboard.server.RegisteredAgent
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -32,6 +33,7 @@ internal class FuelMcpServer(
     private val registeredAgents: ConcurrentHashMap<String, RegisteredAgent>,
     private val agentIdCounter: AtomicLong,
     private val fuelStateProvider: () -> FuelResponse?,
+    private val agentRegistry: AgentRegistry? = null,
 ) {
     private val json = Json { encodeDefaults = true; explicitNulls = false; ignoreUnknownKeys = true }
 
@@ -111,6 +113,8 @@ internal class FuelMcpServer(
                 registeredAt = existing?.registeredAt ?: System.currentTimeMillis(),
             )
             registeredAgents[id] = agent
+            // Persist to SQLite
+            agentRegistry?.upsert(id, agent.name, agent.model, agent.framework, agent.command, agent.status)
             println("[MCP] Agent registered: ${agent.name} ($id)")
 
             val responseJson = buildJsonObject {
