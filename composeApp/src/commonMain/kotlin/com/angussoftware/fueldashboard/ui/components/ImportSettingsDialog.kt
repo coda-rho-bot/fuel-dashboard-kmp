@@ -92,7 +92,6 @@ fun ImportEntryDialog(
                     Spacer(Modifier.height(8.dp))
                     Button(
                         onClick = {
-                            onDismiss()
                             onScanQr()
                         },
                         modifier = Modifier.fillMaxWidth(),

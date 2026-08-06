@@ -28,7 +28,7 @@ actual fun rememberQrScanner(onResult: QrScanResult): QrScannerLauncher {
             setDesiredBarcodeFormats(ScanOptions.QR_CODE)
             setPrompt("Point camera at the QR code")
             setBeepEnabled(true)
-            setOrientationLocked(false)
+            setOrientationLocked(true)
         }
         launcher.launch(options)
     }

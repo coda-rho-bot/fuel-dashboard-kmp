@@ -148,6 +148,7 @@ private fun ProvidersSection(
         if (scannedText != null) {
             SettingsSyncData.fromJson(scannedText)?.let { parsed ->
                 scannedSyncData = parsed
+                showImportEntryDialog = false
             }
         }
     }
