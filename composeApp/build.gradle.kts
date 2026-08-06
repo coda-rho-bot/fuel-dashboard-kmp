@@ -96,6 +96,12 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.ktor.client.cio)
             implementation(libs.kotlinx.coroutines.swing)
+
+            // Embedded HTTP server — desktop only (serves fuel data to mobile devices on LAN)
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+            implementation(libs.ktor.server.content.negotiation)
+            implementation(libs.ktor.server.cors)
         }
 
         androidMain.dependencies {
