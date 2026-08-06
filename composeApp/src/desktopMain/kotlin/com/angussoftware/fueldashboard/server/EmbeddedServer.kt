@@ -8,22 +8,29 @@ import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FleetAgent
 import com.angussoftware.fueldashboard.model.FuelResponse
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.application.call
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer as KtorServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.lang.management.ManagementFactory
 import java.net.NetworkInterface
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Embedded HTTP server — desktop app IS the orchestrator.
@@ -44,9 +51,35 @@ class EmbeddedServer(
     private var server: KtorServer<*, *>? = null
     private val startTimeMs = System.currentTimeMillis()
 
+    /** Thread-safe registry of agents that self-registered via POST /agents/register. */
+    private val registeredAgents = ConcurrentHashMap<String, RegisteredAgent>()
+    private val agentIdCounter = AtomicLong(0)
+
     @Volatile var fuelState: FuelResponse? = null
     @Volatile var agents: List<FleetAgent> = emptyList()
     @Volatile var alerts: List<String> = emptyList()
+
+    /**
+     * Merge registered agents (from POST /agents/register) with the ACP-discovered
+     * agents (pushed from the ViewModel). Returns a unified list for GET /agents.
+     */
+    private fun mergedAgents(): List<FleetAgent> {
+        val discovered = agents
+        val registeredIds = discovered.map { it.agentId }.toMutableSet()
+
+        val fromRegistry = registeredAgents.values.map { reg ->
+            FleetAgent(
+                agentId = reg.id,
+                name = reg.name,
+                currentModel = reg.model ?: "",
+                lastTaskComplexity = "",
+                fuelAllocation = 0,
+                activeSubagents = 0,
+            )
+        }.filter { it.agentId !in registeredIds }
+
+        return discovered + fromRegistry
+    }
 
     fun start() {
         if (server != null) return
@@ -68,7 +101,7 @@ class EmbeddedServer(
 
         routing {
             get("/") {
-                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /health")))
+                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /health", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}")))
             }
 
             get("/fuel") {
@@ -101,7 +134,53 @@ class EmbeddedServer(
                 }
             }
 
-            get("/agents") { call.respond(AgentsResponse(agents)) }
+            get("/agents") { call.respond(AgentsResponse(mergedAgents())) }
+
+            post("/agents/register") {
+                val req = call.receive<RegisterAgentRequest>()
+                val baseId = req.name.lowercase().replace("\\s+".toRegex(), "-")
+                val id = if (baseId.isNotBlank() && !registeredAgents.containsKey(baseId)) {
+                    baseId
+                } else {
+                    "agent-${agentIdCounter.incrementAndGet()}"
+                }
+                val agent = RegisteredAgent(
+                    id = id,
+                    name = req.name,
+                    model = req.model,
+                    framework = req.framework,
+                    command = req.command,
+                    registeredAt = System.currentTimeMillis(),
+                )
+                registeredAgents[id] = agent
+                println("[EmbeddedServer] Agent registered: ${agent.name} ($id)")
+                call.respond(RegisterAgentResponse("registered", id))
+            }
+
+            post("/agents/{id}/state") {
+                val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing agent id"))
+                val req = call.receive<UpdateAgentStateRequest>()
+                val existing = registeredAgents[id]
+                    ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("agent not found: $id"))
+                registeredAgents[id] = existing.copy(
+                    model = req.model ?: existing.model,
+                    status = req.status ?: existing.status,
+                    capabilities = req.capabilities ?: existing.capabilities,
+                )
+                call.respond(StateUpdateResponse("updated"))
+            }
+
+            delete("/agents/{id}") {
+                val id = call.parameters["id"] ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing agent id"))
+                val removed = registeredAgents.remove(id)
+                if (removed != null) {
+                    println("[EmbeddedServer] Agent removed: ${removed.name} ($id)")
+                    call.respond(StateUpdateResponse("removed"))
+                } else {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse("agent not found: $id"))
+                }
+            }
+
             get("/alerts") { call.respond(AlertsResponse(alerts)) }
 
             get("/health") {
@@ -135,6 +214,50 @@ fun getLanUrl(): String {
         "http://localhost:8321"
     }
 }
+
+// ── Registration request/response models ──────────────────────────────
+
+@Serializable
+private data class RegisterAgentRequest(
+    val name: String,
+    val model: String? = null,
+    val framework: String? = null,
+    val command: String? = null,
+)
+
+@Serializable
+private data class RegisterAgentResponse(
+    val status: String,
+    @kotlinx.serialization.SerialName("agentId")
+    val agentId: String,
+)
+
+@Serializable
+private data class UpdateAgentStateRequest(
+    val model: String? = null,
+    val status: String? = null,
+    val capabilities: List<String>? = null,
+)
+
+@Serializable
+private data class StateUpdateResponse(val status: String)
+
+@Serializable
+private data class ErrorResponse(val error: String)
+
+@Serializable
+private data class RegisteredAgent(
+    val id: String,
+    val name: String,
+    val model: String? = null,
+    val framework: String? = null,
+    val command: String? = null,
+    val status: String = "registered",
+    val capabilities: List<String> = emptyList(),
+    val registeredAt: Long = 0,
+)
+
+// ── Existing private models ────────────────────────────────────────────
 
 @Serializable private data class ServiceInfo(val service: String, val version: String, val endpoints: List<String>)
 @Serializable private data class HealthResponse(val status: String, val uptime: Long, val pid: Long)
