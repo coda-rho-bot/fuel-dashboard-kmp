@@ -55,7 +55,9 @@ fun MobileDashboard(
                 FuelColumnContent(
                     state = state,
                     viewModel = viewModel,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                 )
             }
 
