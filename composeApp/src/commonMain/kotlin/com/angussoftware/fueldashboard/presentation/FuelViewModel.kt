@@ -1,5 +1,7 @@
 package com.angussoftware.fueldashboard.presentation
 
+import com.angussoftware.fueldashboard.model.AgentConfig
+import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.model.AgentsResponse
 import com.angussoftware.fueldashboard.model.AlertsResponse
 import com.angussoftware.fueldashboard.model.DecisionsResponse
@@ -20,6 +22,7 @@ import com.angussoftware.fueldashboard.network.LettaCloudProviderAdapter
 import com.angussoftware.fueldashboard.network.MistralProviderAdapter
 import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
 import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
+import com.angussoftware.fueldashboard.settings.AgentSettingsStore
 import com.angussoftware.fueldashboard.settings.FuelSettingsStore
 import com.angussoftware.fueldashboard.storage.BurnRateCalculator
 import com.angussoftware.fueldashboard.storage.FuelHistoryStore
@@ -54,6 +57,7 @@ data class DashboardState(
     val burnRate: Double? = null,
     val dataPointCount: Int = 0,
     val acpAgents: List<AcpAgentDisplay> = emptyList(),
+    val agentSettings: AgentSettings = AgentSettings(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -76,7 +80,8 @@ class FuelViewModel {
 
     init {
         val settings = FuelSettingsStore.loadMultiProvider()
-        _state.value = _state.value.copy(settings = settings)
+        val agents = AgentSettingsStore.load()
+        _state.value = _state.value.copy(settings = settings, agentSettings = agents)
         if (settings.hasAnyConfig) {
             activateAdapters(settings)
         }
@@ -114,6 +119,13 @@ class FuelViewModel {
      */
     var onAgentModelChange: ((agentId: String, model: String) -> Unit)? = null
     var onAgentModeChange: ((agentId: String, mode: String) -> Unit)? = null
+
+    /**
+     * Callback invoked when agent settings change (add/remove).
+     * Set from main.kt (desktop) to restart AcpAgentManager with new config.
+     * Null on platforms without ACP support (Android).
+     */
+    var onAgentSettingsChanged: ((AgentSettings) -> Unit)? = null
 
     /**
      * Push ACP agent display data into dashboard state. Called from main.kt
@@ -186,6 +198,39 @@ class FuelViewModel {
                 providers = current.providers.map { if (it.id == updated.id) updated else it },
             ),
         )
+    }
+
+    // --- Agent settings ---
+
+    /**
+     * Adds a new ACP agent to settings.
+     * Persists immediately and notifies the callback (main.kt restarts the manager).
+     */
+    fun addAgent(name: String, command: String, args: String) {
+        val newConfig = AgentConfig(
+            id = AgentSettingsStore.generateAgentId(),
+            name = name,
+            command = command,
+            args = args,
+        )
+        val updated = _state.value.agentSettings.copy(
+            agents = _state.value.agentSettings.agents + newConfig,
+        )
+        AgentSettingsStore.save(updated)
+        _state.value = _state.value.copy(agentSettings = updated)
+        onAgentSettingsChanged?.invoke(updated)
+    }
+
+    /**
+     * Removes an ACP agent from settings by ID.
+     */
+    fun removeAgent(agentId: String) {
+        val updated = _state.value.agentSettings.copy(
+            agents = _state.value.agentSettings.agents.filterNot { it.id == agentId },
+        )
+        AgentSettingsStore.save(updated)
+        _state.value = _state.value.copy(agentSettings = updated)
+        onAgentSettingsChanged?.invoke(updated)
     }
 
     /**

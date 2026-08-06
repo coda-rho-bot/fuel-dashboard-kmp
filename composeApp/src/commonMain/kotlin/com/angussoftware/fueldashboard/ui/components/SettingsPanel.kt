@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsApplications
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
@@ -49,6 +50,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,6 +65,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.angussoftware.fueldashboard.model.AgentConfig
+import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderCategory
@@ -82,6 +86,7 @@ fun SettingsPanel(
     viewModel: FuelViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val agentSettings = viewModel.state.collectAsState().value.agentSettings
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -112,6 +117,14 @@ fun SettingsPanel(
                 settings = settings,
                 viewModel = viewModel,
                 themeController = themeController,
+            )
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            // --- Agents section ---
+            AgentsSection(
+                agentSettings = agentSettings,
+                viewModel = viewModel,
             )
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
@@ -606,6 +619,228 @@ private fun AddProviderDialog(
                     },
                 ) {
                     Text("Add Provider", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Agents Section
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AgentsSection(
+    agentSettings: AgentSettings,
+    viewModel: FuelViewModel,
+) {
+    var showAddDialog by remember { mutableStateOf(false) }
+    var isCollapsed by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { isCollapsed = !isCollapsed }
+                .padding(end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = if (isCollapsed) "Expand" else "Collapse",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer { rotationZ = if (isCollapsed) 0f else 90f },
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "Agents (${agentSettings.agents.size})",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        TextButton(onClick = { showAddDialog = true }) {
+            Icon(Icons.Default.Add, contentDescription = "Add agent", modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("Add", style = MaterialTheme.typography.labelSmall)
+        }
+    }
+
+    AnimatedVisibility(
+        visible = !isCollapsed,
+        enter = expandVertically(),
+        exit = shrinkVertically(),
+    ) {
+        Column(modifier = Modifier.padding(top = 8.dp)) {
+            if (agentSettings.agents.isEmpty()) {
+                Text(
+                    text = "No agents configured. Click \"+ Add\" to monitor an ACP-compatible agent.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                agentSettings.agents.forEach { agent ->
+                    AgentConfigRow(
+                        agent = agent,
+                        onRemove = { viewModel.removeAgent(agent.id) },
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        AddAgentDialog(
+            onDismiss = { showAddDialog = false },
+            onAdd = { name, command, args ->
+                viewModel.addAgent(name, command, args)
+                showAddDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun AgentConfigRow(
+    agent: AgentConfig,
+    onRemove: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SmartToy,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = agent.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = if (agent.args.isNotBlank()) {
+                            "${agent.command} ${agent.args}"
+                        } else {
+                            agent.command
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Remove agent",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddAgentDialog(
+    onDismiss: () -> Unit,
+    onAdd: (name: String, command: String, args: String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var command by remember { mutableStateOf("") }
+    var args by remember { mutableStateOf("") }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "Add Agent",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Configure an ACP-compatible agent to monitor.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Name (e.g., Coda, Claude)") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = command,
+                    onValueChange = { command = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Command path (e.g., letta-acp, claude)") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = args,
+                    onValueChange = { args = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Arguments (e.g., --yolo, --acp)") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Common: letta-acp --yolo | claude --acp | copilot --acp",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { onAdd(name.trim(), command.trim(), args.trim()) },
+                        enabled = name.isNotBlank() && command.isNotBlank(),
+                    ) {
+                        Text("Add Agent", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
         }

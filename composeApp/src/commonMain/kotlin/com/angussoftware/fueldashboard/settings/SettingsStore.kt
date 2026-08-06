@@ -21,4 +21,5 @@ internal object FuelSettingsKeys {
     const val ORCHESTRATOR_URL = "orchestratorUrl"
     // Active settings
     const val MULTI_PROVIDER = "multiProviderSettings" // JSON: MultiProviderSettings
+    const val AGENT_SETTINGS = "agentSettings"         // JSON: AgentSettings
 }

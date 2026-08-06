@@ -5,12 +5,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.angussoftware.fueldashboard.acp.AcpAgentConfig
+import com.angussoftware.fueldashboard.acp.AcpAgentInfo
+import com.angussoftware.fueldashboard.acp.AcpAgentManager
+import com.angussoftware.fueldashboard.acp.AcpAgentStatus
 import com.angussoftware.fueldashboard.database.DatabaseDriverFactory
 import com.angussoftware.fueldashboard.database.DecisionRepository
+import com.angussoftware.fueldashboard.model.AgentConfig
+import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.server.EmbeddedServer
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.FuelDashboardApp
+import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import com.angussoftware.fueldashboard.ui.theme.DashboardTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,9 +48,71 @@ fun main() = application {
     embeddedServer.start()
 
     // ── ACP Agent Manager ─────────────────────────────────────────────────
-    // Infrastructure is in place (acp/ package) but NOT auto-started.
-    // Agents should be configured by the user in Settings, like LLM providers.
-    // The hardcoded defaultFleet() was Letta-specific and not agnostic.
+    val acpScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+    val agentManager = remember { AcpAgentManager() }
+
+    // Map commonMain AgentConfig → desktop-only AcpAgentConfig
+    fun toAcpConfigs(agents: List<AgentConfig>): List<AcpAgentConfig> =
+        agents.map { config ->
+            AcpAgentConfig(
+                id = config.id,
+                name = config.name,
+                command = config.command,
+                args = config.args.split("\\s+".toRegex()).filter { it.isNotBlank() },
+                env = config.env,
+            )
+        }
+
+    // Map AcpAgentInfo → AcpAgentDisplay for the ViewModel/UI layer
+    fun toDisplay(infos: List<AcpAgentInfo>): List<AcpAgentDisplay> =
+        infos.map { info ->
+            AcpAgentDisplay(
+                id = info.id,
+                name = info.name,
+                currentModel = info.currentModel,
+                availableModels = info.availableModels,
+                currentMode = info.currentMode,
+                availableModes = info.availableModes,
+                status = when (info.status) {
+                    AcpAgentStatus.CONNECTED -> "connected"
+                    AcpAgentStatus.CONNECTING -> "connecting"
+                    AcpAgentStatus.ERROR -> "error"
+                    AcpAgentStatus.DISCONNECTED -> "disconnected"
+                },
+                capabilities = info.capabilities,
+            )
+        }
+
+    // Start monitoring with the initial agent settings (from disk)
+    val initialAgentSettings = viewModel.state.value.agentSettings
+    if (initialAgentSettings.agents.isNotEmpty()) {
+        agentManager.startMonitoring(toAcpConfigs(initialAgentSettings.agents))
+    }
+
+    // Push agent manager state → ViewModel whenever it changes
+    acpScope.launch {
+        agentManager.agents.collect { infos ->
+            viewModel.updateAcpAgents(toDisplay(infos))
+        }
+    }
+
+    // Wire ViewModel callbacks → agent manager (model/mode changes)
+    viewModel.onAgentModelChange = { agentId, model ->
+        acpScope.launch { agentManager.setModel(agentId, model) }
+    }
+    viewModel.onAgentModeChange = { _, _ ->
+        // Mode change not yet implemented in AcpAgentManager
+    }
+
+    // Restart agent manager when settings change (add/remove from UI)
+    viewModel.onAgentSettingsChanged = { newSettings: AgentSettings ->
+        agentManager.stopMonitoring()
+        if (newSettings.agents.isNotEmpty()) {
+            agentManager.startMonitoring(toAcpConfigs(newSettings.agents))
+        } else {
+            viewModel.updateAcpAgents(emptyList())
+        }
+    }
 
     val windowState = rememberWindowState(
         width = 1200.dp,
@@ -52,6 +121,7 @@ fun main() = application {
 
     Window(
         onCloseRequest = {
+            agentManager.stopMonitoring()
             viewModel.close()
             embeddedServer.stop()
             exitApplication()
