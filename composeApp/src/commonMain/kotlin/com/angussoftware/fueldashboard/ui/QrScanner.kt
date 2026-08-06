@@ -8,10 +8,18 @@ import androidx.compose.runtime.Composable
 typealias QrScanResult = (scannedText: String?) -> Unit
 
 /**
+ * Whether this platform supports QR code scanning via camera.
+ *
+ * - Android: true (ZXing camera scanner)
+ * - Desktop / iOS: false (no camera scanner implemented)
+ */
+expect val supportsQrScanning: Boolean
+
+/**
  * Platform QR scanner entry point.
  *
  * On Android: launches the ZXing camera scanner activity.
- * On Desktop: no-op (desktop generates QR codes, doesn't scan them).
+ * On Desktop/iOS: no-op (these platforms can still export QR codes and use text codes).
  *
  * Call [launchQrScanner] to start scanning. When the scan completes (or is cancelled),
  * [onResult] is called with the scanned text (or null if cancelled/failed).

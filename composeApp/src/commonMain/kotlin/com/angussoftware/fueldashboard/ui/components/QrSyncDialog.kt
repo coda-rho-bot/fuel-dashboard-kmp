@@ -23,6 +23,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,10 +39,11 @@ import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.model.SettingsSyncData
 
 /**
- * Dialog that shows a QR code containing all app settings for syncing to a mobile device.
+ * Dialog that shows sync options for transferring settings to another device.
  *
- * The QR code encodes the settings JSON. Below the QR code is the raw JSON text as a fallback,
- * and a security warning about API keys.
+ * Two sync methods are presented:
+ * 1. **QR Code** — scan with phone camera (desktop → mobile)
+ * 2. **Text Code** — base64-encoded string, copy on one device, paste on another (ALL platforms)
  *
  * @param syncData The complete settings data to encode
  * @param onDismiss Called when the dialog is closed
@@ -51,6 +53,7 @@ fun QrSyncDialog(
     syncData: SettingsSyncData,
     onDismiss: () -> Unit,
 ) {
+    val code = remember(syncData) { syncData.toCode() }
     val json = remember(syncData) { syncData.toJson() }
     val capacity = remember(json) { estimateQrCapacity(json) }
     val clipboardManager = LocalClipboardManager.current
@@ -65,7 +68,7 @@ fun QrSyncDialog(
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Sync to Mobile")
+                Text("Sync Settings")
             }
         },
         text = {
@@ -135,41 +138,41 @@ fun QrSyncDialog(
                     )
                 }
 
+                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(1.dp).fillMaxWidth().clip(RoundedCornerShape(1.dp)).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
                 Spacer(Modifier.height(12.dp))
 
-                // JSON fallback text with copy button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Settings JSON (fallback)",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    TextButton(onClick = { clipboardManager.setText(AnnotatedString(json)) }) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = "Copy",
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Copy", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
+                // --- Text code section ---
                 Text(
-                    text = json,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = FontFamily.Monospace,
-                    ),
+                    text = "Or copy this code and paste on another device",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = {},
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 280.dp),
-                    maxLines = 6,
+                    readOnly = true,
+                    singleLine = false,
+                    maxLines = 4,
+                    textStyle = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                    ),
+                    trailingIcon = {
+                        TextButton(onClick = { clipboardManager.setText(AnnotatedString(code)) }) {
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                contentDescription = "Copy",
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Copy")
+                        }
+                    },
                 )
             }
         },

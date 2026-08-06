@@ -1,14 +1,17 @@
 package com.angussoftware.fueldashboard.model
 
 import com.angussoftware.fueldashboard.settings.ThemeController
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Complete settings snapshot for cross-device sync via QR code.
+ * Complete settings snapshot for cross-device sync via QR code or text code.
  *
  * Contains all provider configurations plus theme preferences.
- * Serialized to compact JSON and encoded as a QR code.
+ * Serialized to compact JSON, then either encoded as a QR code or
+ * base64-encoded as a copy-paste text code.
  */
 @Serializable
 data class SettingsSyncData(
@@ -47,6 +50,19 @@ data class SettingsSyncData(
             runCatching {
                 json.decodeFromString(serializer(), jsonString)
             }.getOrNull()
+
+        /**
+         * Decode a base64 text code (from copy-paste sync) back into [SettingsSyncData].
+         *
+         * Works on ALL platforms — no camera needed. Returns null if the code
+         * is invalid base64 or the decoded JSON doesn't parse.
+         */
+        @OptIn(ExperimentalEncodingApi::class)
+        fun fromCode(code: String): SettingsSyncData? = try {
+            fromJson(Base64.decode(code).decodeToString())
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /**
@@ -54,6 +70,17 @@ data class SettingsSyncData(
      */
     fun toJson(): String =
         json.encodeToString(serializer(), this)
+
+    /**
+     * Encode settings as a base64 text code for copy-paste sync.
+     *
+     * Works on ALL platforms (desktop, Android, iOS) without a camera.
+     * The receiver encodes its JSON representation to UTF-8 bytes, then
+     * base64-encodes those bytes.
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    fun toCode(): String =
+        Base64.encode(toJson().encodeToByteArray())
 
     /**
      * Wrap providers back into a [MultiProviderSettings].

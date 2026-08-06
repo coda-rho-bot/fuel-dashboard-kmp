@@ -2,6 +2,9 @@ package com.angussoftware.fueldashboard.ui
 
 import androidx.compose.runtime.Composable
 
+/** Desktop has no camera scanner — QR scanning is not available. */
+actual val supportsQrScanning: Boolean = false
+
 /**
  * Desktop implementation of QR scanner — no-op.
  *

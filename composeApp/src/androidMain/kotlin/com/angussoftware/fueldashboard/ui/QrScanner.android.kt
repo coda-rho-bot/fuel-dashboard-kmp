@@ -5,6 +5,9 @@ import androidx.compose.runtime.Composable
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
+/** Android supports QR scanning via ZXing camera scanner. */
+actual val supportsQrScanning: Boolean = true
+
 /**
  * Android implementation of QR scanner using ZXing Android Embedded.
  *

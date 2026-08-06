@@ -71,6 +71,7 @@ import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.rememberQrScanner
+import com.angussoftware.fueldashboard.ui.supportsQrScanning
 import com.angussoftware.theming.compose.ui.theme.ColorTheme
 import com.angussoftware.theming.compose.ui.theme.ThemeMode
 
@@ -138,6 +139,7 @@ private fun ProvidersSection(
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showQrSyncDialog by remember { mutableStateOf(false) }
+    var showImportEntryDialog by remember { mutableStateOf(false) }
     var scannedSyncData by remember { mutableStateOf<SettingsSyncData?>(null) }
     var isCollapsed by remember { mutableStateOf(false) }
 
@@ -185,9 +187,9 @@ private fun ProvidersSection(
                 Spacer(Modifier.width(4.dp))
                 Text("Sync", style = MaterialTheme.typography.labelSmall)
             }
-            // Import Settings — scans QR code (primarily for Android)
-            TextButton(onClick = { qrScanner.launch() }) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import settings via QR", modifier = Modifier.size(16.dp))
+            // Import Settings — opens dialog with QR scan + paste code options
+            TextButton(onClick = { showImportEntryDialog = true }) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import settings", modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Import", style = MaterialTheme.typography.labelSmall)
             }
@@ -240,6 +242,16 @@ private fun ProvidersSection(
         QrSyncDialog(
             syncData = SettingsSyncData.from(settings, themeController),
             onDismiss = { showQrSyncDialog = false },
+        )
+    }
+
+    // Import entry dialog — choose between QR scan and paste code
+    if (showImportEntryDialog) {
+        ImportEntryDialog(
+            canScanQr = supportsQrScanning,
+            onScanQr = { qrScanner.launch() },
+            onImportCode = { parsed -> scannedSyncData = parsed },
+            onDismiss = { showImportEntryDialog = false },
         )
     }
 
