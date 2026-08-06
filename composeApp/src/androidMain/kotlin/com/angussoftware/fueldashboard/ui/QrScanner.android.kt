@@ -11,8 +11,9 @@ actual val supportsQrScanning: Boolean = true
 /**
  * Android implementation of QR scanner using ZXing Android Embedded.
  *
- * Launches a full-screen camera scanner activity. When a QR code is detected
- * (or the user cancels), [onResult] is called with the decoded text or null.
+ * Launches a full-screen camera scanner activity locked to portrait.
+ * The capture activity inherits the app's portrait orientation from
+ * the manifest android:screenOrientation="portrait" setting.
  */
 @Composable
 actual fun rememberQrScanner(onResult: QrScanResult): QrScannerLauncher {
@@ -28,6 +29,7 @@ actual fun rememberQrScanner(onResult: QrScanResult): QrScannerLauncher {
             setDesiredBarcodeFormats(ScanOptions.QR_CODE)
             setPrompt("Point camera at the QR code")
             setBeepEnabled(true)
+            // Lock to the activity's orientation (portrait from manifest)
             setOrientationLocked(true)
         }
         launcher.launch(options)
