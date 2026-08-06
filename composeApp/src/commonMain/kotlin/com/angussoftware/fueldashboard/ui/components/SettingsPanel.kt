@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsApplications
 import androidx.compose.material.icons.filled.Tune
@@ -65,8 +67,10 @@ import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderCategory
 import com.angussoftware.fueldashboard.model.ProviderKind
+import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
+import com.angussoftware.fueldashboard.ui.rememberQrScanner
 import com.angussoftware.theming.compose.ui.theme.ColorTheme
 import com.angussoftware.theming.compose.ui.theme.ThemeMode
 
@@ -106,6 +110,7 @@ fun SettingsPanel(
             ProvidersSection(
                 settings = settings,
                 viewModel = viewModel,
+                themeController = themeController,
             )
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
@@ -129,9 +134,21 @@ fun SettingsPanel(
 private fun ProvidersSection(
     settings: MultiProviderSettings,
     viewModel: FuelViewModel,
+    themeController: ThemeController,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var showQrSyncDialog by remember { mutableStateOf(false) }
+    var scannedSyncData by remember { mutableStateOf<SettingsSyncData?>(null) }
     var isCollapsed by remember { mutableStateOf(false) }
+
+    // QR scanner — only functional on Android (no-op on desktop)
+    val qrScanner = rememberQrScanner { scannedText ->
+        if (scannedText != null) {
+            SettingsSyncData.fromJson(scannedText)?.let { parsed ->
+                scannedSyncData = parsed
+            }
+        }
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -161,10 +178,24 @@ private fun ProvidersSection(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        TextButton(onClick = { showAddDialog = true }) {
-            Icon(Icons.Default.Add, contentDescription = "Add provider", modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text("Add", style = MaterialTheme.typography.labelSmall)
+        Row {
+            // Sync to Mobile — generates QR code
+            TextButton(onClick = { showQrSyncDialog = true }) {
+                Icon(Icons.Default.QrCode2, contentDescription = "Sync to mobile", modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Sync", style = MaterialTheme.typography.labelSmall)
+            }
+            // Import Settings — scans QR code (primarily for Android)
+            TextButton(onClick = { qrScanner.launch() }) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = "Import settings via QR", modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Import", style = MaterialTheme.typography.labelSmall)
+            }
+            TextButton(onClick = { showAddDialog = true }) {
+                Icon(Icons.Default.Add, contentDescription = "Add provider", modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Add", style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
 
@@ -201,6 +232,26 @@ private fun ProvidersSection(
                 viewModel.addProvider(kind, apiKey, name, url)
                 showAddDialog = false
             },
+        )
+    }
+
+    // QR sync (generator) dialog
+    if (showQrSyncDialog) {
+        QrSyncDialog(
+            syncData = SettingsSyncData.from(settings, themeController),
+            onDismiss = { showQrSyncDialog = false },
+        )
+    }
+
+    // Import confirmation dialog
+    scannedSyncData?.let { data ->
+        ImportSettingsDialog(
+            syncData = data,
+            onConfirm = {
+                viewModel.importSyncedSettings(data)
+                scannedSyncData = null
+            },
+            onDismiss = { scannedSyncData = null },
         )
     }
 }

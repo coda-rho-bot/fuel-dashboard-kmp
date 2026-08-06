@@ -14,6 +14,8 @@ ktor = "3.4.3"
 kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.10.0"
 kotlinx-datetime = "0.7.1"
+qrcode-kotlin = "4.5.0"
+zxing-android-embedded = "4.3.0"
 
 [libraries]
 # Ktor client
@@ -40,8 +42,14 @@ androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:life
 androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 
+# QR Code
+qrcode-kotlin = { module = "io.github.g0dkar:qrcode-kotlin", version.ref = "qrcode-kotlin" }
+
 # Angus Software
 angusSoftware-theming-compose = { module = "com.angussoftware.theming:compose", version.ref = "angusSoftware-theming" }
+
+# QR Scanner (Android only)
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing-android-embedded" }
 
 # Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

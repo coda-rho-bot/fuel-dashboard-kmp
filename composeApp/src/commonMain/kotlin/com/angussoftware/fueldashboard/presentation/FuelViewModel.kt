@@ -169,6 +169,30 @@ class FuelViewModel {
         )
     }
 
+    /**
+     * Imports synced settings from a QR code scan.
+     *
+     * Replaces all current providers and theme with the imported data.
+     */
+    fun importSyncedSettings(syncData: com.angussoftware.fueldashboard.model.SettingsSyncData) {
+        updateSettings(syncData.toMultiProviderSettings())
+
+        // Apply theme settings
+        val themeController = com.angussoftware.fueldashboard.settings.ThemeController
+        runCatching {
+            val mode = com.angussoftware.theming.compose.ui.theme.ThemeMode.valueOf(syncData.themeMode)
+            themeController.updateThemeMode(mode)
+        }
+        runCatching {
+            val light = com.angussoftware.theming.compose.ui.theme.ColorTheme.valueOf(syncData.lightColorTheme)
+            themeController.updateLightColorTheme(light)
+        }
+        runCatching {
+            val dark = com.angussoftware.theming.compose.ui.theme.ColorTheme.valueOf(syncData.darkColorTheme)
+            themeController.updateDarkColorTheme(dark)
+        }
+    }
+
     // --- Internals ---
 
     private fun activateAdapters(settings: MultiProviderSettings) {

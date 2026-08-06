@@ -3,6 +3,7 @@ package com.angussoftware.fueldashboard.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -104,7 +105,7 @@ fun FuelDashboardApp(
 }
 
 // ---------------------------------------------------------------------------
-// Main Dashboard Content
+// Responsive Dashboard — switches between desktop and mobile layouts
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -114,135 +115,35 @@ private fun DashboardContent(
     viewModel: FuelViewModel,
     modifier: Modifier = Modifier,
 ) {
-    // --- Two-column layout: always shown, settings always visible ---
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        if (maxWidth >= 900.dp) {
+            DesktopLayout(state = state, themeController = themeController, viewModel = viewModel)
+        } else {
+            MobileDashboard(state = state, themeController = themeController, viewModel = viewModel)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Desktop Layout — two-column (fuel left, settings/fleet/alerts right)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun DesktopLayout(
+    state: DashboardState,
+    themeController: ThemeController,
+    viewModel: FuelViewModel,
+) {
     Row(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        // === LEFT COLUMN: fuel data / empty / loading / error ===
-        when {
-            // Empty state — no providers configured
-            state.settings.providers.isEmpty() -> {
-                EmptyState(modifier = Modifier.weight(1.5f).fillMaxHeight())
-            }
-            // Loading state — providers configured but no data yet
-            state.isLoading && state.providerReports.isEmpty() && state.fuel == null -> {
-                Box(
-                    modifier = Modifier.weight(1.5f).fillMaxHeight().fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            text = "Connecting to providers...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            // Error state — all providers failed
-            state.providerReports.isEmpty() && state.providerErrors.isNotEmpty() && state.fuel == null -> {
-                Column(
-                    modifier = Modifier.weight(1.5f).fillMaxHeight().padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        "Connection Error",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    state.providerErrors.values.firstOrNull()?.let { msg ->
-                        Text(
-                            msg,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { viewModel.refreshNow() }) {
-                        Text("Retry", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-            // Main content — provider sections
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.weight(1.5f).fillMaxHeight(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    // Orchestrator fuel data (if connected)
-                    state.fuel?.let { fuel ->
-                        item {
-                            RecommendationBanner(
-                                recommendedModel = fuel.recommendedModel,
-                                burnRate = fuel.burnRatePctPerHr,
-                                surplusAlert = fuel.surplusAlert,
-                            )
-                        }
-                    }
+        FuelColumnContent(
+            state = state,
+            viewModel = viewModel,
+            modifier = Modifier.weight(1.5f).fillMaxHeight(),
+        )
 
-                    // Burn rate status
-                    item {
-                        BurnRateStatus(
-                            burnRate = state.burnRate,
-                            dataPoints = state.dataPointCount,
-                        )
-                    }
-
-                    // Last updated timestamp
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = formatLastUpdated(state.lastUpdated),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            val totalErrors = state.providerErrors.size
-                            if (totalErrors > 0) {
-                                Text(
-                                    text = "\u26A0 $totalErrors error${if (totalErrors > 1) "s" else ""}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                            }
-                        }
-                    }
-
-                    // Provider sections — one per active adapter
-                    items(state.activeProviders, key = { it.id }) { config ->
-                        val report = state.providerReports[config.id]
-                        val error = state.providerErrors[config.id]
-
-                        ProviderSection(
-                            config = config,
-                            report = report,
-                            error = error,
-                        )
-                        HorizontalDivider()
-                    }
-
-                    // Decisions (from connected API only)
-                    val decisions = state.decisions.decisions
-                    if (decisions.isNotEmpty()) {
-                        item {
-                            Spacer(Modifier.height(4.dp))
-                            DecisionLog(decisions = decisions)
-                        }
-                    }
-                }
-            }
-        }
-
-        // === RIGHT COLUMN: always visible — settings, agents, alerts ===
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -260,6 +161,140 @@ private fun DashboardContent(
             if (state.hasConnectedApi) {
                 AgentFleetPanel(agents = state.agents.agents)
                 AlertsPanel(alerts = state.alerts.toFuelAlerts())
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fuel Column Content — shared between desktop and mobile
+// Handles empty, loading, error, and main (provider list) states.
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun FuelColumnContent(
+    state: DashboardState,
+    viewModel: FuelViewModel,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        // Empty state — no providers configured
+        state.settings.providers.isEmpty() -> {
+            EmptyState(modifier = modifier)
+        }
+        // Loading state — providers configured but no data yet
+        state.isLoading && state.providerReports.isEmpty() && state.fuel == null -> {
+            Box(
+                modifier = modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "Connecting to providers...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        // Error state — all providers failed
+        state.providerReports.isEmpty() && state.providerErrors.isNotEmpty() && state.fuel == null -> {
+            Column(
+                modifier = modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    "Connection Error",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Spacer(Modifier.height(8.dp))
+                state.providerErrors.values.firstOrNull()?.let { msg ->
+                    Text(
+                        msg,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = { viewModel.refreshNow() }) {
+                    Text("Retry", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        // Main content — provider sections
+        else -> {
+            LazyColumn(
+                modifier = modifier,
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Orchestrator fuel data (if connected)
+                state.fuel?.let { fuel ->
+                    item {
+                        RecommendationBanner(
+                            recommendedModel = fuel.recommendedModel,
+                            burnRate = fuel.burnRatePctPerHr,
+                            surplusAlert = fuel.surplusAlert,
+                        )
+                    }
+                }
+
+                // Burn rate status
+                item {
+                    BurnRateStatus(
+                        burnRate = state.burnRate,
+                        dataPoints = state.dataPointCount,
+                    )
+                }
+
+                // Last updated timestamp
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = formatLastUpdated(state.lastUpdated),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        val totalErrors = state.providerErrors.size
+                        if (totalErrors > 0) {
+                            Text(
+                                text = "\u26A0 $totalErrors error${if (totalErrors > 1) "s" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+
+                // Provider sections — one per active adapter
+                items(state.activeProviders, key = { it.id }) { config ->
+                    val report = state.providerReports[config.id]
+                    val error = state.providerErrors[config.id]
+
+                    ProviderSection(
+                        config = config,
+                        report = report,
+                        error = error,
+                    )
+                    HorizontalDivider()
+                }
+
+                // Decisions (from connected API only)
+                val decisions = state.decisions.decisions
+                if (decisions.isNotEmpty()) {
+                    item {
+                        Spacer(Modifier.height(4.dp))
+                        DecisionLog(decisions = decisions)
+                    }
+                }
             }
         }
     }
