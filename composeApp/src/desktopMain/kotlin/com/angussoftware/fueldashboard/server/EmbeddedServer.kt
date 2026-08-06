@@ -8,6 +8,7 @@ import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FleetAgent
 import com.angussoftware.fueldashboard.model.FuelResponse
+import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -93,6 +94,25 @@ class EmbeddedServer(
     fun stop() {
         server?.stop(GRACE_PERIOD_MS, TIMEOUT_MS)
         server = null
+    }
+
+    /**
+     * Returns registered agents as AcpAgentDisplay for the desktop UI.
+     * Agents registered via MCP or HTTP POST appear here.
+     */
+    fun getRegisteredAgentsForDisplay(): List<AcpAgentDisplay> {
+        return registeredAgents.values.map { agent ->
+            AcpAgentDisplay(
+                id = agent.id,
+                name = agent.name,
+                currentModel = agent.model,
+                availableModels = emptyList(),
+                currentMode = null,
+                availableModes = emptyList(),
+                status = agent.status,
+                capabilities = emptyList(),
+            )
+        }
     }
 
     private fun Application.configureRouting() {

@@ -47,6 +47,31 @@ fun main() = application {
 
     embeddedServer.start()
 
+    // ── Poll MCP/HTTP-registered agents → push to ViewModel ───────────────
+    // Agents registered via MCP (POST /agents/register) or HTTP are stored
+    // in EmbeddedServer.registeredAgents. Poll them every 5s and merge into
+    // the ViewModel's acpAgents so they show in the UI.
+    serverScope.launch {
+        while (true) {
+            val registered = embeddedServer.getRegisteredAgentsForDisplay()
+            // Merge with ACP-discovered agents
+            val acpAgents = viewModel.state.value.acpAgents
+            val merged = mutableListOf<AcpAgentDisplay>()
+            // Add ACP agents first
+            merged.addAll(acpAgents)
+            // Add registered agents that aren't already in the ACP list (avoid duplicates by id)
+            for (agent in registered) {
+                if (merged.none { it.id == agent.id }) {
+                    merged.add(agent)
+                }
+            }
+            if (merged != acpAgents) {
+                viewModel.updateAcpAgents(merged)
+            }
+            kotlinx.coroutines.delay(5_000)
+        }
+    }
+
     // ── ACP Agent Manager ─────────────────────────────────────────────────
     val acpScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val agentManager = remember { AcpAgentManager() }
