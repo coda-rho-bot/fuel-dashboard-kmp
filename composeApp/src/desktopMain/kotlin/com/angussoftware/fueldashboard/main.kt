@@ -5,6 +5,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.angussoftware.fueldashboard.database.DatabaseDriverFactory
+import com.angussoftware.fueldashboard.database.DecisionRepository
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.server.EmbeddedServer
 import com.angussoftware.fueldashboard.settings.ThemeController
@@ -20,15 +22,17 @@ fun main() = application {
     val viewModel = remember { FuelViewModel() }
     val themeController = ThemeController
 
+    // ── Database (decision history) ──────────────────────────────────────
+    val repository = remember { DecisionRepository(DatabaseDriverFactory().createDriver()) }
+
     // ── Embedded HTTP server for LAN access (mobile devices) ──────────────
     val serverScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-    val embeddedServer = remember { EmbeddedServer() }
+    val embeddedServer = remember { EmbeddedServer(repository = repository) }
 
     // Push ViewModel state → server volatile fields whenever they change
     serverScope.launch {
         viewModel.state.collect { state ->
             embeddedServer.fuelState = state.fuel
-            embeddedServer.decisions = state.decisions.decisions
             embeddedServer.agents = state.agents.agents
             embeddedServer.alerts = state.alerts.alerts
         }
