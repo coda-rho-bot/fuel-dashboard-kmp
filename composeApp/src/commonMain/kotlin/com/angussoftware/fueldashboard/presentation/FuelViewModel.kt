@@ -296,12 +296,19 @@ class FuelViewModel {
      * Removes an ACP agent from settings by ID.
      */
     fun removeAgent(agentId: String) {
+        // Remove from ACP agent settings
         val updated = _state.value.agentSettings.copy(
             agents = _state.value.agentSettings.agents.filterNot { it.id == agentId },
         )
         AgentSettingsStore.save(updated)
         _state.value = _state.value.copy(agentSettings = updated)
         onAgentSettingsChanged?.invoke(updated)
+        // Also remove from MCP/HTTP registered agents
+        onRemoveAgent?.invoke(agentId)
+        // Remove from the displayed agent list
+        _state.value = _state.value.copy(
+            acpAgents = _state.value.acpAgents.filterNot { it.id == agentId },
+        )
     }
 
     /**

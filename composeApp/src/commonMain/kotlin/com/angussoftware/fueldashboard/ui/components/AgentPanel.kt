@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -29,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -174,8 +176,9 @@ private fun AgentCard(
 
                 StatusDot(status = agent.status)
 
+                var showDeleteConfirm by remember { mutableStateOf(false) }
                 IconButton(
-                    onClick = { onRemoveAgent(agent.id) },
+                    onClick = { showDeleteConfirm = true },
                     modifier = Modifier.size(28.dp),
                 ) {
                     Icon(
@@ -183,6 +186,22 @@ private fun AgentCard(
                         contentDescription = "Remove agent",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
+                    )
+                }
+                if (showDeleteConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteConfirm = false },
+                        title = { Text("Remove ${agent.name}?") },
+                        text = { Text("This will remove ${agent.name} from the dashboard. They can re-register later.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                onRemoveAgent(agent.id)
+                                showDeleteConfirm = false
+                            }) { Text("Remove") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                        },
                     )
                 }
             }
