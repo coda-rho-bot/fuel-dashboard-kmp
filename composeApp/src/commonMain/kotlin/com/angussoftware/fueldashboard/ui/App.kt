@@ -77,50 +77,51 @@ fun FuelDashboardApp(
         viewModel.startPolling()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Fuel Dashboard",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refreshNow() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        DashboardContent(
-            state = state,
-            themeController = themeController,
-            viewModel = viewModel,
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isCompact = maxWidth < 900.dp
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "Fuel Dashboard",
+                            style = if (isCompact) {
+                                MaterialTheme.typography.titleSmall
+                            } else {
+                                MaterialTheme.typography.titleMedium
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.refreshNow() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                    },
+                )
+            },
+        ) { padding ->
             // Only apply top padding (for TopAppBar) — bottom is handled by mobile nav bar
-            modifier = Modifier.padding(top = padding.calculateTopPadding()),
-        )
-    }
-}
+            val contentModifier = Modifier
+                .fillMaxSize()
+                .padding(top = padding.calculateTopPadding())
 
-// ---------------------------------------------------------------------------
-// Responsive Dashboard — switches between desktop and mobile layouts
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun DashboardContent(
-    state: DashboardState,
-    themeController: ThemeController,
-    viewModel: FuelViewModel,
-    modifier: Modifier = Modifier,
-) {
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        if (maxWidth >= 900.dp) {
-            DesktopLayout(state = state, themeController = themeController, viewModel = viewModel)
-        } else {
-            MobileDashboard(state = state, themeController = themeController, viewModel = viewModel)
+            if (isCompact) {
+                MobileDashboard(
+                    state = state,
+                    themeController = themeController,
+                    viewModel = viewModel,
+                    modifier = contentModifier,
+                )
+            } else {
+                DesktopLayout(
+                    state = state,
+                    themeController = themeController,
+                    viewModel = viewModel,
+                    modifier = contentModifier,
+                )
+            }
         }
     }
 }
@@ -134,9 +135,10 @@ private fun DesktopLayout(
     state: DashboardState,
     themeController: ThemeController,
     viewModel: FuelViewModel,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         FuelColumnContent(
