@@ -1,6 +1,7 @@
 package com.angussoftware.fueldashboard.server
 
 import com.angussoftware.fueldashboard.database.DecisionRepository
+import com.angussoftware.fueldashboard.mcp.FuelMcpServer
 import com.angussoftware.fueldashboard.model.AgentsResponse
 import com.angussoftware.fueldashboard.model.AlertsResponse
 import com.angussoftware.fueldashboard.model.Decision
@@ -25,6 +26,7 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.lang.management.ManagementFactory
@@ -51,9 +53,9 @@ class EmbeddedServer(
     private var server: KtorServer<*, *>? = null
     private val startTimeMs = System.currentTimeMillis()
 
-    /** Thread-safe registry of agents that self-registered via POST /agents/register. */
-    private val registeredAgents = ConcurrentHashMap<String, RegisteredAgent>()
-    private val agentIdCounter = AtomicLong(0)
+    /** Thread-safe registry of agents that self-registered via POST /agents/register or MCP register_agent. */
+    internal val registeredAgents = ConcurrentHashMap<String, RegisteredAgent>()
+    internal val agentIdCounter = AtomicLong(0)
 
     @Volatile var fuelState: FuelResponse? = null
     @Volatile var agents: List<FleetAgent> = emptyList()
@@ -96,12 +98,19 @@ class EmbeddedServer(
     private fun Application.configureRouting() {
         install(CORS) { anyHost() }
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true; encodeDefaults = true })
+            json(Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false })
         }
+
+        // Create the MCP server with shared access to the agent registry and fuel state
+        val mcpServer = FuelMcpServer(
+            registeredAgents = registeredAgents,
+            agentIdCounter = agentIdCounter,
+            fuelStateProvider = { fuelState },
+        ).createServer()
 
         routing {
             get("/") {
-                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /health", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}")))
+                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /health", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
             }
 
             get("/fuel") {
@@ -188,6 +197,14 @@ class EmbeddedServer(
                 call.respond(HealthResponse("ok", uptimeSec, currentPid()))
             }
         }
+
+        // MCP endpoint (Streamable HTTP at /mcp) — allows agents to self-register via MCP protocol
+        // Note: mcpStreamableHttp auto-installs ContentNegotiation with McpJson, but since we already
+        // installed it above, the SDK will log a warning and use our existing config (which is compatible
+        // because we set explicitNulls = false and encodeDefaults = true).
+        mcpStreamableHttp(enableDnsRebindingProtection = false) {
+            mcpServer
+        }
     }
 
     private fun currentPid(): Long = try {
@@ -246,7 +263,7 @@ private data class StateUpdateResponse(val status: String)
 private data class ErrorResponse(val error: String)
 
 @Serializable
-private data class RegisteredAgent(
+internal data class RegisteredAgent(
     val id: String,
     val name: String,
     val model: String? = null,

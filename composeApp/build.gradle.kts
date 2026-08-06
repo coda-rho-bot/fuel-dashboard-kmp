@@ -109,6 +109,9 @@ kotlin {
             // ACP (Agent Client Protocol) — for monitoring Letta/Claude/Copilot agents
             implementation(libs.acp.kotlin)
             implementation(libs.acp.kotlin.ktor.client)
+
+            // MCP (Model Context Protocol) — allows agents to self-register via standard MCP protocol
+            implementation(libs.mcp.kotlin.server)
         }
 
         androidMain.dependencies {

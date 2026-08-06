@@ -18,6 +18,7 @@ qrcode-kotlin = "4.5.0"
 sqldelight = "2.0.2"
 zxing-android-embedded = "4.3.0"
 acp-kotlin = "0.24.0"
+mcp-kotlin = "0.8.4"
 
 [libraries]
 # Ktor server (desktop only)
@@ -66,6 +67,9 @@ sqldelight-android = { module = "app.cash.sqldelight:android-driver", version.re
 # ACP (Agent Client Protocol) — desktop only
 acp-kotlin = { module = "com.agentclientprotocol:acp", version.ref = "acp-kotlin" }
 acp-kotlin-ktor-client = { module = "com.agentclientprotocol:acp-ktor-client", version.ref = "acp-kotlin" }
+
+# MCP (Model Context Protocol) — desktop only (agents connect to us)
+mcp-kotlin-server = { module = "io.modelcontextprotocol:kotlin-sdk-server", version.ref = "mcp-kotlin" }
 
 # Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
