@@ -127,8 +127,22 @@ class EmbeddedServer(
                 currentMode = null,
                 availableModes = emptyList(),
                 status = agent.status,
-                capabilities = emptyList(),
+                capabilities = agent.capabilities,
+                framework = agent.framework,
+                command = agent.command,
+                registeredAt = if (agent.registeredAt > 0) agent.registeredAt else null,
             )
+        }
+    }
+
+    /**
+     * Removes a registered agent from both the in-memory map and SQLite.
+     */
+    fun deleteRegisteredAgent(id: String) {
+        val removed = registeredAgents.remove(id)
+        if (removed != null) {
+            agentRegistry?.remove(id)
+            println("[EmbeddedServer] Agent deleted: ${removed.name} ($id)")
         }
     }
 

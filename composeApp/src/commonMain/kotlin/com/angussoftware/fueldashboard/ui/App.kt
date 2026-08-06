@@ -169,6 +169,9 @@ private fun DesktopLayout(
                 onModeChange = { agentId, mode ->
                     viewModel.onAgentModeChange?.invoke(agentId, mode)
                 },
+                onRemoveAgent = { agentId ->
+                    viewModel.onRemoveAgent?.invoke(agentId)
+                },
             )
 
             if (state.hasConnectedApi) {

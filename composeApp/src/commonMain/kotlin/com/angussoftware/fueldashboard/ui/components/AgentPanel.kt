@@ -1,5 +1,8 @@
 package com.angussoftware.fueldashboard.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,15 +19,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,8 +40,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 
 /**
  * Display model for an agent discovered via ACP (Agent Client Protocol).
@@ -51,6 +60,10 @@ data class AcpAgentDisplay(
     val availableModes: List<String>,
     val status: String, // "connected", "disconnected", "idle", "thinking"
     val capabilities: List<String> = emptyList(),
+    val framework: String? = null,
+    val command: String? = null,
+    val registeredAt: Long? = null,
+    val lastSeen: Long? = null,
 )
 
 /**
@@ -59,6 +72,7 @@ data class AcpAgentDisplay(
  * @param agents       list of agents to render
  * @param onModelChange invoked when the user picks a different model for an agent
  * @param onModeChange  invoked when the user picks a different mode for an agent
+ * @param onRemoveAgent invoked when the user clicks the delete button on an agent card
  * @param modifier      outer modifier
  */
 @Composable
@@ -66,8 +80,11 @@ fun AgentPanel(
     agents: List<AcpAgentDisplay>,
     onModelChange: (agentId: String, model: String) -> Unit,
     onModeChange: (agentId: String, mode: String) -> Unit,
+    onRemoveAgent: (agentId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
+
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = "Agents",
@@ -88,8 +105,13 @@ fun AgentPanel(
         agents.forEach { agent ->
             AgentCard(
                 agent = agent,
+                isExpanded = expandedStates[agent.id] ?: false,
+                onToggleExpand = {
+                    expandedStates[agent.id] = !(expandedStates[agent.id] ?: false)
+                },
                 onModelChange = onModelChange,
                 onModeChange = onModeChange,
+                onRemoveAgent = onRemoveAgent,
             )
             Spacer(Modifier.height(8.dp))
         }
@@ -103,8 +125,11 @@ fun AgentPanel(
 @Composable
 private fun AgentCard(
     agent: AcpAgentDisplay,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
     onModelChange: (agentId: String, model: String) -> Unit,
     onModeChange: (agentId: String, mode: String) -> Unit,
+    onRemoveAgent: (agentId: String) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -114,24 +139,57 @@ private fun AgentCard(
         ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // --- Header row: name + status dot ---
+            // --- Header row: name + lastSeen + expand arrow + status dot + delete ---
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleExpand() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = agent.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = agent.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    // Last seen timestamp
+                    agent.lastSeen?.let { seen ->
+                        Text(
+                            text = formatLastSeen(seen),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
                 StatusDot(status = agent.status)
+
+                IconButton(
+                    onClick = { onRemoveAgent(agent.id) },
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Remove agent",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
 
             Spacer(Modifier.height(8.dp))
 
-            // --- Model row ---
+            // --- Model row (always visible) ---
             ModelRow(
                 currentModel = agent.currentModel,
                 availableModels = agent.availableModels,
@@ -148,12 +206,59 @@ private fun AgentCard(
                 )
             }
 
-            // --- Capabilities row (only if capabilities exist) ---
-            if (agent.capabilities.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                CapabilitiesRow(capabilities = agent.capabilities)
+            // --- Expandable details section ---
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    agent.framework?.let { fw ->
+                        DetailRow(label = "Framework", value = fw)
+                    }
+                    agent.command?.let { cmd ->
+                        DetailRow(label = "Command", value = cmd, monospace = true)
+                    }
+                    agent.registeredAt?.let { ts ->
+                        if (ts > 0) {
+                            DetailRow(label = "Registered", value = formatRegisteredDate(ts))
+                        }
+                    }
+                    if (agent.capabilities.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        CapabilitiesRow(capabilities = agent.capabilities)
+                    }
+                }
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Detail Row (for expanded section)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun DetailRow(label: String, value: String, monospace: Boolean = false) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontFamily = if (monospace) FontFamily.Monospace else null,
+        )
     }
 }
 
@@ -206,7 +311,7 @@ private fun ModelRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = currentModel ?: "—",
+                    text = currentModel ?: "\u2014",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                 )
@@ -236,7 +341,7 @@ private fun ModelRow(
             }
         } else {
             Text(
-                text = currentModel ?: "—",
+                text = currentModel ?: "\u2014",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
@@ -311,7 +416,7 @@ private fun CapabilitiesRow(capabilities: List<String>) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = "Capabilities:",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.width(6.dp))
@@ -335,3 +440,36 @@ private fun CapabilityBadge(label: String) {
             .padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }
+
+// ---------------------------------------------------------------------------
+// Timestamp formatting helpers
+// ---------------------------------------------------------------------------
+
+private fun formatLastSeen(epochMs: Long): String {
+    val now = epochMillisNow()
+    val diffMs = now - epochMs
+    val minutes = diffMs / 60_000
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        minutes < 1440 -> "${minutes / 60}h ago"
+        else -> "${minutes / 1440}d ago"
+    }
+}
+
+private fun formatRegisteredDate(epochMs: Long): String {
+    val now = epochMillisNow()
+    val diffMs = now - epochMs
+    val days = diffMs / 86_400_000
+    return when {
+        days < 1 -> "today"
+        days == 1L -> "yesterday"
+        days < 30 -> "$days days ago"
+        days < 365 -> "${days / 30} months ago"
+        else -> "${days / 365} years ago"
+    }
+}
+
+/** Platform-agnostic current time — uses the commonMain util epochMillis. */
+private fun epochMillisNow(): Long =
+    com.angussoftware.fueldashboard.util.epochMillis()

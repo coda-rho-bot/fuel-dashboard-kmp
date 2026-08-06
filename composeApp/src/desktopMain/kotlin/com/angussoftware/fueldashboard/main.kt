@@ -20,6 +20,7 @@ import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.FuelDashboardApp
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import com.angussoftware.fueldashboard.ui.theme.DashboardTheme
+import com.angussoftware.fueldashboard.util.epochMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -108,6 +109,7 @@ fun main() = application {
                     AcpAgentStatus.DISCONNECTED -> "disconnected"
                 },
                 capabilities = info.capabilities,
+                lastSeen = if (info.status == AcpAgentStatus.CONNECTED) epochMillis() else null,
             )
         }
 
@@ -130,6 +132,18 @@ fun main() = application {
     }
     viewModel.onAgentModeChange = { _, _ ->
         // Mode change not yet implemented in AcpAgentManager
+    }
+
+    // Wire ViewModel callback → EmbeddedServer (agent removal)
+    viewModel.onRemoveAgent = { agentId ->
+        serverScope.launch { embeddedServer.deleteRegisteredAgent(agentId) }
+    }
+
+    // Wire ViewModel callback → DecisionRepository (log decisions to SQLite)
+    viewModel.onDecisionLogged = { agentId, modelHandle, provider, tier, complexity, utilizationRatio, headroom, reason ->
+        serverScope.launch {
+            repository.insert(agentId, modelHandle, provider, tier, complexity, utilizationRatio, headroom, reason)
+        }
     }
 
     // Restart agent manager when settings change (add/remove from UI)

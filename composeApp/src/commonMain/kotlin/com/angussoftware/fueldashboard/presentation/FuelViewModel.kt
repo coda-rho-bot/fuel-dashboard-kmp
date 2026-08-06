@@ -1,5 +1,11 @@
 package com.angussoftware.fueldashboard.presentation
 
+import com.angussoftware.fueldashboard.engine.Complexity
+import com.angussoftware.fueldashboard.engine.FuelConfig
+import com.angussoftware.fueldashboard.engine.FuelModel
+import com.angussoftware.fueldashboard.engine.FuelProviderConfig
+import com.angussoftware.fueldashboard.engine.ProviderStateInfo
+import com.angussoftware.fueldashboard.engine.decideModel
 import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.model.AgentsResponse
@@ -68,6 +74,49 @@ data class DashboardState(
         get() = settings.providers.any { it.kind == ProviderKind.CONNECTED_API && it.isConfigured }
 }
 
+/**
+ * Returns default model tiers for a provider kind — used by the decision engine
+ * when no orchestrator is connected. This is a best-effort heuristic mapping
+ * based on known provider model lineups.
+ */
+private fun defaultModelsFor(kind: ProviderKind): List<FuelModel> = when (kind) {
+    ProviderKind.ZAI -> listOf(
+        FuelModel("glm-4.5", Complexity.TRIVIAL, bareName = "glm-4.5"),
+        FuelModel("glm-4.6", Complexity.LIGHT, bareName = "glm-4.6"),
+        FuelModel("glm-4.7", Complexity.MEDIUM, bareName = "glm-4.7"),
+        FuelModel("glm-5", Complexity.HEAVY, bareName = "glm-5"),
+        FuelModel("glm-5.1", Complexity.HEAVY, bareName = "glm-5.1"),
+    )
+    ProviderKind.LETTA_CLOUD -> listOf(
+        FuelModel("letta-lite", Complexity.LIGHT),
+        FuelModel("letta-standard", Complexity.MEDIUM),
+        FuelModel("letta-pro", Complexity.HEAVY),
+    )
+    ProviderKind.OPENAI -> listOf(
+        FuelModel("gpt-4o-mini", Complexity.LIGHT),
+        FuelModel("gpt-4o", Complexity.MEDIUM),
+        FuelModel("o1", Complexity.HEAVY),
+    )
+    ProviderKind.ANTHROPIC -> listOf(
+        FuelModel("claude-3-5-haiku", Complexity.LIGHT),
+        FuelModel("claude-3-5-sonnet", Complexity.MEDIUM),
+        FuelModel("claude-3-opus", Complexity.HEAVY),
+    )
+    ProviderKind.DEEPSEEK -> listOf(
+        FuelModel("deepseek-chat", Complexity.MEDIUM),
+        FuelModel("deepseek-reasoner", Complexity.HEAVY),
+    )
+    ProviderKind.GROQ -> listOf(
+        FuelModel("llama-3.1-8b", Complexity.LIGHT),
+        FuelModel("llama-3.1-70b", Complexity.MEDIUM),
+    )
+    ProviderKind.MISTRAL -> listOf(
+        FuelModel("mistral-small", Complexity.LIGHT),
+        FuelModel("mistral-large", Complexity.MEDIUM),
+    )
+    ProviderKind.CONNECTED_API -> emptyList()
+}
+
 class FuelViewModel {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -119,6 +168,12 @@ class FuelViewModel {
      */
     var onAgentModelChange: ((agentId: String, model: String) -> Unit)? = null
     var onAgentModeChange: ((agentId: String, mode: String) -> Unit)? = null
+    /**
+     * Callback invoked when the user clicks delete on an agent card.
+     * Set from main.kt (desktop) to remove from EmbeddedServer registry.
+     * Null on platforms without the embedded server (Android).
+     */
+    var onRemoveAgent: ((agentId: String) -> Unit)? = null
 
     /**
      * Callback invoked when agent settings change (add/remove).
@@ -126,6 +181,22 @@ class FuelViewModel {
      * Null on platforms without ACP support (Android).
      */
     var onAgentSettingsChanged: ((AgentSettings) -> Unit)? = null
+
+    /**
+     * Callback invoked when the decision engine picks a model.
+     * Set from main.kt (desktop) to persist to SQLite via DecisionRepository.
+     * Null on platforms without DB support.
+     */
+    var onDecisionLogged: ((
+        agentId: String,
+        modelHandle: String,
+        provider: String,
+        tier: String,
+        complexity: String,
+        utilizationRatio: Double,
+        headroom: Int,
+        reason: String,
+    ) -> Unit)? = null
 
     /**
      * Push ACP agent display data into dashboard state. Called from main.kt
@@ -382,9 +453,68 @@ class FuelViewModel {
             }
         }
 
+        // ── Standalone alert generation ──────────────────────────────────
+        // If no connected API (orchestrator) is providing alerts, generate
+        // them locally from provider fuel percentages.
+        val generatedAlerts = mutableListOf<String>()
+        for ((providerId, report) in reports) {
+            val pct = report.remainingPct
+            if (pct != null && report.available) {
+                val name = report.displayName.ifBlank { providerId }
+                when {
+                    pct < 10 -> generatedAlerts.add("CRITICAL: $name at $pct%")
+                    pct < 25 -> generatedAlerts.add("WARNING: $name at $pct%")
+                }
+            }
+        }
+        // Merge: if the orchestrator provided alerts, use those + generated.
+        // Otherwise, use generated alone.
+        if (generatedAlerts.isNotEmpty()) {
+            alerts = AlertsResponse(alerts.alerts + generatedAlerts)
+        }
+
+        // ── Standalone decision engine ───────────────────────────────────
+        // If no connected API is providing a recommended model, run the
+        // local decision engine to pick the best model from current fuel state.
+        val currentFuel = fuel
+        val recommendedModel = currentFuel?.recommendedModel ?: ""
+        val shouldRunDecisionEngine = recommendedModel.isBlank()
+
+        if (shouldRunDecisionEngine && reports.isNotEmpty()) {
+            val fuelConfig = buildFuelConfigFromReports(reports, _state.value.settings.providers)
+            val providerStates = buildProviderStates(reports)
+            val burnRateVal = BurnRateCalculator.compute(FuelHistoryStore.load())
+
+            val decision = decideModel(
+                config = fuelConfig,
+                providerStates = providerStates,
+                burnRate = burnRateVal,
+                taskFloor = Complexity.MEDIUM,
+                upgradeBenefit = 0.6,
+            )
+
+            if (decision != null) {
+                // Set the recommended model so the banner shows it
+                fuel = (fuel ?: FuelResponse()).copy(
+                    recommendedModel = decision.handle,
+                    burnRatePctPerHr = burnRateVal ?: 0.0,
+                )
+
+                // Log decision to SQLite via callback
+                onDecisionLogged?.invoke(
+                    "system",
+                    decision.handle,
+                    decision.provider,
+                    decision.tier.name.lowercase(),
+                    Complexity.MEDIUM.name.lowercase(),
+                    decision.utilizationRatio ?: 0.0,
+                    decision.headroom,
+                    decision.reason,
+                )
+            }
+        }
+
         // Update burn rate history from provider reports
-        var burnRate: Double? = null
-        var dataPoints = 0
         for ((providerId, report) in reports) {
             if (report.type == ProviderType.WINDOW_CREDIT && report.remainingPct != null) {
                 val usedPct = 100 - report.remainingPct
@@ -398,8 +528,8 @@ class FuelViewModel {
 
         // Compute burn rate from history
         val history = FuelHistoryStore.load()
-        dataPoints = history.size
-        burnRate = BurnRateCalculator.compute(history)
+        val dataPoints = history.size
+        val burnRate = BurnRateCalculator.compute(history)
 
         _state.value = _state.value.copy(
             providerReports = reports,
@@ -418,5 +548,65 @@ class FuelViewModel {
     fun close() {
         stopPolling()
         closeAdapters()
+    }
+
+    // --- Standalone decision engine helpers ---
+
+    /**
+     * Builds a FuelConfig for the decision engine from current provider reports.
+     * Maps provider kinds to known model tiers (best-effort heuristic).
+     */
+    private fun buildFuelConfigFromReports(
+        reports: Map<String, ProviderReport>,
+        providerConfigs: List<ProviderConfig>,
+    ): FuelConfig {
+        val providers = reports.map { (id, report) ->
+            val config = providerConfigs.find { it.id == id }
+            val name = config?.resolvedDisplayName() ?: report.displayName
+            FuelProviderConfig(
+                name = name,
+                priority = when (config?.kind) {
+                    ProviderKind.ZAI -> 1
+                    ProviderKind.LETTA_CLOUD -> 2
+                    ProviderKind.OPENAI -> 3
+                    ProviderKind.ANTHROPIC -> 3
+                    ProviderKind.DEEPSEEK -> 4
+                    ProviderKind.GROQ -> 5
+                    ProviderKind.MISTRAL -> 5
+                    else -> 9
+                },
+                models = config?.kind?.let { kind ->
+                    defaultModelsFor(kind)
+                } ?: emptyList(),
+                unlimited = config?.kind in listOf(
+                    ProviderKind.OPENAI,
+                    ProviderKind.ANTHROPIC,
+                    ProviderKind.DEEPSEEK,
+                    ProviderKind.GROQ,
+                    ProviderKind.MISTRAL,
+                ),
+            )
+        }
+        return FuelConfig(providers = providers)
+    }
+
+    /**
+     * Maps provider states for the decision engine.
+     */
+    private fun buildProviderStates(
+        reports: Map<String, ProviderReport>,
+    ): Map<String, ProviderStateInfo> {
+        return reports.mapValues { (id, report) ->
+            ProviderStateInfo(
+                name = report.displayName,
+                remainingPct = report.remainingPct,
+                available = report.available,
+                resetsAt = if (report.resetsAt != null) {
+                    mapOf("main" to report.resetsAt)
+                } else {
+                    emptyMap()
+                },
+            )
+        }
     }
 }

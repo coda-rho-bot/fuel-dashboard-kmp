@@ -98,6 +98,9 @@ fun MobileDashboard(
                     onModeChange = { agentId, mode ->
                         viewModel.onAgentModeChange?.invoke(agentId, mode)
                     },
+                    onRemoveAgent = { agentId ->
+                        viewModel.onRemoveAgent?.invoke(agentId)
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -580,6 +583,7 @@ private fun AgentsTabContent(
     onGoToSettings: () -> Unit,
     onModelChange: (agentId: String, model: String) -> Unit,
     onModeChange: (agentId: String, mode: String) -> Unit,
+    onRemoveAgent: (agentId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -590,6 +594,7 @@ private fun AgentsTabContent(
             agents = state.acpAgents,
             onModelChange = onModelChange,
             onModeChange = onModeChange,
+            onRemoveAgent = onRemoveAgent,
         )
 
         if (state.hasConnectedApi) {
