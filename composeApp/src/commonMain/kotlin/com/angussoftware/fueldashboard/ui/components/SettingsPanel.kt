@@ -408,27 +408,34 @@ private fun AddProviderDialog(
             )
             Spacer(Modifier.height(12.dp))
 
-            // Provider type dropdown — simple clickable field with dropdown menu
+            // Provider type dropdown
             var menuExpanded by remember { mutableStateOf(false) }
             Box {
-                OutlinedTextField(
-                    value = selectedKind.displayName,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth().clickable { menuExpanded = true },
-                    label = { Text("Provider Type") },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .graphicsLayer { rotationZ = if (menuExpanded) 90f else 0f },
-                        )
-                    },
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { menuExpanded = true }
+                        .padding(horizontal = 12.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = selectedKind.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .graphicsLayer { rotationZ = if (menuExpanded) 90f else 0f },
+                    )
+                }
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
