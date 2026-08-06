@@ -63,6 +63,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
+import com.angussoftware.fueldashboard.model.ProviderCategory
 import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
@@ -440,14 +441,24 @@ private fun AddProviderDialog(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                 ) {
-                    ProviderKind.entries.forEach { kind ->
-                        DropdownMenuItem(
-                            text = { Text(kind.displayName, style = MaterialTheme.typography.bodyMedium) },
-                            onClick = {
-                                selectedKind = kind
-                                menuExpanded = false
-                            },
+                    ProviderCategory.entries.forEach { category ->
+                        // Section header
+                        Text(
+                            text = category.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                         )
+                        // Items in this category
+                        ProviderKind.entries.filter { it.category == category }.forEach { kind ->
+                            DropdownMenuItem(
+                                text = { Text(kind.displayName, style = MaterialTheme.typography.bodyMedium) },
+                                onClick = {
+                                    selectedKind = kind
+                                    menuExpanded = false
+                                },
+                            )
+                        }
                     }
                 }
             }

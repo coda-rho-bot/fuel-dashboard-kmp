@@ -8,15 +8,20 @@ import kotlinx.serialization.Serializable
  * Stored in settings as a discriminator.
  */
 @Serializable
-enum class ProviderKind(val displayName: String) {
-    ZAI("z.ai"),
-    LETTA_CLOUD("Letta Cloud"),
-    OPENAI("OpenAI"),
-    ANTHROPIC("Anthropic"),
-    DEEPSEEK("DeepSeek"),
-    GROQ("Groq"),
-    MISTRAL("Mistral AI"),
-    CONNECTED_API("Connected API"),
+enum class ProviderCategory(val label: String) {
+    LLM_PROVIDER("LLM Providers"),
+    FLEET_BACKEND("Agent Fleet Backend"),
+}
+
+enum class ProviderKind(val displayName: String, val category: ProviderCategory) {
+    ZAI("z.ai", ProviderCategory.LLM_PROVIDER),
+    LETTA_CLOUD("Letta Cloud", ProviderCategory.LLM_PROVIDER),
+    OPENAI("OpenAI", ProviderCategory.LLM_PROVIDER),
+    ANTHROPIC("Anthropic", ProviderCategory.LLM_PROVIDER),
+    DEEPSEEK("DeepSeek", ProviderCategory.LLM_PROVIDER),
+    GROQ("Groq", ProviderCategory.LLM_PROVIDER),
+    MISTRAL("Mistral AI", ProviderCategory.LLM_PROVIDER),
+    CONNECTED_API("Orchestrator", ProviderCategory.FLEET_BACKEND),
 }
 
 /**
