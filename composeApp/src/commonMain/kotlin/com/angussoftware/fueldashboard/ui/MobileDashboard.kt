@@ -18,7 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -62,7 +62,7 @@ import kotlinx.datetime.toLocalDateTime
 
 private enum class MobileTab(val label: String) {
     FUEL("Fuel"),
-    FLEET("Fleet"),
+    AGENTS("Agents"),
     SETTINGS("Settings"),
 }
 
@@ -88,8 +88,8 @@ fun MobileDashboard(
                 )
             }
 
-            MobileTab.FLEET -> {
-                FleetTabContent(
+            MobileTab.AGENTS -> {
+                AgentsTabContent(
                     state = state,
                     onGoToSettings = { selectedTab = MobileTab.SETTINGS.ordinal },
                     modifier = Modifier
@@ -128,7 +128,7 @@ fun MobileDashboard(
                         Icon(
                             imageVector = when (tab) {
                                 MobileTab.FUEL -> Icons.Default.LocalGasStation
-                                MobileTab.FLEET -> Icons.Default.Group
+                                MobileTab.AGENTS -> Icons.Default.Person
                                 MobileTab.SETTINGS -> Icons.Default.Settings
                             },
                             contentDescription = tab.label,
@@ -565,11 +565,11 @@ private fun MobileCreditBalance(report: ProviderReport) {
 }
 
 // ---------------------------------------------------------------------------
-// Fleet Tab Content — with improved empty state
+// Agents Tab Content — with improved empty state
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun FleetTabContent(
+private fun AgentsTabContent(
     state: DashboardState,
     onGoToSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -589,7 +589,7 @@ private fun FleetTabContent(
         AgentFleetPanel(agents = state.agents.agents)
         AlertsPanel(alerts = state.alerts.toFuelAlerts())
 
-        // Show decision history on fleet tab too
+        // Show decision history on agents tab too
         val decisions = state.decisions.decisions
         if (decisions.isNotEmpty()) {
             DecisionLog(decisions = decisions)
@@ -622,14 +622,14 @@ private fun MobileFleetEmptyState(
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "No orchestrator connected",
+                text = "No agents discovered",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Add an Orchestrator provider in Settings to see fleet data",
+                text = "Connect an agent backend to see agent data",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

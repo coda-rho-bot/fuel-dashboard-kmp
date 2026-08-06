@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class ProviderCategory(val label: String) {
     LLM_PROVIDER("LLM Providers"),
-    FLEET_BACKEND("Agent Fleet Backend"),
+    AGENT_BACKEND("Agent Backend"),
 }
 
 enum class ProviderKind(val displayName: String, val category: ProviderCategory) {
@@ -21,7 +21,7 @@ enum class ProviderKind(val displayName: String, val category: ProviderCategory)
     DEEPSEEK("DeepSeek", ProviderCategory.LLM_PROVIDER),
     GROQ("Groq", ProviderCategory.LLM_PROVIDER),
     MISTRAL("Mistral AI", ProviderCategory.LLM_PROVIDER),
-    CONNECTED_API("Orchestrator", ProviderCategory.FLEET_BACKEND),
+    CONNECTED_API("Orchestrator", ProviderCategory.AGENT_BACKEND),
 }
 
 /**

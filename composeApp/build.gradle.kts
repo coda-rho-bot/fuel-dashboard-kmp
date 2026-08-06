@@ -105,6 +105,10 @@ kotlin {
             implementation(libs.ktor.server.cors)
 
             implementation(libs.sqldelight.jvm)
+
+            // ACP (Agent Client Protocol) — for monitoring Letta/Claude/Copilot agents
+            implementation(libs.acp.kotlin)
+            implementation(libs.acp.kotlin.ktor.client)
         }
 
         androidMain.dependencies {

@@ -127,7 +127,7 @@ fun FuelDashboardApp(
 }
 
 // ---------------------------------------------------------------------------
-// Desktop Layout — two-column (fuel left, settings/fleet/alerts right)
+// Desktop Layout — two-column (fuel left, settings/agents/alerts right)
 // ---------------------------------------------------------------------------
 
 @Composable

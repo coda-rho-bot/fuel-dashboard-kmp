@@ -205,7 +205,7 @@ fun ImportSettingsDialog(
     onDismiss: () -> Unit,
 ) {
     val llmProviders = syncData.providers.filter { it.kind.category == ProviderCategory.LLM_PROVIDER }
-    val fleetProviders = syncData.providers.filter { it.kind.category == ProviderCategory.FLEET_BACKEND }
+    val fleetProviders = syncData.providers.filter { it.kind.category == ProviderCategory.AGENT_BACKEND }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -236,7 +236,7 @@ fun ImportSettingsDialog(
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text = "${syncData.providers.size} provider${if (syncData.providers.size != 1) "s" else ""}" +
-                            if (llmProviders.isNotEmpty()) " (${llmProviders.size} LLM, ${fleetProviders.size} fleet)" else "",
+                            if (llmProviders.isNotEmpty()) " (${llmProviders.size} LLM, ${fleetProviders.size} agent)" else "",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
                     )

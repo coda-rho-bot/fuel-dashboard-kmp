@@ -17,6 +17,7 @@ kotlinx-datetime = "0.7.1"
 qrcode-kotlin = "4.5.0"
 sqldelight = "2.0.2"
 zxing-android-embedded = "4.3.0"
+acp-kotlin = "0.24.0"
 
 [libraries]
 # Ktor server (desktop only)
@@ -61,6 +62,10 @@ zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", ve
 # SQLDelight
 sqldelight-jvm = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 sqldelight-android = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+
+# ACP (Agent Client Protocol) — desktop only
+acp-kotlin = { module = "com.agentclientprotocol:acp", version.ref = "acp-kotlin" }
+acp-kotlin-ktor-client = { module = "com.agentclientprotocol:acp-ktor-client", version.ref = "acp-kotlin" }
 
 # Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

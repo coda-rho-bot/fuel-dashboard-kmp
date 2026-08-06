@@ -29,7 +29,7 @@ fun AgentFleetPanel(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            text = "Agent Fleet",
+            text = "Agents",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
         )
