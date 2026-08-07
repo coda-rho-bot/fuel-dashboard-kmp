@@ -120,6 +120,8 @@ fun SettingsPanel(
             // --- Providers section ---
             ProvidersSection(
                 settings = settings,
+                agentSettings = state.agentSettings,
+                serverUrl = state.serverUrl,
                 viewModel = viewModel,
                 themeController = themeController,
                 showHelp = state.showHelp,
@@ -170,6 +172,8 @@ fun SettingsPanel(
 @Composable
 private fun ProvidersSection(
     settings: MultiProviderSettings,
+    agentSettings: AgentSettings,
+    serverUrl: String?,
     viewModel: FuelViewModel,
     themeController: ThemeController,
     showHelp: Boolean,
@@ -291,7 +295,12 @@ private fun ProvidersSection(
     // QR sync (generator) dialog
     if (showQrSyncDialog) {
         QrSyncDialog(
-            syncData = SettingsSyncData.from(settings, themeController, serverUrl = viewModel.state.collectAsState().value.serverUrl),
+            syncData = SettingsSyncData.from(
+                settings = settings,
+                agentSettings = agentSettings,
+                themeController = themeController,
+                serverUrl = serverUrl,
+            ),
             onDismiss = { showQrSyncDialog = false },
         )
     }

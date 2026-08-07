@@ -49,6 +49,7 @@ import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.model.ReportWindow
+import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
@@ -175,6 +176,14 @@ private fun DesktopLayout(
                     viewModel.onRemoveAgent?.invoke(agentId)
                 },
                 onAddAgent = viewModel::addAgent,
+                syncData = SettingsSyncData.from(
+                    settings = state.settings,
+                    agentSettings = state.agentSettings,
+                    themeController = themeController,
+                    serverUrl = state.serverUrl,
+                ),
+                onImportSyncedSettings = viewModel::importSyncedSettings,
+                hasConnectedOrchestrator = state.hasConnectedApi,
                 showHelp = state.showHelp,
             )
 

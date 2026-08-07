@@ -344,10 +344,14 @@ class FuelViewModel {
     /**
      * Imports synced settings from a QR code scan.
      *
-     * Replaces all current providers and theme with the imported data.
+     * Replaces all current providers, agent configurations, and theme with the imported data.
      */
     fun importSyncedSettings(syncData: com.angussoftware.fueldashboard.model.SettingsSyncData) {
         updateSettings(syncData.toMultiProviderSettings())
+
+        AgentSettingsStore.save(syncData.agentSettings)
+        _state.value = _state.value.copy(agentSettings = syncData.agentSettings)
+        onAgentSettingsChanged?.invoke(syncData.agentSettings)
 
         // Apply theme settings
         val themeController = com.angussoftware.fueldashboard.settings.ThemeController

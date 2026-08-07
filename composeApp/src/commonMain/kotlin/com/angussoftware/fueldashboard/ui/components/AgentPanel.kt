@@ -22,6 +22,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,6 +49,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.angussoftware.fueldashboard.model.SettingsSyncData
+import com.angussoftware.fueldashboard.ui.rememberQrScanner
+import com.angussoftware.fueldashboard.ui.supportsQrScanning
 import kotlin.math.abs
 
 /**
@@ -78,6 +83,9 @@ data class AcpAgentDisplay(
  * @param onModeChange  invoked when the user picks a different mode for an agent
  * @param onRemoveAgent invoked when the user clicks the delete button on an agent card
  * @param onAddAgent    invoked when the user submits a manual agent configuration
+ * @param syncData      current settings snapshot to share with another device
+ * @param onImportSyncedSettings invoked when imported settings are confirmed
+ * @param hasConnectedOrchestrator whether an Orchestrator provider is configured
  * @param modifier      outer modifier
  */
 @Composable
@@ -87,11 +95,25 @@ fun AgentPanel(
     onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
     onAddAgent: (name: String, command: String, args: String) -> Unit,
+    syncData: SettingsSyncData,
+    onImportSyncedSettings: (SettingsSyncData) -> Unit,
+    hasConnectedOrchestrator: Boolean,
     showHelp: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
     var showAddDialog by remember { mutableStateOf(false) }
+    var showQrSyncDialog by remember { mutableStateOf(false) }
+    var showImportEntryDialog by remember { mutableStateOf(false) }
+    var scannedSyncData by remember { mutableStateOf<SettingsSyncData?>(null) }
+    val qrScanner = rememberQrScanner { scannedText ->
+        if (scannedText != null) {
+            SettingsSyncData.fromJson(scannedText)?.let { parsed ->
+                scannedSyncData = parsed
+                showImportEntryDialog = false
+            }
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -99,22 +121,64 @@ fun AgentPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "Agents",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            TextButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Add agent", modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Add Manually", style = MaterialTheme.typography.labelSmall)
+            Text(text = "Agents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { showQrSyncDialog = true }) {
+                    Icon(Icons.Default.QrCode2, contentDescription = "Sync agents", modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Sync", style = MaterialTheme.typography.labelSmall)
+                }
+                TextButton(onClick = { showImportEntryDialog = true }) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Import agents", modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Import", style = MaterialTheme.typography.labelSmall)
+                }
+                TextButton(onClick = { showAddDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add agent", modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add Manually", style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
 
+        if (showHelp) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "• Agents self-register via MCP, can be added manually via ACP, or sync from desktop through an Orchestrator provider.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "• Registered agents and their current model, mode, and connection status appear here.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         if (agents.isEmpty()) {
-            if (showHelp) {
-                HelpText("Agents can self-register via MCP. Add fuel-dashboard MCP server to your agent config.")
+            if (hasConnectedOrchestrator) {
+                HelpText("Connected to server but no agents registered yet. Agents appear here when they self-register via MCP.")
+            } else {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "• Agents can self-register via MCP (add this app as an MCP server in your agent config)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "• Or add an agent manually with the Add Manually button",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "• On mobile: connect to your desktop via Orchestrator provider in Settings to sync agents",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         } else {
             agents.forEach { agent ->
@@ -140,6 +204,33 @@ fun AgentPanel(
                 onAddAgent(name, command, args)
                 showAddDialog = false
             },
+        )
+    }
+
+    if (showQrSyncDialog) {
+        QrSyncDialog(
+            syncData = syncData,
+            onDismiss = { showQrSyncDialog = false },
+        )
+    }
+
+    if (showImportEntryDialog) {
+        ImportEntryDialog(
+            canScanQr = supportsQrScanning,
+            onScanQr = { qrScanner.launch() },
+            onImportCode = { parsed -> scannedSyncData = parsed },
+            onDismiss = { showImportEntryDialog = false },
+        )
+    }
+
+    scannedSyncData?.let { data ->
+        ImportSettingsDialog(
+            syncData = data,
+            onConfirm = {
+                onImportSyncedSettings(data)
+                scannedSyncData = null
+            },
+            onDismiss = { scannedSyncData = null },
         )
     }
 }

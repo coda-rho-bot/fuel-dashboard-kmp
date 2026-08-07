@@ -9,7 +9,7 @@ import kotlinx.serialization.json.Json
 /**
  * Complete settings snapshot for cross-device sync via QR code or text code.
  *
- * Contains all provider configurations plus theme preferences.
+ * Contains provider and agent configurations plus theme preferences.
  * Serialized to compact JSON, then either encoded as a QR code or
  * base64-encoded as a copy-paste text code.
  */
@@ -21,9 +21,10 @@ data class SettingsSyncData(
     val lightColorTheme: String,
     val darkColorTheme: String,
     val serverUrl: String? = null,
+    val agentSettings: AgentSettings = AgentSettings(),
 ) {
     companion object {
-        const val CURRENT_VERSION = 2
+        const val CURRENT_VERSION = 3
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -36,6 +37,7 @@ data class SettingsSyncData(
          */
         fun from(
             settings: MultiProviderSettings,
+            agentSettings: AgentSettings,
             themeController: ThemeController,
             serverUrl: String? = null,
         ): SettingsSyncData = SettingsSyncData(
@@ -44,6 +46,7 @@ data class SettingsSyncData(
             lightColorTheme = themeController.lightColorTheme.name,
             darkColorTheme = themeController.darkColorTheme.name,
             serverUrl = serverUrl,
+            agentSettings = agentSettings,
         )
 
         /**

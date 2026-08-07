@@ -46,6 +46,7 @@ import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.model.ReportWindow
+import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
@@ -105,6 +106,13 @@ fun MobileDashboard(
                         viewModel.onRemoveAgent?.invoke(agentId)
                     },
                     onAddAgent = viewModel::addAgent,
+                    syncData = SettingsSyncData.from(
+                        settings = state.settings,
+                        agentSettings = state.agentSettings,
+                        themeController = themeController,
+                        serverUrl = state.serverUrl,
+                    ),
+                    onImportSyncedSettings = viewModel::importSyncedSettings,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -619,6 +627,8 @@ private fun AgentsTabContent(
     onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
     onAddAgent: (name: String, command: String, args: String) -> Unit,
+    syncData: SettingsSyncData,
+    onImportSyncedSettings: (SettingsSyncData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -631,6 +641,9 @@ private fun AgentsTabContent(
             onModeChange = onModeChange,
             onRemoveAgent = onRemoveAgent,
             onAddAgent = onAddAgent,
+            syncData = syncData,
+            onImportSyncedSettings = onImportSyncedSettings,
+            hasConnectedOrchestrator = state.hasConnectedApi,
             showHelp = state.showHelp,
         )
 
