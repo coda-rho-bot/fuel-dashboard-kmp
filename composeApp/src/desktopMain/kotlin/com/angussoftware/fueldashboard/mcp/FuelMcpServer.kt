@@ -2,7 +2,11 @@ package com.angussoftware.fueldashboard.mcp
 
 import com.angussoftware.fueldashboard.database.AgentRegistry
 import com.angussoftware.fueldashboard.model.FuelResponse
+import com.angussoftware.fueldashboard.model.MultiProviderSettings
+import com.angussoftware.fueldashboard.model.ProviderConfig
+import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.server.RegisteredAgent
+import com.angussoftware.fueldashboard.settings.FuelSettingsStore
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
@@ -14,12 +18,62 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+
+internal data class SafeProvider(
+    val id: String,
+    val kind: String,
+    val name: String,
+    val serverUrl: String,
+)
+
+internal data class ProviderRemoval(
+    val settings: MultiProviderSettings,
+    val removed: ProviderConfig?,
+)
+
+internal fun addProviderToSettings(
+    settings: MultiProviderSettings,
+    provider: ProviderConfig,
+): MultiProviderSettings = settings.copy(providers = settings.providers + provider)
+
+internal fun removeProviderFromSettings(
+    settings: MultiProviderSettings,
+    id: String?,
+    name: String?,
+): ProviderRemoval {
+    val provider = if (!id.isNullOrBlank()) {
+        settings.providers.find { it.id == id }
+    } else {
+        settings.providers.find {
+            it.displayName.equals(name, ignoreCase = true) ||
+                it.resolvedDisplayName().equals(name, ignoreCase = true)
+        }
+    }
+    return if (provider == null) {
+        ProviderRemoval(settings, null)
+    } else {
+        ProviderRemoval(
+            settings = settings.copy(providers = settings.providers.filterNot { it.id == provider.id }),
+            removed = provider,
+        )
+    }
+}
+
+internal fun safeProviders(settings: MultiProviderSettings): List<SafeProvider> = settings.providers.map {
+    SafeProvider(
+        id = it.id,
+        kind = it.kind.name,
+        name = it.displayName,
+        serverUrl = it.serverUrl,
+    )
+}
 
 /**
  * MCP server that exposes the Fuel Dashboard's agent registration and fuel state
@@ -34,6 +88,7 @@ internal class FuelMcpServer(
     private val agentIdCounter: AtomicLong,
     private val fuelStateProvider: () -> FuelResponse?,
     private val agentRegistry: AgentRegistry? = null,
+    private val onProvidersChanged: () -> Unit = {},
 ) {
     private val json = Json { encodeDefaults = true; explicitNulls = false; ignoreUnknownKeys = true }
 
@@ -56,6 +111,10 @@ internal class FuelMcpServer(
         registerAgentTool()
         updateModelTool()
         updateStatusTool()
+        addProviderTool()
+        removeProviderTool()
+        listProvidersTool()
+        addOrchestratorTool()
         currentFuelResource()
         recommendationResource()
     }
@@ -220,6 +279,210 @@ internal class FuelMcpServer(
             }
         }
     }
+
+    /**
+     * Tool: add_provider
+     *
+     * Adds an LLM provider to the persisted multi-provider settings.
+     */
+    private fun Server.addProviderTool() {
+        addTool(
+            name = "add_provider",
+            description = "Adds an LLM provider to the Fuel Dashboard. Requires 'kind' and 'api_key'.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("kind", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Provider kind (e.g., 'OPENAI', 'ANTHROPIC', or 'ZAI')")
+                    })
+                    put("api_key", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Provider API key")
+                    })
+                    put("name", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Optional display name")
+                    })
+                    put("server_url", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Optional provider server URL override")
+                    })
+                },
+                required = listOf("kind", "api_key"),
+            ),
+        ) { request ->
+            val args = request.arguments
+            val kindName = args?.get("kind")?.jsonPrimitive?.content
+            val apiKey = args?.get("api_key")?.jsonPrimitive?.content
+            if (kindName.isNullOrBlank() || apiKey.isNullOrBlank()) {
+                return@addTool errorResult("kind and api_key are required")
+            }
+
+            val kind = parseProviderKind(kindName)
+                ?: return@addTool errorResult("unknown provider kind: $kindName")
+            val provider = ProviderConfig(
+                id = FuelSettingsStore.generateProviderId(),
+                kind = kind,
+                apiKey = apiKey,
+                displayName = args["name"]?.jsonPrimitive?.content ?: "",
+                serverUrl = args["server_url"]?.jsonPrimitive?.content ?: "",
+            )
+
+            runCatching {
+                val current = FuelSettingsStore.loadMultiProvider()
+                FuelSettingsStore.saveMultiProvider(
+                    addProviderToSettings(current, provider),
+                )
+                onProvidersChanged()
+            }.fold(
+                onSuccess = {
+                    successResult("provider added: ${provider.id}")
+                },
+                onFailure = { errorResult("failed to add provider: ${it.message ?: "unknown error"}") },
+            )
+        }
+    }
+
+    /**
+     * Tool: remove_provider
+     *
+     * Removes one provider by ID or display name.
+     */
+    private fun Server.removeProviderTool() {
+        addTool(
+            name = "remove_provider",
+            description = "Removes a configured provider by 'id' or 'name'. ID takes precedence when both are provided.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("id", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Provider ID")
+                    })
+                    put("name", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Provider display name")
+                    })
+                },
+            ),
+        ) { request ->
+            val args = request.arguments
+            val id = args?.get("id")?.jsonPrimitive?.content
+            val name = args?.get("name")?.jsonPrimitive?.content
+            if (id.isNullOrBlank() && name.isNullOrBlank()) {
+                return@addTool errorResult("id or name is required")
+            }
+
+            runCatching {
+                val current = FuelSettingsStore.loadMultiProvider()
+                val removal = removeProviderFromSettings(current, id, name)
+                if (removal.removed == null) {
+                    errorResult("provider not found")
+                } else {
+                    FuelSettingsStore.saveMultiProvider(removal.settings)
+                    onProvidersChanged()
+                    successResult("provider removed: ${removal.removed.id}")
+                }
+            }.getOrElse { errorResult("failed to remove provider: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    /**
+     * Tool: list_providers
+     *
+     * Lists configured providers without exposing API keys.
+     */
+    private fun Server.listProvidersTool() {
+        addTool(
+            name = "list_providers",
+            description = "Lists configured providers without API keys.",
+        ) {
+            val providers = safeProviders(FuelSettingsStore.loadMultiProvider())
+            val response = buildJsonObject {
+                put("providers", buildJsonArray {
+                    providers.forEach { provider ->
+                        add(buildJsonObject {
+                            put("id", provider.id)
+                            put("kind", provider.kind)
+                            put("name", provider.name)
+                            put("server_url", provider.serverUrl)
+                        })
+                    }
+                })
+            }
+            CallToolResult(content = listOf(TextContent(text = response.toString())))
+        }
+    }
+
+    /**
+     * Tool: add_orchestrator
+     *
+     * Adds a remote Fuel Dashboard server connection.
+     */
+    private fun Server.addOrchestratorTool() {
+        addTool(
+            name = "add_orchestrator",
+            description = "Adds a remote Fuel Dashboard server connection. Requires 'url'.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("url", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Remote Fuel Dashboard server URL")
+                    })
+                },
+                required = listOf("url"),
+            ),
+        ) { request ->
+            val url = request.arguments?.get("url")?.jsonPrimitive?.content
+            if (url.isNullOrBlank()) {
+                return@addTool errorResult("url is required")
+            }
+
+            val provider = ProviderConfig(
+                id = FuelSettingsStore.generateProviderId(),
+                kind = ProviderKind.CONNECTED_API,
+                serverUrl = url,
+                displayName = "Orchestrator",
+            )
+            runCatching {
+                val current = FuelSettingsStore.loadMultiProvider()
+                FuelSettingsStore.saveMultiProvider(
+                    addProviderToSettings(current, provider),
+                )
+                onProvidersChanged()
+            }.fold(
+                onSuccess = {
+                    successResult("orchestrator added: ${provider.id}")
+                },
+                onFailure = { errorResult("failed to add orchestrator: ${it.message ?: "unknown error"}") },
+            )
+        }
+    }
+
+    private fun parseProviderKind(value: String): ProviderKind? = runCatching {
+        ProviderKind.valueOf(value.trim().uppercase().replace('-', '_').replace(' ', '_'))
+    }.getOrNull()
+
+
+    private fun successResult(message: String): CallToolResult = CallToolResult(
+        content = listOf(
+            TextContent(
+                text = buildJsonObject {
+                    put("status", "success")
+                    put("message", message)
+                }.toString(),
+            ),
+        ),
+    )
+
+    private fun errorResult(message: String): CallToolResult =
+        CallToolResult(
+            content = listOf(
+                TextContent(
+                    text = buildJsonObject { put("error", message) }.toString(),
+                ),
+            ),
+            isError = true,
+        )
 
     // ── Resources ─────────────────────────────────────────────────────────
 

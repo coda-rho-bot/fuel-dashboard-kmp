@@ -38,7 +38,13 @@ fun main() = application {
 
     // ── Embedded HTTP server for LAN access (mobile devices) ──────────────
     val serverScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-    val embeddedServer = remember { EmbeddedServer(repository = repository, agentRegistry = agentRegistry) }
+    val embeddedServer = remember {
+        EmbeddedServer(
+            repository = repository,
+            agentRegistry = agentRegistry,
+            onProvidersChanged = { viewModel.reloadSettings() },
+        )
+    }
 
     // Push ViewModel state → server volatile fields whenever they change
     serverScope.launch {

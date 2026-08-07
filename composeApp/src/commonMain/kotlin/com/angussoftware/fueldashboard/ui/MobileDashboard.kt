@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -53,6 +54,8 @@ import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
 import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
+import com.angussoftware.fueldashboard.ui.components.HelpIcon
+import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
@@ -163,7 +166,7 @@ private fun MobileFuelContent(
     when {
         // Empty state — no providers configured
         state.settings.providers.isEmpty() -> {
-            MobileEmptyState(modifier = modifier)
+            MobileEmptyState(showHelp = state.showHelp, modifier = modifier)
         }
         // Loading state — providers configured but no data yet
         state.isLoading && state.providerReports.isEmpty() && state.fuel == null -> {
@@ -246,6 +249,7 @@ private fun MobileFuelContent(
                         config = config,
                         report = report,
                         error = error,
+                        showHelp = state.showHelp,
                     )
                 }
 
@@ -267,7 +271,10 @@ private fun MobileFuelContent(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun MobileEmptyState(modifier: Modifier = Modifier) {
+private fun MobileEmptyState(
+    showHelp: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -287,6 +294,10 @@ private fun MobileEmptyState(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (showHelp) {
+                Spacer(Modifier.height(16.dp))
+                HelpText("Welcome! Add your LLM provider by clicking + Add in Providers below.")
+            }
         }
     }
 }
@@ -347,6 +358,7 @@ private fun MobileProviderCard(
     config: ProviderConfig,
     report: ProviderReport?,
     error: String?,
+    showHelp: Boolean,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -431,7 +443,7 @@ private fun MobileProviderCard(
                     if (rateLimitWindows.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         rateLimitWindows.forEach { window ->
-                            MobileWindowRow(window = window)
+                            MobileWindowRow(window = window, showHelp = showHelp)
                         }
                     }
 
@@ -439,23 +451,23 @@ private fun MobileProviderCard(
                     val budgetWindow = report.windows.firstOrNull { it.name == "Monthly Budget" }
                     if (budgetWindow != null) {
                         Spacer(Modifier.height(8.dp))
-                        MobileWindowRow(window = budgetWindow)
+                        MobileWindowRow(window = budgetWindow, showHelp = showHelp)
                     }
                 }
 
                 ProviderType.RATE_LIMIT -> {
                     report.windows.forEach { window ->
-                        MobileWindowRow(window = window)
+                        MobileWindowRow(window = window, showHelp = showHelp)
                     }
                 }
 
                 ProviderType.WINDOW_CREDIT -> {
                     if (report.windows.isNotEmpty()) {
                         report.windows.forEach { window ->
-                            MobileWindowRow(window = window)
+                            MobileWindowRow(window = window, showHelp = showHelp)
                         }
                     } else if (report.remainingPct != null) {
-                        FuelBar(remainingPct = report.remainingPct, label = "Remaining")
+                        FuelBar(remainingPct = report.remainingPct, label = "Remaining", showHelp = showHelp)
                     } else {
                         Text(
                             "No usage data (unlimited or static)",
@@ -467,7 +479,7 @@ private fun MobileProviderCard(
                     // Credit balance (Letta Cloud) — prominent display
                     if (report.creditsTotal != null && report.creditsTotal > 0) {
                         Spacer(Modifier.height(12.dp))
-                        MobileCreditBalance(report = report)
+                        MobileCreditBalance(report = report, showHelp = showHelp)
                     }
                 }
             }
@@ -480,19 +492,14 @@ private fun MobileProviderCard(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun MobileWindowRow(window: ReportWindow) {
+private fun MobileWindowRow(window: ReportWindow, showHelp: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = window.name,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             window.remainingPct?.let { pct ->
-                FuelBar(remainingPct = pct, compact = true, label = window.name)
+                FuelBar(remainingPct = pct, compact = true, label = window.name, showHelp = showHelp)
             } ?: Text(
                 "\u2014",
                 style = MaterialTheme.typography.labelSmall,
@@ -511,7 +518,10 @@ private fun MobileWindowRow(window: ReportWindow) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun MobileCreditBalance(report: ProviderReport) {
+private fun MobileCreditBalance(
+    report: ProviderReport,
+    showHelp: Boolean,
+) {
     val criticallyLow = report.creditsTotal != null && report.creditsTotal < 1000
     val containerColor = if (criticallyLow)
         MaterialTheme.colorScheme.errorContainer
@@ -532,12 +542,18 @@ private fun MobileCreditBalance(report: ProviderReport) {
             .padding(12.dp),
     ) {
         // Balance — big and prominent
-        Text(
-            text = "${report.creditsTotal}",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = contentColor,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${report.creditsTotal}",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+            )
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("Your purchased credits.")
+            }
+        }
         Text(
             text = "credits remaining",
             style = MaterialTheme.typography.bodyMedium,
@@ -594,6 +610,7 @@ private fun AgentsTabContent(
             onModelChange = onModelChange,
             onModeChange = onModeChange,
             onRemoveAgent = onRemoveAgent,
+            showHelp = state.showHelp,
         )
 
         if (state.hasConnectedApi) {

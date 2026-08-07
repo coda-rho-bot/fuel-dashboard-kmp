@@ -22,4 +22,5 @@ internal object FuelSettingsKeys {
     // Active settings
     const val MULTI_PROVIDER = "multiProviderSettings" // JSON: MultiProviderSettings
     const val AGENT_SETTINGS = "agentSettings"         // JSON: AgentSettings
+    const val SHOW_HELP = "showHelp"
 }

@@ -57,6 +57,8 @@ import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
 import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
+import com.angussoftware.fueldashboard.ui.components.HelpIcon
+import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
@@ -172,6 +174,7 @@ private fun DesktopLayout(
                 onRemoveAgent = { agentId ->
                     viewModel.onRemoveAgent?.invoke(agentId)
                 },
+                showHelp = state.showHelp,
             )
 
             if (state.hasConnectedApi) {
@@ -195,7 +198,7 @@ internal fun FuelColumnContent(
     when {
         // Empty state — no providers configured
         state.settings.providers.isEmpty() -> {
-            EmptyState(modifier = modifier)
+            EmptyState(showHelp = state.showHelp, modifier = modifier)
         }
         // Loading state — providers configured but no data yet
         state.isLoading && state.providerReports.isEmpty() && state.fuel == null -> {
@@ -298,6 +301,7 @@ internal fun FuelColumnContent(
                         config = config,
                         report = report,
                         error = error,
+                        showHelp = state.showHelp,
                     )
                     HorizontalDivider()
                 }
@@ -320,7 +324,10 @@ internal fun FuelColumnContent(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun EmptyState(modifier: Modifier = Modifier) {
+private fun EmptyState(
+    showHelp: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -340,6 +347,10 @@ private fun EmptyState(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (showHelp) {
+                Spacer(Modifier.height(16.dp))
+                HelpText("Welcome! Add your LLM provider by clicking + Add in Providers below.")
+            }
         }
     }
 }
@@ -379,6 +390,7 @@ private fun ProviderSection(
     config: ProviderConfig,
     report: ProviderReport?,
     error: String?,
+    showHelp: Boolean,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -453,7 +465,7 @@ private fun ProviderSection(
                 if (rateLimitWindows.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
                     rateLimitWindows.forEach { window ->
-                        RateLimitWindowRow(window = window)
+                        RateLimitWindowRow(window = window, showHelp = showHelp)
                     }
                 }
 
@@ -461,14 +473,14 @@ private fun ProviderSection(
                 val budgetWindow = report.windows.firstOrNull { it.name == "Monthly Budget" }
                 if (budgetWindow != null) {
                     Spacer(Modifier.height(8.dp))
-                    ReportWindowRow(window = budgetWindow)
+                    ReportWindowRow(window = budgetWindow, showHelp = showHelp)
                 }
             }
 
             ProviderType.RATE_LIMIT -> {
                 // Rate limit only (no budget)
                 report.windows.forEach { window ->
-                    ReportWindowRow(window = window)
+                    ReportWindowRow(window = window, showHelp = showHelp)
                 }
             }
 
@@ -477,11 +489,11 @@ private fun ProviderSection(
                 if (report.windows.isNotEmpty()) {
                     // Sub-window gauges are the primary fuel indicators
                     report.windows.forEach { window ->
-                        ReportWindowRow(window = window)
+                        ReportWindowRow(window = window, showHelp = showHelp)
                     }
                 } else if (report.remainingPct != null) {
                     // No sub-windows — show a single overall gauge
-                    FuelBar(remainingPct = report.remainingPct, label = "Remaining")
+                    FuelBar(remainingPct = report.remainingPct, label = "Remaining", showHelp = showHelp)
                 } else {
                     Text(
                         "No usage data (unlimited or static)",
@@ -519,15 +531,21 @@ private fun ProviderSection(
                                 else
                                     MaterialTheme.colorScheme.onSurface,
                             )
-                            Text(
-                                text = "credits remaining",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = if (criticallyLow)
-                                    MaterialTheme.colorScheme.onErrorContainer
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "credits remaining",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (criticallyLow)
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (showHelp) {
+                                    Spacer(Modifier.width(4.dp))
+                                    HelpIcon("Your purchased credits.")
+                                }
+                            }
                             // Monthly usage
                             if (report.creditsUsed != null && report.creditsLimit != null) {
                                 Spacer(Modifier.height(6.dp))
@@ -563,19 +581,14 @@ private fun ProviderSection(
 }
 
 @Composable
-private fun ReportWindowRow(window: ReportWindow) {
+private fun ReportWindowRow(window: ReportWindow, showHelp: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = window.name,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             window.remainingPct?.let { pct ->
-                FuelBar(remainingPct = pct, compact = true, label = window.name)
+                FuelBar(remainingPct = pct, compact = true, label = window.name, showHelp = showHelp)
             } ?: Text(
                 "\u2014",
                 style = MaterialTheme.typography.labelSmall,
@@ -601,19 +614,14 @@ private fun formatLastUpdated(epochMs: Long): String {
  * Uses FuelBar styling since the windows already carry remainingPct.
  */
 @Composable
-private fun RateLimitWindowRow(window: ReportWindow) {
+private fun RateLimitWindowRow(window: ReportWindow, showHelp: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = window.name,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             window.remainingPct?.let { pct ->
-                FuelBar(remainingPct = pct, compact = true)
+                FuelBar(remainingPct = pct, compact = true, label = window.name, showHelp = showHelp)
             } ?: Text(
                 "\u2014",
                 style = MaterialTheme.typography.labelSmall,

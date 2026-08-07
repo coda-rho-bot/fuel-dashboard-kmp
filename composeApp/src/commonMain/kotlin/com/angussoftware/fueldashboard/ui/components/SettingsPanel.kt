@@ -51,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -90,7 +91,8 @@ fun SettingsPanel(
     viewModel: FuelViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val agentSettings = viewModel.state.collectAsState().value.agentSettings
+    val state = viewModel.state.collectAsState().value
+    val agentSettings = state.agentSettings
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -121,6 +123,7 @@ fun SettingsPanel(
                 settings = settings,
                 viewModel = viewModel,
                 themeController = themeController,
+                showHelp = state.showHelp,
             )
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
@@ -129,7 +132,8 @@ fun SettingsPanel(
             AgentsSection(
                 agentSettings = agentSettings,
                 viewModel = viewModel,
-                liveAgents = viewModel.state.collectAsState().value.acpAgents,
+                liveAgents = state.acpAgents,
+                showHelp = state.showHelp,
             )
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
@@ -141,6 +145,31 @@ fun SettingsPanel(
 
             // --- Color theme picker ---
             ColorThemePicker(themeController)
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    Text(
+                        text = "Show Help",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "Show helpful explanations throughout the dashboard",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.showHelp,
+                    onCheckedChange = viewModel::setShowHelp,
+                )
+            }
         }
     }
 }
@@ -154,6 +183,7 @@ private fun ProvidersSection(
     settings: MultiProviderSettings,
     viewModel: FuelViewModel,
     themeController: ThemeController,
+    showHelp: Boolean,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showQrSyncDialog by remember { mutableStateOf(false) }
@@ -206,6 +236,10 @@ private fun ProvidersSection(
                 Spacer(Modifier.width(4.dp))
                 Text("Sync", style = MaterialTheme.typography.labelSmall)
             }
+            if (showHelp) {
+                HelpIcon("Scan with your phone to copy all settings.")
+                Spacer(Modifier.width(4.dp))
+            }
             // Import Settings — opens dialog with QR scan + paste code options
             TextButton(onClick = { showImportEntryDialog = true }) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = "Import settings", modifier = Modifier.size(16.dp))
@@ -227,17 +261,16 @@ private fun ProvidersSection(
     ) {
         Column(modifier = Modifier.padding(top = 8.dp)) {
             if (settings.providers.isEmpty()) {
-                Text(
-                    text = "No providers configured. Click \"+ Add\" to set up a fuel provider.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (showHelp) {
+                    HelpText("Welcome! Add your LLM provider by clicking + Add in Providers below.")
+                }
             } else {
                 settings.providers.forEach { config ->
                     ProviderConfigRow(
                         config = config,
                         onUpdate = { viewModel.updateProvider(it) },
                         onRemove = { viewModel.removeProvider(config.id) },
+                        showHelp = showHelp,
                     )
                     Spacer(Modifier.height(4.dp))
                 }
@@ -253,6 +286,7 @@ private fun ProvidersSection(
                 viewModel.addProvider(kind, apiKey, name, url)
                 showAddDialog = false
             },
+            showHelp = showHelp,
         )
     }
 
@@ -292,6 +326,7 @@ private fun ProviderConfigRow(
     config: ProviderConfig,
     onUpdate: (ProviderConfig) -> Unit,
     onRemove: () -> Unit,
+    showHelp: Boolean,
 ) {
     var isEditing by remember { mutableStateOf(false) }
     var localKey by remember(config.id, isEditing) { mutableStateOf(config.apiKey) }
@@ -397,7 +432,15 @@ private fun ProviderConfigRow(
                     value = localKey,
                     onValueChange = { localKey = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("API Key") },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("API Key")
+                            if (showHelp) {
+                                Spacer(Modifier.width(4.dp))
+                                HelpIcon("Stored locally, never shared.")
+                            }
+                        }
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -415,7 +458,15 @@ private fun ProviderConfigRow(
                     value = localUrl,
                     onValueChange = { localUrl = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Server URL (optional)") },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Server URL (optional)")
+                            if (showHelp) {
+                                Spacer(Modifier.width(4.dp))
+                                HelpIcon("Optional - only change for self-hosted endpoints.")
+                            }
+                        }
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -469,6 +520,7 @@ private fun ProviderConfigRow(
 private fun AddProviderDialog(
     onDismiss: () -> Unit,
     onAdd: (ProviderKind, String, String, String) -> Unit,
+    showHelp: Boolean,
 ) {
     var selectedKind by remember { mutableStateOf(ProviderKind.ZAI) }
     var apiKey by remember { mutableStateOf("") }
@@ -567,7 +619,15 @@ private fun AddProviderDialog(
                     value = apiKey,
                     onValueChange = { apiKey = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("${selectedKind.displayName} API Key") },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${selectedKind.displayName} API Key")
+                            if (showHelp) {
+                                Spacer(Modifier.width(4.dp))
+                                HelpIcon("Stored locally, never shared.")
+                            }
+                        }
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -596,7 +656,15 @@ private fun AddProviderDialog(
                 value = serverUrl,
                 onValueChange = { serverUrl = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (selectedKind == ProviderKind.CONNECTED_API) "Orchestrator URL" else "Server URL (override for self-hosted)") },
+                label = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (selectedKind == ProviderKind.CONNECTED_API) "Orchestrator URL" else "Server URL (override for self-hosted)")
+                        if (showHelp) {
+                            Spacer(Modifier.width(4.dp))
+                            HelpIcon("Optional - only change for self-hosted endpoints.")
+                        }
+                    }
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -639,6 +707,7 @@ private fun AgentsSection(
     agentSettings: AgentSettings,
     viewModel: FuelViewModel,
     liveAgents: List<AcpAgentDisplay>,
+    showHelp: Boolean,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var isCollapsed by remember { mutableStateOf(false) }
@@ -685,11 +754,9 @@ private fun AgentsSection(
     ) {
         Column(modifier = Modifier.padding(top = 8.dp)) {
             if (liveAgents.isEmpty() && agentSettings.agents.isEmpty()) {
-                Text(
-                    text = "No agents discovered. Agents can self-register via MCP, or click \"+ Add\" to manually configure one.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (showHelp) {
+                    HelpText("Agents can self-register via MCP. Add fuel-dashboard MCP server to your agent config.")
+                }
             } else {
                 // Show live (MCP/HTTP-registered) agents
                 liveAgents.forEach { agent ->

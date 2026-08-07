@@ -83,6 +83,7 @@ fun AgentPanel(
     onModelChange: (agentId: String, model: String) -> Unit,
     onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
+    showHelp: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
@@ -96,11 +97,9 @@ fun AgentPanel(
         Spacer(Modifier.height(8.dp))
 
         if (agents.isEmpty()) {
-            Text(
-                text = "No agents discovered. Make sure your agent framework is running.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (showHelp) {
+                HelpText("Agents can self-register via MCP. Add fuel-dashboard MCP server to your agent config.")
+            }
             return
         }
 

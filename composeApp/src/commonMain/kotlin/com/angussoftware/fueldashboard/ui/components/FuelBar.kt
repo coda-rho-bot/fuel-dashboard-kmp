@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ fun FuelBar(
     remainingPct: Int,
     label: String? = null,
     compact: Boolean = false,
+    showHelp: Boolean = false,
 ) {
     val animatedColor by animateColorAsState(
         targetValue = fuelColor(remainingPct),
@@ -49,12 +51,18 @@ fun FuelBar(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (showHelp) {
+                        Spacer(Modifier.width(4.dp))
+                        HelpIcon("Remaining quota. Updates every 30 seconds.")
+                    }
+                }
                 Text(
                     text = "$remainingPct%",
                     style = MaterialTheme.typography.bodyMedium,

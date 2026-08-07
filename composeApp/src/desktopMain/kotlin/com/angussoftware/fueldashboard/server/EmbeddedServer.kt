@@ -45,6 +45,7 @@ class EmbeddedServer(
     private val agentRegistry: AgentRegistry? = null,
     private val port: Int = DEFAULT_PORT,
     private val host: String = DEFAULT_HOST,
+    private val onProvidersChanged: () -> Unit = {},
 ) {
     companion object {
         const val DEFAULT_PORT = 8321
@@ -158,6 +159,7 @@ class EmbeddedServer(
             agentIdCounter = agentIdCounter,
             fuelStateProvider = { fuelState },
             agentRegistry = agentRegistry,
+            onProvidersChanged = onProvidersChanged,
         ).createServer()
 
         routing {

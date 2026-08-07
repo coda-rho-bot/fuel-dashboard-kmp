@@ -30,6 +30,9 @@ import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
 import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
 import com.angussoftware.fueldashboard.settings.AgentSettingsStore
 import com.angussoftware.fueldashboard.settings.FuelSettingsStore
+import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
+import com.angussoftware.fueldashboard.settings.loadStringSetting
+import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.storage.BurnRateCalculator
 import com.angussoftware.fueldashboard.storage.FuelHistoryStore
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
@@ -65,6 +68,7 @@ data class DashboardState(
     val acpAgents: List<AcpAgentDisplay> = emptyList(),
     val agentSettings: AgentSettings = AgentSettings(),
     val serverUrl: String? = null,
+    val showHelp: Boolean = true,
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -125,7 +129,12 @@ class FuelViewModel {
 
     private val adapters = mutableMapOf<String, ProviderAdapter>()
 
-    private val _state = MutableStateFlow(DashboardState(isLoading = false))
+    private val _state = MutableStateFlow(
+        DashboardState(
+            isLoading = false,
+            showHelp = loadStringSetting(FuelSettingsKeys.SHOW_HELP, "true").toBoolean(),
+        ),
+    )
     val state: StateFlow<DashboardState> = _state.asStateFlow()
 
     init {
@@ -211,16 +220,32 @@ class FuelViewModel {
         _state.value = _state.value.copy(serverUrl = url)
     }
 
+    fun setShowHelp(showHelp: Boolean) {
+        saveStringSetting(FuelSettingsKeys.SHOW_HELP, showHelp.toString())
+        _state.value = _state.value.copy(showHelp = showHelp)
+    }
+
     // --- Settings updates ---
 
     /**
      * Updates multi-provider settings and restarts polling with the new adapters.
      */
     fun updateSettings(newSettings: MultiProviderSettings) {
+        FuelSettingsStore.saveMultiProvider(newSettings)
+
+        applySettings(newSettings)
+    }
+
+    /**
+     * Reloads provider settings persisted by an external integration such as MCP.
+     */
+    fun reloadSettings() {
+        applySettings(FuelSettingsStore.loadMultiProvider())
+    }
+
+    private fun applySettings(newSettings: MultiProviderSettings) {
         stopPolling()
         closeAdapters()
-
-        FuelSettingsStore.saveMultiProvider(newSettings)
 
         _state.value = _state.value.copy(
             settings = newSettings,
