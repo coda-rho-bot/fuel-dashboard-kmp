@@ -413,6 +413,11 @@ private fun ProviderMcpSetupGuide() {
         )
         ProviderGuideText("MCP server URL: http://localhost:8321/mcp")
         ProviderGuideText(
+            "Authentication: All write operations (POST, DELETE, MCP tool calls) require the Embedded Server API Key " +
+                "(shown above in Settings). Pass it as an Authorization header:\n" +
+                "Authorization: Bearer <your-api-key>",
+        )
+        ProviderGuideText(
             "Available MCP tools for provider management:\n" +
                 "• add_provider: adds an LLM provider (kind, api_key; optional name, server_url)\n" +
                 "• remove_provider: removes a provider by name or ID\n" +
@@ -1020,7 +1025,7 @@ private fun AgentsSection(
         Column(modifier = Modifier.padding(top = 8.dp)) {
             if (liveAgents.isEmpty() && agentSettings.agents.isEmpty()) {
                 if (showHelp) {
-                    HelpText("Agents can self-register via MCP. Add fuel-dashboard MCP server to your agent config.")
+                    HelpText("Agents can self-register via MCP (http://localhost:8321/mcp, requires server API key as Bearer token). Or add an agent manually below.")
                 }
             } else {
                 // Show live (MCP/HTTP-registered) agents
