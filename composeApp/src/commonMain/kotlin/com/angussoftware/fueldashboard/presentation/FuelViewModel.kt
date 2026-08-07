@@ -550,6 +550,34 @@ class FuelViewModel {
             burnRate = if (burnRate != null && burnRate > 0) burnRate else null,
             dataPointCount = dataPoints,
         )
+
+        // Merge orchestrator agents into acpAgents so they show in the AgentPanel
+        // (works on both desktop and mobile — desktop gets ACP agents via main.kt,
+        // mobile gets orchestrator agents via ConnectedApiProviderAdapter)
+        if (agents.agents.isNotEmpty()) {
+            val orchestratorAgents = agents.agents.map { agent ->
+                AcpAgentDisplay(
+                    id = agent.agentId,
+                    name = agent.name,
+                    currentModel = agent.currentModel.ifBlank { null },
+                    availableModels = emptyList(),
+                    currentMode = null,
+                    availableModes = emptyList(),
+                    status = "connected",
+                    capabilities = emptyList(),
+                )
+            }
+            // Merge: keep existing ACP/MCP-registered agents, add orchestrator ones that aren't duplicates
+            val existing = _state.value.acpAgents.toMutableList()
+            for (agent in orchestratorAgents) {
+                if (existing.none { it.id == agent.id || it.name.equals(agent.name, ignoreCase = true) }) {
+                    existing.add(agent)
+                }
+            }
+            if (existing.size != _state.value.acpAgents.size) {
+                _state.value = _state.value.copy(acpAgents = existing)
+            }
+        }
     }
 
     fun close() {
