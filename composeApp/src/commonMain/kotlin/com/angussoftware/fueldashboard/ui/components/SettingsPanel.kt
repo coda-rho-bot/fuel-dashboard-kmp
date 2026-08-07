@@ -259,7 +259,7 @@ private fun ProvidersSection(
     // QR sync (generator) dialog
     if (showQrSyncDialog) {
         QrSyncDialog(
-            syncData = SettingsSyncData.from(settings, themeController),
+            syncData = SettingsSyncData.from(settings, themeController, serverUrl = viewModel.state.collectAsState().value.serverUrl),
             onDismiss = { showQrSyncDialog = false },
         )
     }

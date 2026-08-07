@@ -20,9 +20,10 @@ data class SettingsSyncData(
     val themeMode: String,
     val lightColorTheme: String,
     val darkColorTheme: String,
+    val serverUrl: String? = null,
 ) {
     companion object {
-        const val CURRENT_VERSION = 1
+        const val CURRENT_VERSION = 2
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -31,15 +32,18 @@ data class SettingsSyncData(
 
         /**
          * Build a [SettingsSyncData] from the current app state.
+         * @param serverUrl the desktop's public URL (tunnel or LAN) for mobile to connect to
          */
         fun from(
             settings: MultiProviderSettings,
             themeController: ThemeController,
+            serverUrl: String? = null,
         ): SettingsSyncData = SettingsSyncData(
             providers = settings.providers,
             themeMode = themeController.themeMode.name,
             lightColorTheme = themeController.lightColorTheme.name,
             darkColorTheme = themeController.darkColorTheme.name,
+            serverUrl = serverUrl,
         )
 
         /**

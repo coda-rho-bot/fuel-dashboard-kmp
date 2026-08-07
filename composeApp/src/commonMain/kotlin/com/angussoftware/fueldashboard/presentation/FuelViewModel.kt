@@ -64,6 +64,7 @@ data class DashboardState(
     val dataPointCount: Int = 0,
     val acpAgents: List<AcpAgentDisplay> = emptyList(),
     val agentSettings: AgentSettings = AgentSettings(),
+    val serverUrl: String? = null,
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -206,6 +207,10 @@ class FuelViewModel {
         _state.value = _state.value.copy(acpAgents = agents)
     }
 
+    fun setServerUrl(url: String?) {
+        _state.value = _state.value.copy(serverUrl = url)
+    }
+
     // --- Settings updates ---
 
     /**
@@ -332,6 +337,28 @@ class FuelViewModel {
         runCatching {
             val dark = com.angussoftware.theming.compose.ui.theme.ColorTheme.valueOf(syncData.darkColorTheme)
             themeController.updateDarkColorTheme(dark)
+        }
+
+        // If the sync data includes a server URL, auto-add an Orchestrator provider
+        // so mobile can connect to the desktop immediately
+        syncData.serverUrl?.let { url ->
+            val currentSettings = _state.value.settings
+            val hasOrchestrator = currentSettings.providers.any {
+                it.kind == ProviderKind.CONNECTED_API && it.serverUrl == url
+            }
+            if (!hasOrchestrator) {
+                val newProvider = ProviderConfig(
+                    id = "synced-orchestrator",
+                    kind = ProviderKind.CONNECTED_API,
+                    apiKey = "",
+                    displayName = "Dashboard Server",
+                    serverUrl = url,
+                )
+                val updated = currentSettings.copy(
+                    providers = currentSettings.providers + newProvider,
+                )
+                updateSettings(updated)
+            }
         }
     }
 

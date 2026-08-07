@@ -51,6 +51,21 @@ fun main() = application {
 
     embeddedServer.start()
 
+    // ── Set server URL for QR sync ────────────────────────────────────────
+    val serverUrl = remember {
+        try {
+            val conn = java.net.URL("https://fuel.angussoftware.dev").openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = 2000
+            conn.requestMethod = "GET"
+            conn.responseCode // triggers connection
+            conn.disconnect()
+            "https://fuel.angussoftware.dev"
+        } catch (e: Exception) {
+            com.angussoftware.fueldashboard.server.getLanUrl()
+        }
+    }
+    viewModel.setServerUrl(serverUrl)
+
     // ── Poll MCP/HTTP-registered agents → push to ViewModel ───────────────
     // Agents registered via MCP (POST /agents/register) or HTTP are stored
     // in EmbeddedServer.registeredAgents. Poll them every 5s and merge into
