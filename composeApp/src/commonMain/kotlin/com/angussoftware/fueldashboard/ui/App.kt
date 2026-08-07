@@ -59,7 +59,7 @@ import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
-import com.angussoftware.fueldashboard.ui.components.formatCountdown
+import com.angussoftware.fueldashboard.ui.components.CountdownText
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -544,11 +544,14 @@ private fun ProviderSection(
                             }
                             // Reset date
                             if (report.creditsResetAt != null) {
-                                Text(
-                                    text = "Quota resets ${formatCountdown(report.creditsResetAt)}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Quota resets ",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    CountdownText(resetsAt = report.creditsResetAt)
+                                }
                             }
                         }
                     }
@@ -581,11 +584,7 @@ private fun ReportWindowRow(window: ReportWindow) {
         }
         Spacer(Modifier.width(12.dp))
         window.resetsAt?.let { resetTime ->
-            Text(
-                text = formatCountdown(resetTime),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            CountdownText(resetsAt = resetTime)
         }
     }
 }
@@ -623,11 +622,7 @@ private fun RateLimitWindowRow(window: ReportWindow) {
         }
         Spacer(Modifier.width(12.dp))
         window.resetsAt?.let { resetTime ->
-            Text(
-                text = formatCountdown(resetTime),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            CountdownText(resetsAt = resetTime)
         }
     }
 }
