@@ -234,7 +234,7 @@ private fun ProvidersSection(
     }
     if (showHelp) {
         Text(
-            text = "Sync copies settings to your phone. Import reads from another device.",
+            text = "Sync copies settings to another device. Import reads from another device.",
             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
