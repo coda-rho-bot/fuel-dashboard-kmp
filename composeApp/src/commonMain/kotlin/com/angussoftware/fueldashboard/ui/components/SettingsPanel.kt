@@ -476,6 +476,7 @@ private fun ProviderConfigRow(
                         ProviderKind.DEEPSEEK -> Icons.Default.Api
                         ProviderKind.GROQ -> Icons.Default.Api
                         ProviderKind.MISTRAL -> Icons.Default.Api
+                        ProviderKind.JUNIE -> Icons.Default.Api
                         ProviderKind.CONNECTED_API -> Icons.Default.Hub
                     },
                     contentDescription = null,
@@ -548,34 +549,37 @@ private fun ProviderConfigRow(
                 )
                 Spacer(Modifier.height(4.dp))
 
-                // API key
-                OutlinedTextField(
-                    value = localKey,
-                    onValueChange = { localKey = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("API Key")
-                            if (showHelp) {
-                                Spacer(Modifier.width(4.dp))
-                                HelpIcon("Stored locally, never shared.")
+                if (config.kind != ProviderKind.JUNIE) {
+                    // API key
+                    OutlinedTextField(
+                        value = localKey,
+                        onValueChange = { localKey = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("API Key")
+                                if (showHelp) {
+                                    Spacer(Modifier.width(4.dp))
+                                    HelpIcon("Stored locally, never shared.")
+                                }
                             }
-                        }
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        TextButton(onClick = { showKey = !showKey }) {
-                            Text(if (showKey) "Hide" else "Show", style = MaterialTheme.typography.labelSmall)
-                        }
-                    },
-                )
-                Spacer(Modifier.height(4.dp))
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            TextButton(onClick = { showKey = !showKey }) {
+                                Text(if (showKey) "Hide" else "Show", style = MaterialTheme.typography.labelSmall)
+                            }
+                        },
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
 
-                // Server URL (optional override)
-                OutlinedTextField(
+                if (config.kind != ProviderKind.JUNIE) {
+                    // Server URL (optional override)
+                    OutlinedTextField(
                     value = localUrl,
                     onValueChange = { localUrl = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -598,8 +602,16 @@ private fun ProviderConfigRow(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     },
-                )
-                Spacer(Modifier.height(8.dp))
+                    )
+                    Spacer(Modifier.height(8.dp))
+                } else {
+                    Text(
+                        text = "Uses the local junie-auth binary; no API key or server URL is needed.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
 
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                     TextButton(onClick = {
@@ -741,7 +753,7 @@ private fun AddProviderDialog(
             Spacer(Modifier.height(4.dp))
 
             // API key — required for most providers, optional for Connected API
-            if (selectedKind != ProviderKind.CONNECTED_API) {
+            if (selectedKind != ProviderKind.CONNECTED_API && selectedKind != ProviderKind.JUNIE) {
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = { apiKey = it },
@@ -777,9 +789,11 @@ private fun AddProviderDialog(
                 ProviderKind.DEEPSEEK -> "https://api.deepseek.com"
                 ProviderKind.GROQ -> "https://api.groq.com/openai"
                 ProviderKind.MISTRAL -> "https://api.mistral.ai"
+                ProviderKind.JUNIE -> ""
                 ProviderKind.CONNECTED_API -> "http://127.0.0.1:8321"
             }
-            OutlinedTextField(
+            if (selectedKind != ProviderKind.JUNIE) {
+                OutlinedTextField(
                 value = serverUrl,
                 onValueChange = { serverUrl = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -804,7 +818,14 @@ private fun AddProviderDialog(
                 placeholder = {
                     Text(defaultUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
-            )
+                )
+            } else {
+                Text(
+                    text = "Junie uses the local junie-auth binary. Balance checks are manual and cost about $0.20.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
 
@@ -818,10 +839,10 @@ private fun AddProviderDialog(
                 Spacer(Modifier.width(8.dp))
                 TextButton(
                     onClick = { onAdd(selectedKind, apiKey.trim(), displayName.trim(), serverUrl.trim()) },
-                    enabled = if (selectedKind == ProviderKind.CONNECTED_API) {
-                        serverUrl.isNotBlank()
-                    } else {
-                        apiKey.isNotBlank()
+                    enabled = when (selectedKind) {
+                        ProviderKind.CONNECTED_API -> serverUrl.isNotBlank()
+                        ProviderKind.JUNIE -> true
+                        else -> apiKey.isNotBlank()
                     },
                 ) {
                     Text("Add Provider", style = MaterialTheme.typography.labelSmall)

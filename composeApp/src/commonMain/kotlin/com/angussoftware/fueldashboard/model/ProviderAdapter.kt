@@ -39,6 +39,8 @@ data class ProviderReport(
     val creditsTotal: Int? = null,
     val creditsLow: Boolean = false,
     val creditsResetAt: Long? = null, // when monthly quota refreshes (epoch ms)
+    /** Provider-specific secondary information, such as Junie's license tier. */
+    val detail: String? = null,
 )
 
 /**

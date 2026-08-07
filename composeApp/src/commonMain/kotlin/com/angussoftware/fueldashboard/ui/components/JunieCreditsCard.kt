@@ -20,18 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.util.epochMillis
-
-data class JunieCreditsInfo(
-    val balance: Double,
-    val license: String?,
-)
-
-fun parseJunieCredits(output: String): JunieCreditsInfo? {
-    val balance = Regex("Balance left: \\$(\\d+\\.\\d+)").find(output)?.groupValues?.get(1)?.toDoubleOrNull()
-    val license = Regex("License: (.+)").find(output)?.groupValues?.get(1)?.trim()
-    return if (balance != null) JunieCreditsInfo(balance, license) else null
-}
 
 fun formatJunieLastChecked(lastChecked: Long?, now: Long = epochMillis()): String {
     if (lastChecked == null) return "Never"
@@ -46,9 +36,8 @@ fun formatJunieLastChecked(lastChecked: Long?, now: Long = epochMillis()): Strin
 }
 
 @Composable
-fun JunieCreditsCard(
-    info: JunieCreditsInfo?,
-    lastChecked: Long?,
+fun JunieProviderBalance(
+    report: ProviderReport?,
     isChecking: Boolean,
     onCheckBalance: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -65,25 +54,20 @@ fun JunieCreditsCard(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = "Junie Credits",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = info?.let { "${'$'}${"%.2f".format(it.balance)}" } ?: "Not checked yet",
+                text = report?.limitDollars?.let { "${'$'}${"%.2f".format(it)}" } ?: "Not checked yet",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
-            info?.license?.let { license ->
+            report?.detail?.let { license ->
                 Text(
-                    text = license,
+                    text = "License: $license",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
-                text = "Last checked: ${formatJunieLastChecked(lastChecked)}",
+                text = "Last checked: ${formatJunieLastChecked(report?.resetsAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

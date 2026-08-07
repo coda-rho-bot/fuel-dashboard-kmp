@@ -57,7 +57,7 @@ import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
-import com.angussoftware.fueldashboard.ui.components.JunieCreditsCard
+import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
@@ -175,20 +175,11 @@ private fun MobileFuelContent(
 ) {
     when {
         // Empty state — no providers configured
-        state.settings.providers.isEmpty() && state.junieCredits == null -> {
-            Column(modifier = modifier) {
-                MobileEmptyState(
-                    showHelp = state.showHelp,
-                    modifier = Modifier.weight(1f),
-                )
-                JunieCreditsCard(
-                    info = null,
-                    lastChecked = null,
-                    isChecking = false,
-                    onCheckBalance = null,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
+        state.settings.providers.isEmpty() -> {
+            MobileEmptyState(
+                showHelp = state.showHelp,
+                modifier = modifier,
+            )
         }
         // Loading state — providers configured but no data yet
         state.isLoading && state.providerReports.isEmpty() && state.fuel == null -> {
@@ -284,15 +275,6 @@ private fun MobileFuelContent(
                         report = report,
                         error = error,
                         showHelp = state.showHelp,
-                    )
-                }
-
-                item {
-                    JunieCreditsCard(
-                        info = state.junieCredits,
-                        lastChecked = state.junieLastChecked,
-                        isChecking = false,
-                        onCheckBalance = null,
                     )
                 }
 
@@ -443,6 +425,16 @@ private fun MobileProviderCard(
                     text = error,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
+                )
+                if (config.kind != com.angussoftware.fueldashboard.model.ProviderKind.JUNIE) return@Column
+            }
+
+            if (config.kind == com.angussoftware.fueldashboard.model.ProviderKind.JUNIE) {
+                Spacer(Modifier.height(12.dp))
+                JunieProviderBalance(
+                    report = report,
+                    isChecking = false,
+                    onCheckBalance = null,
                 )
                 return@Column
             }

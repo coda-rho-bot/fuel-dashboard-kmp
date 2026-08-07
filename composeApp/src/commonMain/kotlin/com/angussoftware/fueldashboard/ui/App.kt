@@ -50,6 +50,7 @@ import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.model.ReportWindow
 import com.angussoftware.fueldashboard.model.SettingsSyncData
+import com.angussoftware.fueldashboard.network.canCheckJunieBalance
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
@@ -60,7 +61,7 @@ import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
-import com.angussoftware.fueldashboard.ui.components.JunieCreditsCard
+import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
@@ -74,7 +75,6 @@ import kotlin.math.roundToInt
 fun FuelDashboardApp(
     viewModel: FuelViewModel,
     themeController: ThemeController = ThemeController,
-    junieAuthAvailable: Boolean = false,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -124,7 +124,6 @@ fun FuelDashboardApp(
                     state = state,
                     themeController = themeController,
                     viewModel = viewModel,
-                    junieAuthAvailable = junieAuthAvailable,
                     modifier = contentModifier,
                 )
             }
@@ -141,7 +140,6 @@ private fun DesktopLayout(
     state: DashboardState,
     themeController: ThemeController,
     viewModel: FuelViewModel,
-    junieAuthAvailable: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -151,7 +149,6 @@ private fun DesktopLayout(
         FuelColumnContent(
             state = state,
             viewModel = viewModel,
-            junieAuthAvailable = junieAuthAvailable,
             modifier = Modifier.weight(1.5f).fillMaxHeight(),
         )
 
@@ -208,13 +205,11 @@ private fun DesktopLayout(
 internal fun FuelColumnContent(
     state: DashboardState,
     viewModel: FuelViewModel,
-    junieAuthAvailable: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val showJunieCredits = junieAuthAvailable && viewModel.onJunieCheck != null
     when {
         // Empty state — no providers configured
-        state.settings.providers.isEmpty() && !showJunieCredits -> {
+        state.settings.providers.isEmpty() -> {
             EmptyState(showHelp = state.showHelp, modifier = modifier)
         }
         // Loading state — providers configured but no data yet
@@ -331,19 +326,14 @@ internal fun FuelColumnContent(
                         report = report,
                         error = error,
                         showHelp = state.showHelp,
+                        isChecking = config.id in state.checkingProviderIds,
+                        onCheckJunieBalance = if (canCheckJunieBalance) {
+                            { viewModel.checkJunieCredits(config.id) }
+                        } else {
+                            null
+                        },
                     )
                     HorizontalDivider()
-                }
-
-                if (showJunieCredits) {
-                    item {
-                        JunieCreditsCard(
-                            info = state.junieCredits,
-                            lastChecked = state.junieLastChecked,
-                            isChecking = state.isCheckingJunie,
-                            onCheckBalance = viewModel::checkJunieCredits,
-                        )
-                    }
                 }
 
                 // Decisions (from connected API only)
@@ -429,6 +419,8 @@ private fun ProviderSection(
     report: ProviderReport?,
     error: String?,
     showHelp: Boolean,
+    isChecking: Boolean,
+    onCheckJunieBalance: (() -> Unit)?,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -462,6 +454,16 @@ private fun ProviderSection(
                 text = error,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+            )
+            if (config.kind != ProviderKind.JUNIE) return@Column
+        }
+
+        if (config.kind == ProviderKind.JUNIE) {
+            Spacer(Modifier.height(8.dp))
+            JunieProviderBalance(
+                report = report,
+                isChecking = isChecking,
+                onCheckBalance = onCheckJunieBalance,
             )
             return@Column
         }

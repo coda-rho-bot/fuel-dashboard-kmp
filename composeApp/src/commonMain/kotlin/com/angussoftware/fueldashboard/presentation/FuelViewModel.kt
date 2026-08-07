@@ -24,6 +24,7 @@ import com.angussoftware.fueldashboard.network.AnthropicProviderAdapter
 import com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter
 import com.angussoftware.fueldashboard.network.DeepSeekProviderAdapter
 import com.angussoftware.fueldashboard.network.GroqProviderAdapter
+import com.angussoftware.fueldashboard.network.JunieProviderAdapter
 import com.angussoftware.fueldashboard.network.LettaCloudProviderAdapter
 import com.angussoftware.fueldashboard.network.MistralProviderAdapter
 import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
@@ -36,7 +37,6 @@ import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.storage.BurnRateCalculator
 import com.angussoftware.fueldashboard.storage.FuelHistoryStore
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
-import com.angussoftware.fueldashboard.ui.components.JunieCreditsInfo
 import com.angussoftware.fueldashboard.util.epochMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,9 +70,7 @@ data class DashboardState(
     val agentSettings: AgentSettings = AgentSettings(),
     val serverUrl: String? = null,
     val showHelp: Boolean = true,
-    val junieCredits: JunieCreditsInfo? = null,
-    val junieLastChecked: Long? = null,
-    val isCheckingJunie: Boolean = false,
+    val checkingProviderIds: Set<String> = emptySet(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -123,6 +121,7 @@ private fun defaultModelsFor(kind: ProviderKind): List<FuelModel> = when (kind) 
         FuelModel("mistral-small", Complexity.LIGHT),
         FuelModel("mistral-large", Complexity.MEDIUM),
     )
+    ProviderKind.JUNIE -> emptyList()
     ProviderKind.CONNECTED_API -> emptyList()
 }
 
@@ -144,14 +143,9 @@ class FuelViewModel {
     init {
         val settings = FuelSettingsStore.loadMultiProvider()
         val agents = AgentSettingsStore.load()
-        val junieBalance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull()
-        val junieLicense = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null }
-        val junieLastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull()
         _state.value = _state.value.copy(
             settings = settings,
             agentSettings = agents,
-            junieCredits = junieBalance?.let { JunieCreditsInfo(it, junieLicense) },
-            junieLastChecked = junieLastChecked,
         )
         if (settings.hasAnyConfig) {
             activateAdapters(settings)
@@ -197,11 +191,6 @@ class FuelViewModel {
      */
     var onRemoveAgent: ((agentId: String) -> Unit)? = null
 
-    /**
-     * Callback invoked by [checkJunieCredits] on desktop to run the chargeable
-     * junie-credits command. Null on mobile and when Junie is unavailable.
-     */
-    var onJunieCheck: (() -> Unit)? = null
 
     /**
      * Callback invoked when agent settings change (add/remove).
@@ -243,27 +232,31 @@ class FuelViewModel {
         _state.value = _state.value.copy(showHelp = showHelp)
     }
 
-    fun checkJunieCredits() {
-        if (_state.value.isCheckingJunie || onJunieCheck == null) return
-        _state.value = _state.value.copy(isCheckingJunie = true)
-        onJunieCheck?.invoke()
-    }
+    /** Runs Junie's chargeable balance command only after an explicit desktop user action. */
+    fun checkJunieCredits(providerId: String) {
+        val adapter = adapters[providerId] as? JunieProviderAdapter ?: return
+        if (providerId in _state.value.checkingProviderIds) return
 
-    fun completeJunieCreditsCheck(info: JunieCreditsInfo?) {
-        if (info == null) {
-            _state.value = _state.value.copy(isCheckingJunie = false)
-            return
-        }
-
-        val checkedAt = epochMillis()
-        saveStringSetting(FuelSettingsKeys.JUNIE_BALANCE, info.balance.toString())
-        saveStringSetting(FuelSettingsKeys.JUNIE_LICENSE, info.license.orEmpty())
-        saveStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, checkedAt.toString())
         _state.value = _state.value.copy(
-            junieCredits = info,
-            junieLastChecked = checkedAt,
-            isCheckingJunie = false,
+            checkingProviderIds = _state.value.checkingProviderIds + providerId,
         )
+        scope.launch {
+            runCatching { adapter.checkBalance() }
+                .onSuccess { report ->
+                    _state.value = _state.value.copy(
+                        providerReports = _state.value.providerReports + (providerId to report),
+                        providerErrors = _state.value.providerErrors - providerId,
+                        checkingProviderIds = _state.value.checkingProviderIds - providerId,
+                        lastUpdated = epochMillis(),
+                    )
+                }
+                .onFailure { error ->
+                    _state.value = _state.value.copy(
+                        providerErrors = _state.value.providerErrors + (providerId to (error.message ?: "Junie balance check failed")),
+                        checkingProviderIds = _state.value.checkingProviderIds - providerId,
+                    )
+                }
+        }
     }
 
     // --- Settings updates ---
@@ -299,6 +292,7 @@ class FuelViewModel {
             alerts = AlertsResponse(),
             burnRate = null,
             dataPointCount = 0,
+            checkingProviderIds = emptySet(),
         )
 
         if (newSettings.hasAnyConfig) {
@@ -487,6 +481,10 @@ class FuelViewModel {
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
                 monthlyBudgetUsd = null,
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.JUNIE -> JunieProviderAdapter(
+                providerId = config.id,
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.CONNECTED_API -> ConnectedApiProviderAdapter(

@@ -5,7 +5,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import java.io.File
 import com.angussoftware.fueldashboard.acp.AcpAgentConfig
 import com.angussoftware.fueldashboard.acp.AcpAgentInfo
 import com.angussoftware.fueldashboard.acp.AcpAgentManager
@@ -20,7 +19,6 @@ import com.angussoftware.fueldashboard.server.EmbeddedServer
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.FuelDashboardApp
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
-import com.angussoftware.fueldashboard.ui.components.parseJunieCredits
 import com.angussoftware.fueldashboard.ui.theme.DashboardTheme
 import com.angussoftware.fueldashboard.util.epochMillis
 import kotlinx.coroutines.CoroutineScope
@@ -32,7 +30,6 @@ import kotlinx.coroutines.launch
 fun main() = application {
     val viewModel = remember { FuelViewModel() }
     val themeController = ThemeController
-    val junieAuthAvailable = remember { isCommandAvailable("junie-auth") }
 
     // ── Database (decision history + agent registry) ─────────────────────
     val dbDriver = remember { DatabaseDriverFactory().createDriver() }
@@ -163,19 +160,6 @@ fun main() = application {
         serverScope.launch { embeddedServer.deleteRegisteredAgent(agentId) }
     }
 
-    if (junieAuthAvailable) {
-        viewModel.onJunieCheck = {
-            serverScope.launch {
-                val output = runCatching {
-                    val process = ProcessBuilder("junie-credits")
-                        .redirectErrorStream(true)
-                        .start()
-                    process.inputStream.bufferedReader().use { it.readText() }.also { process.waitFor() }
-                }.getOrNull()
-                viewModel.completeJunieCreditsCheck(output?.let(::parseJunieCredits))
-            }
-        }
-    }
 
     // Wire ViewModel callback → DecisionRepository (log decisions to SQLite)
     viewModel.onDecisionLogged = { agentId, modelHandle, provider, tier, complexity, utilizationRatio, headroom, reason ->
@@ -213,15 +197,7 @@ fun main() = application {
             FuelDashboardApp(
                 viewModel = viewModel,
                 themeController = themeController,
-                junieAuthAvailable = junieAuthAvailable,
             )
         }
-    }
-}
-
-private fun isCommandAvailable(command: String): Boolean {
-    val path = System.getenv("PATH") ?: return false
-    return path.split(File.pathSeparator).any { directory ->
-        File(directory, command).canExecute()
     }
 }
