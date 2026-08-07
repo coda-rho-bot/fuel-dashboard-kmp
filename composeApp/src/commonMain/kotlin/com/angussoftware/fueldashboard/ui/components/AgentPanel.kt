@@ -175,35 +175,6 @@ private fun AgentCard(
                 }
 
                 StatusDot(status = agent.status)
-
-                var showDeleteConfirm by remember { mutableStateOf(false) }
-                IconButton(
-                    onClick = { showDeleteConfirm = true },
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Remove agent",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                if (showDeleteConfirm) {
-                    AlertDialog(
-                        onDismissRequest = { showDeleteConfirm = false },
-                        title = { Text("Remove ${agent.name}?") },
-                        text = { Text("This will remove ${agent.name} from the dashboard. They can re-register later.") },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                onRemoveAgent(agent.id)
-                                showDeleteConfirm = false
-                            }) { Text("Remove") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
-                        },
-                    )
-                }
             }
 
             Spacer(Modifier.height(8.dp))
