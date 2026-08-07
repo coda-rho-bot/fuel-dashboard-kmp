@@ -140,6 +140,14 @@ fun AgentPanel(
                 }
             }
         }
+        if (showHelp) {
+            Text(
+                text = "Sync and Import transfer ALL settings (providers + agents + themes) between devices.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            )
+        }
         Spacer(Modifier.height(8.dp))
 
         if (agents.isEmpty()) {
