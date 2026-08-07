@@ -20,8 +20,13 @@ fun parseJunieBalance(output: String): JunieBalanceInfo? {
 }
 
 /**
- * Provides Junie's last-known monthly balance. Polling is intentionally cache-only because
- * invoking junie-credits charges for a check; [checkBalance] is called only by an explicit user action.
+ * Provides Junie's last-known monthly balance.
+ *
+ * Balance checking requires the `junie-credits` helper script to be installed in PATH.
+ * The standard Junie CLI (`junie`) does not expose balance information non-interactively,
+ * so this helper script is a separate dependency. Polling is intentionally cache-only
+ * because invoking junie-credits charges for a check; [checkBalance] is called only by
+ * an explicit user action.
  */
 class JunieProviderAdapter(
     override val providerId: String,
@@ -61,8 +66,8 @@ class JunieProviderAdapter(
     }
 }
 
-/** Actual implementation invokes the local junie-credits binary on desktop only. */
+/** Actual implementation invokes the local junie-credits helper script on desktop only. */
 internal expect suspend fun runJunieCredits(): String
 
-/** Whether this platform can run the local junie-auth-backed balance command. */
+/** Whether this platform can run the junie-credits balance command (checks PATH for the helper script). */
 internal expect val canCheckJunieBalance: Boolean

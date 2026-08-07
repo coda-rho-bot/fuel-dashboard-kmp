@@ -5,7 +5,7 @@ Monitor and manage provider fuel state across your AI fleet.
 
 ## Multi-Provider System
 
-The dashboard supports 9 provider types simultaneously, each with its own adapter and fuel budgeting strategy. The embedded orchestrator routes model requests across providers based on tier selection.
+The dashboard supports 9 provider types simultaneously, each with its own adapter and fuel budgeting strategy. The embedded orchestrator recommends models across providers based on tier selection and current fuel state.
 
 ## Major Features
 
@@ -19,7 +19,7 @@ Agents can discover each other through the ACP protocol.
 
 ### Embedded Orchestrator
 
-The embedded orchestrator routes model requests across providers according to tier selection and current fuel state.
+The embedded orchestrator recommends models across providers according to tier selection and current fuel state.
 
 ### QR Sync
 
@@ -77,11 +77,11 @@ Configure provider credentials and dashboard settings on first launch.
 composeApp/src/
 ├── commonMain/kotlin/.../fueldashboard/
 │   ├── model/         — API data classes + FuelSource interface
-│   ├── network/       — Ktor HTTP client + provider adapters (z.ai, orchestrator)
+│   ├── network/       — Ktor HTTP client + provider adapters (z.ai, OpenAI, Anthropic, DeepSeek, Groq, Mistral, Letta Cloud, Junie, orchestrator)
 │   ├── presentation/  — ViewModel with StateFlow + polling
 │   ├── settings/      — ThemeController + fuel settings storage
 │   ├── storage/       — Local history + burn rate calculator
-│   └── ui/            — Compose UI (dashboard, components, setup screen)
+│   └── ui/            — Compose UI (dashboard, components, settings panel)
 ├── desktopMain/       — JVM entry point (Window + system dark mode detection)
 ├── androidMain/       — Android entry point (MainActivity)
 └── iosMain/           — iOS stub

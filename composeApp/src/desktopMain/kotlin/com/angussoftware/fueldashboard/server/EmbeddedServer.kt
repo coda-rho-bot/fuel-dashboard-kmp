@@ -9,7 +9,10 @@ import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FleetAgent
 import com.angussoftware.fueldashboard.model.FuelResponse
+import com.angussoftware.fueldashboard.model.JunieBalanceData
+import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
+import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -155,6 +158,22 @@ class EmbeddedServer(
         }
     }
 
+    /**
+     * Reads the last-known Junie balance from persisted settings.
+     * Returns null if no balance has ever been checked.
+     */
+    private fun junieBalanceData(): JunieBalanceData? {
+        val balance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull()
+            ?: return null
+        val license = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null }
+        val lastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull()
+        return JunieBalanceData(
+            balance = balance,
+            license = license,
+            lastChecked = lastChecked,
+        )
+    }
+
     private fun Application.configureRouting() {
         install(CORS) { anyHost() }
         install(ContentNegotiation) {
@@ -183,8 +202,9 @@ class EmbeddedServer(
 
             get("/fuel") {
                 val state = fuelState
-                if (state != null) call.respond(state)
-                else call.respondText("{\"providers\":{}}", contentType = ContentType.Application.Json)
+                val withJunie = state?.copy(junie = junieBalanceData())
+                    ?: FuelResponse(junie = junieBalanceData())
+                call.respond(withJunie)
             }
 
             get("/decisions") {

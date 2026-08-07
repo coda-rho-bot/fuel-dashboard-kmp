@@ -21,6 +21,16 @@ data class FuelResponse(
     val modManaged: Map<String, Boolean> = emptyMap(),
     @SerialName("surplus_alert")
     val surplusAlert: Boolean = false,
+    /** Junie balance data, if available on the host. */
+    val junie: JunieBalanceData? = null,
+)
+
+@Serializable
+data class JunieBalanceData(
+    val balance: Double = 0.0,
+    val license: String? = null,
+    @SerialName("last_checked")
+    val lastChecked: Long? = null,
 )
 
 @Serializable

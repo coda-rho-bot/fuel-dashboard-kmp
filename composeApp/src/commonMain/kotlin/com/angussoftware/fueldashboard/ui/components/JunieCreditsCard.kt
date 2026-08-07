@@ -98,6 +98,13 @@ fun JunieProviderBalance(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            } else {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Balance checking requires the junie-credits helper script. Install Junie CLI to use this provider.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

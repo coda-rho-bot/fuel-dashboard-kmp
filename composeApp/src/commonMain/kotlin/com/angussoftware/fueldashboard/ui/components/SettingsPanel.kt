@@ -681,7 +681,7 @@ private fun ProviderConfigRow(
                     Spacer(Modifier.height(8.dp))
                 } else {
                     Text(
-                        text = "Uses the local junie-auth binary; no API key or server URL is needed.",
+                        text = "Requires the junie-credits helper script in PATH. No API key or server URL is needed.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -895,7 +895,7 @@ private fun AddProviderDialog(
                             Spacer(Modifier.width(4.dp))
                             HelpIcon(
                                 if (selectedKind == ProviderKind.CONNECTED_API) {
-                                    "URL of the remote dashboard to connect to."
+                                    "Connects to another Fuel Dashboard instance to monitor its providers. Only needs the server URL — read access is open. Use this to aggregate multiple machines."
                                 } else {
                                     "Optional - only change for self-hosted endpoints."
                                 },
@@ -912,7 +912,7 @@ private fun AddProviderDialog(
                 )
             } else {
                 Text(
-                    text = "Junie uses the local junie-auth binary. Balance checks are manual and cost about $0.20.",
+                    text = "Requires Junie CLI and the junie-credits helper script in PATH. Balance checks are manual and cost about $0.20.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
