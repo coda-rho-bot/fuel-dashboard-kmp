@@ -24,6 +24,23 @@ class DashboardUiApiTest {
     }
 
     @Test
+    fun agentPanelProvidesExpandableMcpAcpAndMobileSetupGuides() {
+        val source = sourceFile("ui/components/AgentPanel.kt").readText()
+
+        assertTrue(source.contains("How to connect agents via MCP (recommended)"))
+        assertTrue(source.contains("How to connect agents via ACP (advanced)"))
+        assertTrue(source.contains("How to see agents on mobile"))
+        assertTrue(source.contains("http://localhost:8321/mcp"))
+        assertTrue(source.contains("register_agent (register name, model, framework)"))
+        assertTrue(source.contains("fuel://recommendation (read recommended model)"))
+        assertTrue(source.contains("ACP-compatible agents: Letta Code, Claude Code, Codex CLI, GitHub Copilot, Gemini CLI."))
+        assertTrue(source.contains("The phone polls the desktop every 30 seconds for agent data."))
+        assertTrue(source.contains("AnimatedVisibility"))
+        assertTrue(source.contains("expandVertically"))
+        assertTrue(source.contains("FontFamily.Monospace"))
+    }
+
+    @Test
     fun fuelScreensExplainProviderStatesAndManagement() {
         val expectedEmptyState = "No providers configured. Add your LLM provider in Settings to start monitoring fuel levels. \\u2192"
 

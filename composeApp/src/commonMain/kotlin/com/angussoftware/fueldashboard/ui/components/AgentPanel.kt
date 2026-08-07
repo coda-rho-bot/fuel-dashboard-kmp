@@ -142,22 +142,6 @@ fun AgentPanel(
         }
         Spacer(Modifier.height(8.dp))
 
-        if (showHelp) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "• Agents self-register via MCP, can be added manually via ACP, or sync from desktop through an Orchestrator provider.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = "• Registered agents and their current model, mode, and connection status appear here.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-        }
-
         if (agents.isEmpty()) {
             if (hasConnectedOrchestrator) {
                 HelpText("Connected to server but no agents registered yet. Agents appear here when they self-register via MCP.")
@@ -194,6 +178,15 @@ fun AgentPanel(
                 )
                 Spacer(Modifier.height(8.dp))
             }
+        }
+
+        if (showHelp) {
+            Spacer(Modifier.height(8.dp))
+            McpSetupGuide()
+            Spacer(Modifier.height(8.dp))
+            AcpSetupGuide()
+            Spacer(Modifier.height(8.dp))
+            MobileSyncGuide()
         }
     }
 
@@ -233,6 +226,184 @@ fun AgentPanel(
             onDismiss = { scannedSyncData = null },
         )
     }
+}
+
+@Composable
+private fun McpSetupGuide() {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    ExpandableSetupGuide(
+        title = "How to connect agents via MCP (recommended)",
+        isExpanded = isExpanded,
+        onToggle = { isExpanded = !isExpanded },
+    ) {
+        GuideText(
+            "MCP (Model Context Protocol) is a standard way for AI agents to communicate with external tools. " +
+                "Your dashboard includes a built-in MCP server that agents can connect to.",
+        )
+        GuideText("1. The dashboard MCP server runs at:")
+        CodeExample("Desktop: http://localhost:8321/mcp\nLAN: http://[your-IP]:8321/mcp")
+        GuideText("2. Add the MCP server to Letta Code settings.json mcpServers:")
+        CodeExample(
+            """
+            {
+              "mcpServers": {
+                "fuel-dashboard": {
+                  "url": "http://localhost:8321/mcp"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+        GuideText("3. For Claude Code, add the same configuration to .mcp.json or settings:")
+        CodeExample(
+            """
+            {
+              "mcpServers": {
+                "fuel-dashboard": {
+                  "url": "http://localhost:8321/mcp"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+        GuideText("4. For other agents, any MCP-compatible client can connect to the same URL.")
+        GuideText(
+            "5. When an agent connects, it calls the register_agent tool with its name and model, then appears in the dashboard.",
+        )
+        GuideText(
+            "Available MCP tools for agents:\n" +
+                "• register_agent (register name, model, framework)\n" +
+                "• update_model (report model changes)\n" +
+                "• update_status (report idle/thinking/error status)\n" +
+                "• add_provider (add an LLM provider to monitor)\n" +
+                "• list_providers (see configured providers)",
+        )
+        GuideText(
+            "Available MCP resources for agents:\n" +
+                "• fuel://current (read current fuel state)\n" +
+                "• fuel://recommendation (read recommended model)",
+        )
+    }
+}
+
+@Composable
+private fun AcpSetupGuide() {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    ExpandableSetupGuide(
+        title = "How to connect agents via ACP (advanced)",
+        isExpanded = isExpanded,
+        onToggle = { isExpanded = !isExpanded },
+    ) {
+        GuideText(
+            "ACP (Agent Client Protocol) is a standard for direct agent-to-client communication over stdin/stdout. " +
+                "It allows the dashboard to spawn agent processes and read their models, modes, and capabilities.",
+        )
+        GuideText("1. Click 'Add Manually' button above.")
+        GuideText("2. Enter the agent's name (e.g., 'Coda').")
+        GuideText("3. Enter the command path (e.g., '/usr/local/bin/letta-acp').")
+        CodeExample("/usr/local/bin/letta-acp")
+        GuideText("4. Enter arguments (e.g., '--yolo').")
+        CodeExample("--yolo")
+        GuideText("5. The dashboard will spawn the process and communicate via ACP.")
+        GuideText("ACP-compatible agents: Letta Code, Claude Code, Codex CLI, GitHub Copilot, Gemini CLI.")
+        GuideText(
+            "Note: ACP only works on desktop (requires spawning local processes). Mobile devices get agents from the desktop via the Orchestrator provider.",
+        )
+    }
+}
+
+@Composable
+private fun MobileSyncGuide() {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    ExpandableSetupGuide(
+        title = "How to see agents on mobile",
+        isExpanded = isExpanded,
+        onToggle = { isExpanded = !isExpanded },
+    ) {
+        GuideText("Agents discovered on desktop are shared with mobile automatically:")
+        GuideText("1. On your phone, go to Settings → Add Provider.")
+        GuideText("2. Select 'Orchestrator' under Agent Backend.")
+        GuideText("3. Enter your desktop's URL:")
+        CodeExample("https://fuel.angussoftware.dev\nhttp://192.168.x.x:8321")
+        GuideText("4. The phone polls the desktop every 30 seconds for agent data.")
+        GuideText("5. Agents appear in the Agents tab on mobile.")
+        GuideText(
+            "Or: use the Sync button on your desktop's Agents tab to scan a QR code that includes the orchestrator URL.",
+        )
+    }
+}
+
+@Composable
+private fun ExpandableSetupGuide(
+    title: String,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Collapse $title" else "Expand $title",
+                    modifier = Modifier.graphicsLayer { rotationZ = if (isExpanded) 180f else 0f },
+                )
+            }
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    content()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuideText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+}
+
+@Composable
+private fun CodeExample(code: String) {
+    Text(
+        text = code,
+        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+            .padding(8.dp),
+    )
 }
 
 @Composable
