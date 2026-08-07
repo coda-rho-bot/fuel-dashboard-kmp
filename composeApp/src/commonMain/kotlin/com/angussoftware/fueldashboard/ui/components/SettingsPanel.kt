@@ -214,17 +214,12 @@ private fun ProvidersSection(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            // Sync to Mobile — generates QR code
+        Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { showQrSyncDialog = true }) {
                 Icon(Icons.Default.QrCode2, contentDescription = "Sync to mobile", modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Sync", style = MaterialTheme.typography.labelSmall)
             }
-            // Import Settings — opens dialog with QR scan + paste code options
             TextButton(onClick = { showImportEntryDialog = true }) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = "Import settings", modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
@@ -236,14 +231,14 @@ private fun ProvidersSection(
                 Text("Add", style = MaterialTheme.typography.labelSmall)
             }
         }
-        if (showHelp) {
-            Text(
-                text = "Scan with your phone to copy all settings.",
-                modifier = Modifier.align(Alignment.End).padding(top = 2.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    }
+    if (showHelp) {
+        Text(
+            text = "Sync copies settings to your phone. Import reads from another device.",
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 
     AnimatedVisibility(
