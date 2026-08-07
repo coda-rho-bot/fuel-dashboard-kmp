@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,7 +72,9 @@ import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderCategory
 import com.angussoftware.fueldashboard.model.ProviderKind
+import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import com.angussoftware.fueldashboard.model.SettingsSyncData
+import androidx.compose.runtime.collectAsState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.rememberQrScanner
@@ -125,6 +128,7 @@ fun SettingsPanel(
             AgentsSection(
                 agentSettings = agentSettings,
                 viewModel = viewModel,
+                liveAgents = viewModel.state.collectAsState().value.acpAgents,
             )
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
@@ -633,6 +637,7 @@ private fun AddProviderDialog(
 private fun AgentsSection(
     agentSettings: AgentSettings,
     viewModel: FuelViewModel,
+    liveAgents: List<AcpAgentDisplay>,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var isCollapsed by remember { mutableStateOf(false) }
@@ -659,7 +664,7 @@ private fun AgentsSection(
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                text = "Agents (${agentSettings.agents.size})",
+                text = "Agents (${liveAgents.size})",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
@@ -678,19 +683,32 @@ private fun AgentsSection(
         exit = shrinkVertically(),
     ) {
         Column(modifier = Modifier.padding(top = 8.dp)) {
-            if (agentSettings.agents.isEmpty()) {
+            if (liveAgents.isEmpty() && agentSettings.agents.isEmpty()) {
                 Text(
-                    text = "No agents configured. Click \"+ Add\" to monitor an ACP-compatible agent.",
+                    text = "No agents discovered. Agents can self-register via MCP, or click \"+ Add\" to manually configure one.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                agentSettings.agents.forEach { agent ->
-                    AgentConfigRow(
-                        agent = agent,
+                // Show live (MCP/HTTP-registered) agents
+                liveAgents.forEach { agent ->
+                    LiveAgentRow(
+                        name = agent.name,
+                        model = agent.currentModel,
+                        status = agent.status,
                         onRemove = { viewModel.removeAgent(agent.id) },
                     )
                     Spacer(Modifier.height(4.dp))
+                }
+                // Show manually configured ACP agents that aren't live yet
+                agentSettings.agents.forEach { agent ->
+                    if (liveAgents.none { it.id == agent.id }) {
+                        AgentConfigRow(
+                            agent = agent,
+                            onRemove = { viewModel.removeAgent(agent.id) },
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
                 }
             }
         }
@@ -704,6 +722,39 @@ private fun AgentsSection(
                 showAddDialog = false
             },
         )
+    }
+}
+
+@Composable
+private fun LiveAgentRow(
+    name: String,
+    model: String?,
+    status: String,
+    onRemove: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Status dot
+            Box(
+                modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp))
+                    .background(when (status) { "connected" -> Color(0xFF4CAF50); "idle" -> Color(0xFFFFA726); else -> MaterialTheme.colorScheme.outline }),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                model?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace) }
+            }
+            IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "Remove agent", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            }
+        }
     }
 }
 
