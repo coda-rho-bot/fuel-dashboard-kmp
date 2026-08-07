@@ -25,8 +25,7 @@ class ConnectedApiProviderAdapter(
     private val baseUrl: String,
     private val customDisplayName: String = "",
 ) : ProviderAdapter {
-
-    override val displayName: String = customDisplayName.ifBlank { "Connected API" }
+    override val displayName: String = customDisplayName.ifBlank { "Remote Dashboard" }
     override val providerType: ProviderType = ProviderType.WINDOW_CREDIT
 
     private val client = FuelApiClient(baseUrl)

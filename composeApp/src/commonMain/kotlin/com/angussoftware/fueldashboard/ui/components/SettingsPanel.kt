@@ -267,7 +267,7 @@ private fun ProvidersSection(
         Column(modifier = Modifier.padding(top = 8.dp)) {
             if (settings.providers.isEmpty()) {
                 if (showHelp) {
-                    HelpText("Welcome! Add your LLM provider by clicking + Add in Providers below.")
+                    HelpText("Welcome! Add a provider by clicking + Add in Providers below.")
                 }
             } else {
                 settings.providers.forEach { config ->
@@ -341,15 +341,16 @@ private fun ProviderMcpSetupGuide() {
         onToggle = { isExpanded = !isExpanded },
     ) {
         ProviderGuideText(
-            "Agents connected to the dashboard's MCP server can automatically add and remove LLM providers. " +
+            "Agents connected to the dashboard's MCP server can automatically manage LLM providers and connect a remote dashboard. " +
                 "No manual entry needed.",
         )
         ProviderGuideText("MCP server URL: http://localhost:8321/mcp")
         ProviderGuideText(
             "Available MCP tools for provider management:\n" +
-                "• add_provider: adds an LLM provider (kind, api_key, name)\n" +
+                "• add_provider: adds an LLM provider (kind, api_key; optional name, server_url)\n" +
                 "• remove_provider: removes a provider by name or ID\n" +
-                "• list_providers: lists all configured providers",
+                "• list_providers: lists all configured providers\n" +
+                "• add_orchestrator: connects to a remote dashboard (url)",
         )
         ProviderGuideText("Example — an agent adding a z.ai provider:")
         ProviderCodeExample(
@@ -364,9 +365,9 @@ private fun ProviderMcpSetupGuide() {
             }
             """.trimIndent(),
         )
-        ProviderGuideText("Supported provider kinds: zai, letta_cloud, openai, anthropic, deepseek, groq, mistral")
+        ProviderGuideText("Supported LLM provider kinds: zai, letta_cloud, openai, anthropic, deepseek, groq, mistral")
         ProviderGuideText(
-            "When an agent adds a provider via MCP, it appears here automatically and starts polling for fuel data.",
+            "When an agent adds an LLM provider or remote dashboard via MCP, it appears here automatically and starts polling for fuel data.",
         )
     }
 }
@@ -664,7 +665,7 @@ private fun AddProviderDialog(
                 )
                 if (showHelp) {
                     Spacer(Modifier.width(4.dp))
-                    HelpIcon("Choose your LLM provider. Enter your API key to start monitoring fuel.")
+                    HelpIcon("Choose a provider. Enter its API key or the remote dashboard URL to start monitoring fuel.")
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -784,10 +785,16 @@ private fun AddProviderDialog(
                 modifier = Modifier.fillMaxWidth(),
                 label = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (selectedKind == ProviderKind.CONNECTED_API) "Orchestrator URL" else "Server URL (override for self-hosted)")
+                        Text(if (selectedKind == ProviderKind.CONNECTED_API) "Remote Dashboard URL" else "Server URL (override for self-hosted)")
                         if (showHelp) {
                             Spacer(Modifier.width(4.dp))
-                            HelpIcon("Optional - only change for self-hosted endpoints.")
+                            HelpIcon(
+                                if (selectedKind == ProviderKind.CONNECTED_API) {
+                                    "URL of the remote dashboard to connect to."
+                                } else {
+                                    "Optional - only change for self-hosted endpoints."
+                                },
+                            )
                         }
                     }
                 },

@@ -1,0 +1,120 @@
+package com.angussoftware.fueldashboard.ui.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.angussoftware.fueldashboard.util.epochMillis
+
+data class JunieCreditsInfo(
+    val balance: Double,
+    val license: String?,
+)
+
+fun parseJunieCredits(output: String): JunieCreditsInfo? {
+    val balance = Regex("Balance left: \\$(\\d+\\.\\d+)").find(output)?.groupValues?.get(1)?.toDoubleOrNull()
+    val license = Regex("License: (.+)").find(output)?.groupValues?.get(1)?.trim()
+    return if (balance != null) JunieCreditsInfo(balance, license) else null
+}
+
+fun formatJunieLastChecked(lastChecked: Long?, now: Long = epochMillis()): String {
+    if (lastChecked == null) return "Never"
+
+    val elapsedMs = (now - lastChecked).coerceAtLeast(0L)
+    return when {
+        elapsedMs < 60_000L -> "Just now"
+        elapsedMs < 60 * 60_000L -> "${elapsedMs / 60_000L}m ago"
+        elapsedMs < 24 * 60 * 60_000L -> "${elapsedMs / (60 * 60_000L)}h ago"
+        else -> "${elapsedMs / (24 * 60 * 60_000L)}d ago"
+    }
+}
+
+@Composable
+fun JunieCreditsCard(
+    info: JunieCreditsInfo?,
+    lastChecked: Long?,
+    isChecking: Boolean,
+    onCheckBalance: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = "Junie Credits",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = info?.let { "${'$'}${"%.2f".format(it.balance)}" } ?: "Not checked yet",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            info?.license?.let { license ->
+                Text(
+                    text = license,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = "Last checked: ${formatJunieLastChecked(lastChecked)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            if (isChecking) {
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        text = "Checking... this costs ~${'$'}0.20",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            } else if (onCheckBalance != null) {
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = onCheckBalance,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Check Balance")
+                }
+                Text(
+                    text = "Checking costs ~${'$'}0.20",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}

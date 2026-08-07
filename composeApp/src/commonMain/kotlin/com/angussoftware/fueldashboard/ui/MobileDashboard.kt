@@ -57,6 +57,7 @@ import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
+import com.angussoftware.fueldashboard.ui.components.JunieCreditsCard
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
@@ -174,8 +175,20 @@ private fun MobileFuelContent(
 ) {
     when {
         // Empty state — no providers configured
-        state.settings.providers.isEmpty() -> {
-            MobileEmptyState(showHelp = state.showHelp, modifier = modifier)
+        state.settings.providers.isEmpty() && state.junieCredits == null -> {
+            Column(modifier = modifier) {
+                MobileEmptyState(
+                    showHelp = state.showHelp,
+                    modifier = Modifier.weight(1f),
+                )
+                JunieCreditsCard(
+                    info = null,
+                    lastChecked = null,
+                    isChecking = false,
+                    onCheckBalance = null,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
         }
         // Loading state — providers configured but no data yet
         state.isLoading && state.providerReports.isEmpty() && state.fuel == null -> {
@@ -274,6 +287,15 @@ private fun MobileFuelContent(
                     )
                 }
 
+                item {
+                    JunieCreditsCard(
+                        info = state.junieCredits,
+                        lastChecked = state.junieLastChecked,
+                        isChecking = false,
+                        onCheckBalance = null,
+                    )
+                }
+
                 // Decisions (from connected API only)
                 val decisions = state.decisions.decisions
                 if (decisions.isNotEmpty()) {
@@ -305,13 +327,13 @@ private fun MobileEmptyState(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "No providers configured. Add your LLM provider in Settings to start monitoring fuel levels. \u2192",
+                text = "No providers configured. Add a provider in Settings to start monitoring fuel levels. \u2192",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (showHelp) {
                 Spacer(Modifier.height(16.dp))
-                HelpText("Welcome! Add your LLM provider by clicking + Add in Providers below.")
+                HelpText("Welcome! Add a provider by clicking + Add in Providers below.")
             }
         }
     }

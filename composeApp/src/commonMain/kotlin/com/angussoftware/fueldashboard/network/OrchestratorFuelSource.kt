@@ -12,7 +12,7 @@ class OrchestratorFuelSource(
     private val apiClient: FuelApiClient,
 ) : FuelSource {
 
-    override val displayName: String = "Orchestrator"
+    override val displayName: String = "Remote Dashboard"
 
     override suspend fun getFuel(): FuelResponse = apiClient.getFuel()
 }

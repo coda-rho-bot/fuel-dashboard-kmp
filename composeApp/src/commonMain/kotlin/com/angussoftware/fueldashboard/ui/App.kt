@@ -60,6 +60,7 @@ import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
+import com.angussoftware.fueldashboard.ui.components.JunieCreditsCard
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
@@ -73,6 +74,7 @@ import kotlin.math.roundToInt
 fun FuelDashboardApp(
     viewModel: FuelViewModel,
     themeController: ThemeController = ThemeController,
+    junieAuthAvailable: Boolean = false,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -122,6 +124,7 @@ fun FuelDashboardApp(
                     state = state,
                     themeController = themeController,
                     viewModel = viewModel,
+                    junieAuthAvailable = junieAuthAvailable,
                     modifier = contentModifier,
                 )
             }
@@ -138,6 +141,7 @@ private fun DesktopLayout(
     state: DashboardState,
     themeController: ThemeController,
     viewModel: FuelViewModel,
+    junieAuthAvailable: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -147,6 +151,7 @@ private fun DesktopLayout(
         FuelColumnContent(
             state = state,
             viewModel = viewModel,
+            junieAuthAvailable = junieAuthAvailable,
             modifier = Modifier.weight(1.5f).fillMaxHeight(),
         )
 
@@ -203,11 +208,13 @@ private fun DesktopLayout(
 internal fun FuelColumnContent(
     state: DashboardState,
     viewModel: FuelViewModel,
+    junieAuthAvailable: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val showJunieCredits = junieAuthAvailable && viewModel.onJunieCheck != null
     when {
         // Empty state — no providers configured
-        state.settings.providers.isEmpty() -> {
+        state.settings.providers.isEmpty() && !showJunieCredits -> {
             EmptyState(showHelp = state.showHelp, modifier = modifier)
         }
         // Loading state — providers configured but no data yet
@@ -328,6 +335,17 @@ internal fun FuelColumnContent(
                     HorizontalDivider()
                 }
 
+                if (showJunieCredits) {
+                    item {
+                        JunieCreditsCard(
+                            info = state.junieCredits,
+                            lastChecked = state.junieLastChecked,
+                            isChecking = state.isCheckingJunie,
+                            onCheckBalance = viewModel::checkJunieCredits,
+                        )
+                    }
+                }
+
                 // Decisions (from connected API only)
                 val decisions = state.decisions.decisions
                 if (decisions.isNotEmpty()) {
@@ -359,13 +377,13 @@ private fun EmptyState(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "No providers configured. Add your LLM provider in Settings to start monitoring fuel levels. \u2192",
+                text = "No providers configured. Add a provider in Settings to start monitoring fuel levels. \u2192",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (showHelp) {
                 Spacer(Modifier.height(16.dp))
-                HelpText("Welcome! Add your LLM provider by clicking + Add in Providers below.")
+                HelpText("Welcome! Add a provider by clicking + Add in Providers below.")
             }
         }
     }

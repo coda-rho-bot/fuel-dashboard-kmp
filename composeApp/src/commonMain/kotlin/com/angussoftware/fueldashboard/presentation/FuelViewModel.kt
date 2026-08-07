@@ -36,6 +36,7 @@ import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.storage.BurnRateCalculator
 import com.angussoftware.fueldashboard.storage.FuelHistoryStore
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
+import com.angussoftware.fueldashboard.ui.components.JunieCreditsInfo
 import com.angussoftware.fueldashboard.util.epochMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +70,9 @@ data class DashboardState(
     val agentSettings: AgentSettings = AgentSettings(),
     val serverUrl: String? = null,
     val showHelp: Boolean = true,
+    val junieCredits: JunieCreditsInfo? = null,
+    val junieLastChecked: Long? = null,
+    val isCheckingJunie: Boolean = false,
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -140,7 +144,15 @@ class FuelViewModel {
     init {
         val settings = FuelSettingsStore.loadMultiProvider()
         val agents = AgentSettingsStore.load()
-        _state.value = _state.value.copy(settings = settings, agentSettings = agents)
+        val junieBalance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull()
+        val junieLicense = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null }
+        val junieLastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull()
+        _state.value = _state.value.copy(
+            settings = settings,
+            agentSettings = agents,
+            junieCredits = junieBalance?.let { JunieCreditsInfo(it, junieLicense) },
+            junieLastChecked = junieLastChecked,
+        )
         if (settings.hasAnyConfig) {
             activateAdapters(settings)
         }
@@ -186,6 +198,12 @@ class FuelViewModel {
     var onRemoveAgent: ((agentId: String) -> Unit)? = null
 
     /**
+     * Callback invoked by [checkJunieCredits] on desktop to run the chargeable
+     * junie-credits command. Null on mobile and when Junie is unavailable.
+     */
+    var onJunieCheck: (() -> Unit)? = null
+
+    /**
      * Callback invoked when agent settings change (add/remove).
      * Set from main.kt (desktop) to restart AcpAgentManager with new config.
      * Null on platforms without ACP support (Android).
@@ -223,6 +241,29 @@ class FuelViewModel {
     fun setShowHelp(showHelp: Boolean) {
         saveStringSetting(FuelSettingsKeys.SHOW_HELP, showHelp.toString())
         _state.value = _state.value.copy(showHelp = showHelp)
+    }
+
+    fun checkJunieCredits() {
+        if (_state.value.isCheckingJunie || onJunieCheck == null) return
+        _state.value = _state.value.copy(isCheckingJunie = true)
+        onJunieCheck?.invoke()
+    }
+
+    fun completeJunieCreditsCheck(info: JunieCreditsInfo?) {
+        if (info == null) {
+            _state.value = _state.value.copy(isCheckingJunie = false)
+            return
+        }
+
+        val checkedAt = epochMillis()
+        saveStringSetting(FuelSettingsKeys.JUNIE_BALANCE, info.balance.toString())
+        saveStringSetting(FuelSettingsKeys.JUNIE_LICENSE, info.license.orEmpty())
+        saveStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, checkedAt.toString())
+        _state.value = _state.value.copy(
+            junieCredits = info,
+            junieLastChecked = checkedAt,
+            isCheckingJunie = false,
+        )
     }
 
     // --- Settings updates ---
@@ -380,7 +421,7 @@ class FuelViewModel {
                     id = "synced-orchestrator",
                     kind = ProviderKind.CONNECTED_API,
                     apiKey = "",
-                    displayName = "Dashboard Server",
+                    displayName = "Remote Dashboard",
                     serverUrl = url,
                 )
                 val updated = currentSettings.copy(

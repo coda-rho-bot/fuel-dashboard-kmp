@@ -45,17 +45,18 @@ class DashboardUiApiTest {
         val source = sourceFile("ui/components/SettingsPanel.kt").readText()
 
         assertTrue(source.contains("How agents can add providers via MCP"))
-        assertTrue(source.contains("Agents connected to the dashboard's MCP server can automatically add and remove LLM providers."))
+        assertTrue(source.contains("Agents connected to the dashboard's MCP server can automatically manage LLM providers and connect a remote dashboard."))
         assertTrue(source.contains("No manual entry needed."))
         assertTrue(source.contains("MCP server URL: http://localhost:8321/mcp"))
-        assertTrue(source.contains("add_provider: adds an LLM provider (kind, api_key, name)"))
+        assertTrue(source.contains("add_provider: adds an LLM provider (kind, api_key; optional name, server_url)"))
         assertTrue(source.contains("remove_provider: removes a provider by name or ID"))
         assertTrue(source.contains("list_providers: lists all configured providers"))
+        assertTrue(source.contains("add_orchestrator: connects to a remote dashboard (url)"))
         assertTrue(source.contains("\"kind\": \"zai\""))
         assertTrue(source.contains("\"api_key\": \"your-api-key\""))
         assertTrue(source.contains("\"name\": \"z.ai (Work)\""))
-        assertTrue(source.contains("Supported provider kinds: zai, letta_cloud, openai, anthropic, deepseek, groq, mistral"))
-        assertTrue(source.contains("When an agent adds a provider via MCP, it appears here automatically and starts polling for fuel data."))
+        assertTrue(source.contains("Supported LLM provider kinds: zai, letta_cloud, openai, anthropic, deepseek, groq, mistral"))
+        assertTrue(source.contains("When an agent adds an LLM provider or remote dashboard via MCP, it appears here automatically and starts polling for fuel data."))
         assertTrue(source.contains("if (showHelp)"))
         assertTrue(source.contains("AnimatedVisibility"))
         assertTrue(source.contains("expandVertically"))
@@ -64,7 +65,7 @@ class DashboardUiApiTest {
 
     @Test
     fun fuelScreensExplainProviderStatesAndManagement() {
-        val expectedEmptyState = "No providers configured. Add your LLM provider in Settings to start monitoring fuel levels. \\u2192"
+        val expectedEmptyState = "No providers configured. Add a provider in Settings to start monitoring fuel levels. \\u2192"
 
         listOf("ui/App.kt", "ui/MobileDashboard.kt").forEach { path ->
             val source = sourceFile(path).readText()

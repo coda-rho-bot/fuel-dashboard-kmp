@@ -152,7 +152,7 @@ fun AgentPanel(
 
         if (agents.isEmpty()) {
             if (hasConnectedOrchestrator) {
-                HelpText("Connected to server but no agents registered yet. Agents appear here when they self-register via MCP.")
+                HelpText("A Remote Dashboard is configured, but no agents are available. Agents appear here when they are registered on the remote dashboard.")
             } else {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -166,7 +166,7 @@ fun AgentPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = "• On mobile: connect to your desktop via Orchestrator provider in Settings to sync agents",
+                        text = "• On mobile: connect to a remote dashboard in Settings to see desktop agents",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -285,7 +285,9 @@ private fun McpSetupGuide() {
                 "• update_model (report model changes)\n" +
                 "• update_status (report idle/thinking/error status)\n" +
                 "• add_provider (add an LLM provider to monitor)\n" +
-                "• list_providers (see configured providers)",
+                "• remove_provider (remove a provider by ID or name)\n" +
+                "• list_providers (see configured providers)\n" +
+                "• add_orchestrator (connect to a remote dashboard)",
         )
         GuideText(
             "Available MCP resources for agents:\n" +
@@ -317,7 +319,7 @@ private fun AcpSetupGuide() {
         GuideText("5. The dashboard will spawn the process and communicate via ACP.")
         GuideText("ACP-compatible agents: Letta Code, Claude Code, Codex CLI, GitHub Copilot, Gemini CLI.")
         GuideText(
-            "Note: ACP only works on desktop (requires spawning local processes). Mobile devices get agents from the desktop via the Orchestrator provider.",
+            "Note: ACP only works on desktop (requires spawning local processes). Mobile devices get agents from the desktop through a Remote Dashboard connection.",
         )
     }
 }
@@ -331,15 +333,15 @@ private fun MobileSyncGuide() {
         isExpanded = isExpanded,
         onToggle = { isExpanded = !isExpanded },
     ) {
-        GuideText("Agents discovered on desktop are shared with mobile automatically:")
+        GuideText("To view agents discovered on desktop from mobile:")
         GuideText("1. On your phone, go to Settings → Add Provider.")
-        GuideText("2. Select 'Orchestrator' under Agent Backend.")
+        GuideText("2. Select 'Remote Dashboard' under Agent Backend.")
         GuideText("3. Enter your desktop's URL:")
         CodeExample("https://fuel.angussoftware.dev\nhttp://192.168.x.x:8321")
         GuideText("4. The phone polls the desktop every 30 seconds for agent data.")
         GuideText("5. Agents appear in the Agents tab on mobile.")
         GuideText(
-            "Or: use the Sync button on your desktop's Agents tab to scan a QR code that includes the orchestrator URL.",
+            "Or: use the Sync button on your desktop's Agents tab to scan a QR code that includes the remote dashboard URL.",
         )
     }
 }

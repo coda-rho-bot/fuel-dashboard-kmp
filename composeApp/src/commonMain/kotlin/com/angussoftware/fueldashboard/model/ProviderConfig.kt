@@ -21,7 +21,7 @@ enum class ProviderKind(val displayName: String, val category: ProviderCategory)
     DEEPSEEK("DeepSeek", ProviderCategory.LLM_PROVIDER),
     GROQ("Groq", ProviderCategory.LLM_PROVIDER),
     MISTRAL("Mistral AI", ProviderCategory.LLM_PROVIDER),
-    CONNECTED_API("Orchestrator", ProviderCategory.AGENT_BACKEND),
+    CONNECTED_API("Remote Dashboard", ProviderCategory.AGENT_BACKEND),
 }
 
 /**

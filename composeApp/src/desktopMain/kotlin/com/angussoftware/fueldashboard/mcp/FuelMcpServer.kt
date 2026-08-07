@@ -441,7 +441,7 @@ internal class FuelMcpServer(
                 id = FuelSettingsStore.generateProviderId(),
                 kind = ProviderKind.CONNECTED_API,
                 serverUrl = url,
-                displayName = "Orchestrator",
+                displayName = "Remote Dashboard",
             )
             runCatching {
                 val current = FuelSettingsStore.loadMultiProvider()
@@ -451,9 +451,9 @@ internal class FuelMcpServer(
                 onProvidersChanged()
             }.fold(
                 onSuccess = {
-                    successResult("orchestrator added: ${provider.id}")
+                    successResult("remote dashboard added: ${provider.id}")
                 },
-                onFailure = { errorResult("failed to add orchestrator: ${it.message ?: "unknown error"}") },
+                onFailure = { errorResult("failed to add remote dashboard: ${it.message ?: "unknown error"}") },
             )
         }
     }
