@@ -104,6 +104,7 @@ fun MobileDashboard(
                     onRemoveAgent = { agentId ->
                         viewModel.onRemoveAgent?.invoke(agentId)
                     },
+                    onAddAgent = viewModel::addAgent,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -219,6 +220,16 @@ private fun MobileFuelContent(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (state.providerReports.isNotEmpty() || state.fuel != null) {
+                    item {
+                        Text(
+                            text = "Providers managed in Settings",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
                 // Orchestrator fuel data (if connected)
                 state.fuel?.let { fuel ->
                     item {
@@ -286,13 +297,7 @@ private fun MobileEmptyState(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "No providers configured",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Add a provider in Settings \u2192",
+                text = "No providers configured. Add your LLM provider in Settings to start monitoring fuel levels. \u2192",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -613,6 +618,7 @@ private fun AgentsTabContent(
     onModelChange: (agentId: String, model: String) -> Unit,
     onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
+    onAddAgent: (name: String, command: String, args: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -624,6 +630,7 @@ private fun AgentsTabContent(
             onModelChange = onModelChange,
             onModeChange = onModeChange,
             onRemoveAgent = onRemoveAgent,
+            onAddAgent = onAddAgent,
             showHelp = state.showHelp,
         )
 

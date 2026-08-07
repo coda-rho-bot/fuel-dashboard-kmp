@@ -92,7 +92,6 @@ fun SettingsPanel(
     modifier: Modifier = Modifier,
 ) {
     val state = viewModel.state.collectAsState().value
-    val agentSettings = state.agentSettings
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -123,16 +122,6 @@ fun SettingsPanel(
                 settings = settings,
                 viewModel = viewModel,
                 themeController = themeController,
-                showHelp = state.showHelp,
-            )
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-            // --- Agents section ---
-            AgentsSection(
-                agentSettings = agentSettings,
-                viewModel = viewModel,
-                liveAgents = state.acpAgents,
                 showHelp = state.showHelp,
             )
 
@@ -201,11 +190,7 @@ private fun ProvidersSection(
         }
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
@@ -229,16 +214,15 @@ private fun ProvidersSection(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        Row {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
             // Sync to Mobile — generates QR code
             TextButton(onClick = { showQrSyncDialog = true }) {
                 Icon(Icons.Default.QrCode2, contentDescription = "Sync to mobile", modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Sync", style = MaterialTheme.typography.labelSmall)
-            }
-            if (showHelp) {
-                HelpIcon("Scan with your phone to copy all settings.")
-                Spacer(Modifier.width(4.dp))
             }
             // Import Settings — opens dialog with QR scan + paste code options
             TextButton(onClick = { showImportEntryDialog = true }) {
@@ -251,6 +235,14 @@ private fun ProvidersSection(
                 Spacer(Modifier.width(4.dp))
                 Text("Add", style = MaterialTheme.typography.labelSmall)
             }
+        }
+        if (showHelp) {
+            Text(
+                text = "Scan with your phone to copy all settings.",
+                modifier = Modifier.align(Alignment.End).padding(top = 2.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 
@@ -897,93 +889,6 @@ private fun AgentConfigRow(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp),
                     )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddAgentDialog(
-    onDismiss: () -> Unit,
-    onAdd: (name: String, command: String, args: String) -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var command by remember { mutableStateOf("") }
-    var args by remember { mutableStateOf("") }
-
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    text = "Add Agent",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Configure an ACP-compatible agent to monitor.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Name (e.g., Coda, Claude)") },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = command,
-                    onValueChange = { command = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Command path (e.g., letta-acp, claude)") },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                )
-                Spacer(Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = args,
-                    onValueChange = { args = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Arguments (e.g., --yolo, --acp)") },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                )
-
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Common: letta-acp --yolo | claude --acp | copilot --acp",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", style = MaterialTheme.typography.labelSmall)
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(
-                        onClick = { onAdd(name.trim(), command.trim(), args.trim()) },
-                        enabled = name.isNotBlank() && command.isNotBlank(),
-                    ) {
-                        Text("Add Agent", style = MaterialTheme.typography.labelSmall)
-                    }
                 }
             }
         }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
@@ -29,6 +30,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,6 +77,7 @@ data class AcpAgentDisplay(
  * @param onModelChange invoked when the user picks a different model for an agent
  * @param onModeChange  invoked when the user picks a different mode for an agent
  * @param onRemoveAgent invoked when the user clicks the delete button on an agent card
+ * @param onAddAgent    invoked when the user submits a manual agent configuration
  * @param modifier      outer modifier
  */
 @Composable
@@ -83,38 +86,147 @@ fun AgentPanel(
     onModelChange: (agentId: String, model: String) -> Unit,
     onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
+    onAddAgent: (name: String, command: String, args: String) -> Unit,
     showHelp: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
+    var showAddDialog by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = "Agents",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Agents",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            TextButton(onClick = { showAddDialog = true }) {
+                Icon(Icons.Default.Add, contentDescription = "Add agent", modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Add Manually", style = MaterialTheme.typography.labelSmall)
+            }
+        }
         Spacer(Modifier.height(8.dp))
 
         if (agents.isEmpty()) {
             if (showHelp) {
                 HelpText("Agents can self-register via MCP. Add fuel-dashboard MCP server to your agent config.")
             }
-            return
+        } else {
+            agents.forEach { agent ->
+                AgentCard(
+                    agent = agent,
+                    isExpanded = expandedStates[agent.id] ?: false,
+                    onToggleExpand = {
+                        expandedStates[agent.id] = !(expandedStates[agent.id] ?: false)
+                    },
+                    onModelChange = onModelChange,
+                    onModeChange = onModeChange,
+                    onRemoveAgent = onRemoveAgent,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
         }
+    }
 
-        agents.forEach { agent ->
-            AgentCard(
-                agent = agent,
-                isExpanded = expandedStates[agent.id] ?: false,
-                onToggleExpand = {
-                    expandedStates[agent.id] = !(expandedStates[agent.id] ?: false)
-                },
-                onModelChange = onModelChange,
-                onModeChange = onModeChange,
-                onRemoveAgent = onRemoveAgent,
-            )
-            Spacer(Modifier.height(8.dp))
+    if (showAddDialog) {
+        AddAgentDialog(
+            onDismiss = { showAddDialog = false },
+            onAdd = { name, command, args ->
+                onAddAgent(name, command, args)
+                showAddDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+internal fun AddAgentDialog(
+    onDismiss: () -> Unit,
+    onAdd: (name: String, command: String, args: String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var command by remember { mutableStateOf("") }
+    var args by remember { mutableStateOf("") }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "Add Agent",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Configure an ACP-compatible agent to monitor.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Name (e.g., Coda, Claude)") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = command,
+                    onValueChange = { command = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Command path (e.g., letta-acp, claude)") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = args,
+                    onValueChange = { args = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Arguments (e.g., --yolo, --acp)") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Common: letta-acp --yolo | claude --acp | copilot --acp",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { onAdd(name.trim(), command.trim(), args.trim()) },
+                        enabled = name.isNotBlank() && command.isNotBlank(),
+                    ) {
+                        Text("Add Agent", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
         }
     }
 }

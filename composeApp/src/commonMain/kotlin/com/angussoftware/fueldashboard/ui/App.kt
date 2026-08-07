@@ -174,6 +174,7 @@ private fun DesktopLayout(
                 onRemoveAgent = { agentId ->
                     viewModel.onRemoveAgent?.invoke(agentId)
                 },
+                onAddAgent = viewModel::addAgent,
                 showHelp = state.showHelp,
             )
 
@@ -250,6 +251,16 @@ internal fun FuelColumnContent(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (state.providerReports.isNotEmpty() || state.fuel != null) {
+                    item {
+                        Text(
+                            text = "Providers managed in Settings",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
                 // Orchestrator fuel data (if connected)
                 state.fuel?.let { fuel ->
                     item {
@@ -339,13 +350,7 @@ private fun EmptyState(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "No providers configured",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Add a provider in Settings \u2192",
+                text = "No providers configured. Add your LLM provider in Settings to start monitoring fuel levels. \u2192",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
