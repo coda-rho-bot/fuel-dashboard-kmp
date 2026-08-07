@@ -9,11 +9,15 @@ import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FleetAgent
 import com.angussoftware.fueldashboard.model.FuelResponse
+import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.install
 import io.ktor.server.application.call
 import io.ktor.server.cio.CIO
@@ -21,6 +25,7 @@ import io.ktor.server.engine.EmbeddedServer as KtorServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.request.path
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -33,6 +38,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.lang.management.ManagementFactory
 import java.net.NetworkInterface
+import java.security.SecureRandom
+import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -56,6 +63,7 @@ class EmbeddedServer(
 
     private var server: KtorServer<*, *>? = null
     private val startTimeMs = System.currentTimeMillis()
+    private val apiKey = ServerApiKeyStore.loadOrCreate(::generateApiKey)
 
     /** Thread-safe registry of agents that self-registered via POST /agents/register or MCP register_agent. */
     internal val registeredAgents = ConcurrentHashMap<String, RegisteredAgent>()
@@ -153,6 +161,12 @@ class EmbeddedServer(
             json(Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false })
         }
 
+        intercept(ApplicationCallPipeline.Call) {
+            if (call.request.path() == "/mcp" && !call.requireApiKey()) {
+                finish()
+            }
+        }
+
         // Create the MCP server with shared access to the agent registry and fuel state
         val mcpServer = FuelMcpServer(
             registeredAgents = registeredAgents,
@@ -200,6 +214,7 @@ class EmbeddedServer(
             get("/agents") { call.respond(AgentsResponse(mergedAgents())) }
 
             post("/agents/register") {
+                if (!call.requireApiKey()) return@post
                 val req = call.receive<RegisterAgentRequest>()
                 val baseId = req.name.lowercase().replace("\\s+".toRegex(), "-")
                 // Dedup by name — update existing instead of creating duplicate
@@ -221,6 +236,7 @@ class EmbeddedServer(
             }
 
             post("/agents/{id}/state") {
+                if (!call.requireApiKey()) return@post
                 val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing agent id"))
                 val req = call.receive<UpdateAgentStateRequest>()
                 val existing = registeredAgents[id]
@@ -234,6 +250,7 @@ class EmbeddedServer(
             }
 
             delete("/agents/{id}") {
+                if (!call.requireApiKey()) return@delete
                 val id = call.parameters["id"] ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing agent id"))
                 val removed = registeredAgents.remove(id)
                 if (removed != null) {
@@ -262,10 +279,30 @@ class EmbeddedServer(
         }
     }
 
+    private suspend fun ApplicationCall.requireApiKey(): Boolean {
+        val error = bearerAuthorizationError(apiKey, request.headers[HttpHeaders.Authorization])
+        if (error == null) return true
+
+        respond(HttpStatusCode.Unauthorized, ErrorResponse(error))
+        return false
+    }
+
     private fun currentPid(): Long = try {
         ProcessHandle.current().pid()
     } catch (e: Exception) {
         ManagementFactory.getRuntimeMXBean().name.substringBefore('@').toLongOrNull() ?: -1
+    }
+
+    private fun generateApiKey(): String = ByteArray(32)
+        .also(SecureRandom()::nextBytes)
+        .let { Base64.getUrlEncoder().withoutPadding().encodeToString(it) }
+}
+
+internal fun bearerAuthorizationError(expectedKey: String, authorizationHeader: String?): String? {
+    return if (authorizationHeader == "Bearer $expectedKey") {
+        null
+    } else {
+        "Unauthorized: provide Authorization: Bearer <API key>."
     }
 }
 

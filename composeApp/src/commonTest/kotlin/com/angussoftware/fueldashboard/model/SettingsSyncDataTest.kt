@@ -38,4 +38,25 @@ class SettingsSyncDataTest {
 
         assertTrue(restored?.agentSettings?.agents?.isEmpty() == true)
     }
+
+    @Test
+    fun syncRoundTripPreservesMonthlyBudget() {
+        val syncData = SettingsSyncData(
+            providers = listOf(
+                ProviderConfig(
+                    id = "openai",
+                    kind = ProviderKind.OPENAI,
+                    apiKey = "key",
+                    monthlyBudgetUsd = 42.50,
+                ),
+            ),
+            themeMode = "SYSTEM",
+            lightColorTheme = "Default",
+            darkColorTheme = "Default",
+        )
+
+        val restored = SettingsSyncData.fromJson(syncData.toJson())
+
+        assertEquals(42.50, restored?.providers?.single()?.monthlyBudgetUsd)
+    }
 }

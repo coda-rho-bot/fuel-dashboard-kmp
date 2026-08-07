@@ -1,14 +1,41 @@
 # Fuel Dashboard (KMP)
 
 Cross-platform dashboard for monitoring AI provider fuel/quota status.
-Works standalone with a provider API key, or connected to a fuel orchestrator for fleet monitoring.
+Monitor and manage provider fuel state across your AI fleet.
 
-## Modes
+## Multi-Provider System
 
-| Mode | Setup | Features |
-|------|-------|----------|
-| **Direct** | Enter your provider API key | Fuel bars, burn rates, countdowns |
-| **Connected** | Enter orchestrator URL | Full fleet data (agents, decisions, alerts) |
+The dashboard supports 9 provider types simultaneously, each with its own adapter and fuel budgeting strategy. The embedded orchestrator routes model requests across providers based on tier selection.
+
+## Major Features
+
+### MCP Server
+
+The dashboard exposes an MCP server on port 8321, allowing external AI agents to manage providers, register themselves, and query fuel state.
+
+### ACP Agent Discovery
+
+Agents can discover each other through the ACP protocol.
+
+### Embedded Orchestrator
+
+The embedded orchestrator routes model requests across providers according to tier selection and current fuel state.
+
+### QR Sync
+
+Mobile devices can sync settings by scanning a QR code from the desktop app.
+
+### Help System
+
+A built-in help system is available from the UI.
+
+### Junie Credits
+
+The dashboard can check the available Junie credit balance.
+
+### 17 Themes
+
+The app ships with 17 color themes.
 
 ## Targets
 
@@ -32,7 +59,7 @@ Works standalone with a provider API key, or connected to a fuel orchestrator fo
 ./gradlew :composeApp:run
 ```
 
-On first launch, enter your provider API key (direct mode) or orchestrator URL (connected mode).
+Configure provider credentials and dashboard settings on first launch.
 
 ## Building
 
@@ -62,12 +89,17 @@ composeApp/src/
 
 ## Provider Adapters
 
-| Provider | Status | How it works |
-|----------|--------|-------------|
-| z.ai | ✅ Built | Direct API polling (`/api/monitor/usage/quota/limit`) |
-| Orchestrator | ✅ Built | REST API client (any backend that implements the API) |
-| OpenAI | 🔲 Planned | Rate limit headers + usage API |
-| Anthropic | 🔲 Planned | Rate limit headers |
+| Provider | Limit Type | Status |
+|----------|------------|--------|
+| z.ai | WINDOW_CREDIT | Built |
+| Letta Cloud | WINDOW_CREDIT | Built |
+| OpenAI | SPEND_BUDGET + RATE_LIMIT | Built |
+| Anthropic | SPEND_BUDGET + RATE_LIMIT | Built |
+| DeepSeek | SPEND_BUDGET | Built |
+| Groq | RATE_LIMIT | Built |
+| Mistral | SPEND_BUDGET + RATE_LIMIT | Built |
+| Junie | SPEND_BUDGET (manual check) | Built |
+| Remote Dashboard (Agent Backend) | - | Built |
 
 ## Forgejo
 

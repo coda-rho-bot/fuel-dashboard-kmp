@@ -38,6 +38,7 @@ data class ProviderConfig(
     val apiKey: String = "",
     val serverUrl: String = "",
     val displayName: String = "",
+    val monthlyBudgetUsd: Double = 0.0,
 ) {
     /**
      * Resolved display name: custom name > provider's default.
@@ -71,6 +72,9 @@ data class ProviderConfig(
             else -> apiKey.isNotBlank()
         }
 }
+
+val ProviderKind.supportsMonthlyBudget: Boolean
+    get() = this == ProviderKind.OPENAI || this == ProviderKind.ANTHROPIC || this == ProviderKind.MISTRAL
 
 /**
  * Serializable settings wrapper for multi-provider storage.

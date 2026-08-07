@@ -814,22 +814,6 @@ private fun CapabilityBadge(label: String) {
     )
 }
 
-// ---------------------------------------------------------------------------
-// Timestamp formatting helpers
-// ---------------------------------------------------------------------------
-
-private fun formatLastSeen(epochMs: Long): String {
-    val now = epochMillisNow()
-    val diffMs = now - epochMs
-    val minutes = diffMs / 60_000
-    return when {
-        minutes < 1 -> "just now"
-        minutes < 60 -> "${minutes}m ago"
-        minutes < 1440 -> "${minutes / 60}h ago"
-        else -> "${minutes / 1440}d ago"
-    }
-}
-
 private fun formatRegisteredDate(epochMs: Long): String {
     val now = epochMillisNow()
     val diffMs = now - epochMs

@@ -51,18 +51,8 @@ class LettaCloudProviderAdapter(
     override val displayName: String = customDisplayName ?: "Letta Cloud"
     override val providerType: ProviderType = ProviderType.WINDOW_CREDIT
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    private val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    private val json = SharedHttpClient.json
+    private val client = SharedHttpClient.client
 
     companion object {
         private const val QUOTA_PATH = "/v1/organizations/self/quotas"
@@ -263,7 +253,5 @@ class LettaCloudProviderAdapter(
         null
     }
 
-    override fun close() {
-        client.close()
-    }
+    override fun close() = Unit
 }

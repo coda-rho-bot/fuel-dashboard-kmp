@@ -65,18 +65,8 @@ class OpenAIProviderAdapter(
     override val displayName: String = customDisplayName ?: "OpenAI"
     override val providerType: ProviderType = ProviderType.SPEND_BUDGET
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    private val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    private val json = SharedHttpClient.json
+    private val client = SharedHttpClient.client
 
     companion object {
         private const val COSTS_PATH = "/v1/organization/costs"
@@ -364,9 +354,7 @@ class OpenAIProviderAdapter(
         return if (totalMs > 0) totalMs else 60_000L
     }
 
-    override fun close() {
-        client.close()
-    }
+    override fun close() = Unit
 }
 
 // -----------------------------------------------------------------------

@@ -35,18 +35,7 @@ class ZaiDirectFuelSource(
 
     override val displayName: String = "z.ai Direct"
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    private val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    private val client = SharedHttpClient.client
 
     companion object {
         private const val ENDPOINT = "https://api.z.ai/api/monitor/usage/quota/limit"
@@ -159,7 +148,5 @@ class ZaiDirectFuelSource(
         Pair(0, null)
     }
 
-    fun close() {
-        client.close()
-    }
+    fun close() = Unit
 }

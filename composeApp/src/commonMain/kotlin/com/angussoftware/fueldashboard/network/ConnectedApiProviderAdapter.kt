@@ -94,7 +94,5 @@ class ConnectedApiProviderAdapter(
         )
     }
 
-    override fun close() {
-        client.close()
-    }
+    override fun close() = Unit
 }

@@ -60,18 +60,8 @@ class DeepSeekProviderAdapter(
     override val displayName: String = customDisplayName ?: "DeepSeek"
     override val providerType: ProviderType = ProviderType.SPEND_BUDGET
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    private val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    private val json = SharedHttpClient.json
+    private val client = SharedHttpClient.client
 
     companion object {
         private const val BALANCE_PATH = "/user/balance"
@@ -177,9 +167,7 @@ class DeepSeekProviderAdapter(
         )
     }
 
-    override fun close() {
-        client.close()
-    }
+    override fun close() = Unit
 }
 
 // -----------------------------------------------------------------------

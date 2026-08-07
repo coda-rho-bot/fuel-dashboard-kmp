@@ -15,18 +15,8 @@ import kotlinx.serialization.json.Json
 class FuelApiClient(
     baseUrl: String = "http://127.0.0.1:8321",
 ) {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    val client: HttpClient
+        get() = SharedHttpClient.client
 
     private val base = baseUrl.trimEnd('/')
 
@@ -45,7 +35,5 @@ class FuelApiClient(
     suspend fun getHealth(): String =
         client.get("$base/health").bodyAsText()
 
-    fun close() {
-        client.close()
-    }
+    fun close() = Unit
 }

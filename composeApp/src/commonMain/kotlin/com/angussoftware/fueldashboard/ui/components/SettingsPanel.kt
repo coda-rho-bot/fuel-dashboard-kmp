@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Api
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.DarkMode
@@ -63,6 +64,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -75,10 +78,12 @@ import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderCategory
 import com.angussoftware.fueldashboard.model.ProviderKind
+import com.angussoftware.fueldashboard.model.supportsMonthlyBudget
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import com.angussoftware.fueldashboard.model.SettingsSyncData
 import androidx.compose.runtime.collectAsState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
+import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.rememberQrScanner
 import com.angussoftware.fueldashboard.ui.supportsQrScanning
@@ -93,6 +98,8 @@ fun SettingsPanel(
     modifier: Modifier = Modifier,
 ) {
     val state = viewModel.state.collectAsState().value
+    val serverApiKey = remember { ServerApiKeyStore.load() }
+    val clipboardManager = LocalClipboardManager.current
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -127,6 +134,14 @@ fun SettingsPanel(
                 themeController = themeController,
                 showHelp = state.showHelp,
             )
+
+            if (serverApiKey.isNotBlank()) {
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                ServerApiKeySection(
+                    apiKey = serverApiKey,
+                    onCopy = { clipboardManager.setText(AnnotatedString(serverApiKey)) },
+                )
+            }
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
@@ -164,6 +179,44 @@ fun SettingsPanel(
             }
         }
     }
+}
+
+@Composable
+private fun ServerApiKeySection(
+    apiKey: String,
+    onCopy: () -> Unit,
+) {
+    Text(
+        text = "Embedded Server API Key",
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = "Required for POST, DELETE, and MCP requests. Send it as a Bearer token.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(8.dp))
+    OutlinedTextField(
+        value = apiKey,
+        onValueChange = {},
+        modifier = Modifier.fillMaxWidth(),
+        readOnly = true,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        trailingIcon = {
+            TextButton(onClick = onCopy) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Copy API key",
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Copy")
+            }
+        },
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -287,8 +340,8 @@ private fun ProvidersSection(
     if (showAddDialog) {
         AddProviderDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { kind, apiKey, name, url ->
-                viewModel.addProvider(kind, apiKey, name, url)
+            onAdd = { kind, apiKey, name, url, monthlyBudgetUsd ->
+                viewModel.addProvider(kind, apiKey, name, url, monthlyBudgetUsd)
                 showAddDialog = false
             },
             showHelp = showHelp,
@@ -453,6 +506,9 @@ private fun ProviderConfigRow(
     var localKey by remember(config.id, isEditing) { mutableStateOf(config.apiKey) }
     var localName by remember(config.id, isEditing) { mutableStateOf(config.displayName) }
     var localUrl by remember(config.id, isEditing) { mutableStateOf(config.serverUrl) }
+    var localMonthlyBudgetUsd by remember(config.id, isEditing) {
+        mutableStateOf(config.monthlyBudgetUsd.takeIf { it > 0 }?.toString().orEmpty())
+    }
     var showKey by remember { mutableStateOf(false) }
 
     Card(
@@ -613,11 +669,25 @@ private fun ProviderConfigRow(
                     Spacer(Modifier.height(8.dp))
                 }
 
+                if (config.kind.supportsMonthlyBudget) {
+                    OutlinedTextField(
+                        value = localMonthlyBudgetUsd,
+                        onValueChange = { localMonthlyBudgetUsd = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Monthly Budget ($)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                     TextButton(onClick = {
                         localKey = config.apiKey
                         localName = config.displayName
                         localUrl = config.serverUrl
+                        localMonthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 }?.toString().orEmpty()
                         isEditing = false
                     }) {
                         Text("Cancel", style = MaterialTheme.typography.labelSmall)
@@ -627,6 +697,7 @@ private fun ProviderConfigRow(
                             apiKey = localKey.trim(),
                             displayName = localName.trim(),
                             serverUrl = localUrl.trim(),
+                            monthlyBudgetUsd = localMonthlyBudgetUsd.toDoubleOrNull()?.takeIf { it > 0 } ?: 0.0,
                         ))
                         isEditing = false
                     }) {
@@ -652,13 +723,14 @@ private fun ProviderConfigRow(
 @Composable
 private fun AddProviderDialog(
     onDismiss: () -> Unit,
-    onAdd: (ProviderKind, String, String, String) -> Unit,
+    onAdd: (ProviderKind, String, String, String, Double) -> Unit,
     showHelp: Boolean,
 ) {
     var selectedKind by remember { mutableStateOf(ProviderKind.ZAI) }
     var apiKey by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var serverUrl by remember { mutableStateOf("") }
+    var monthlyBudgetUsd by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
 
     Card(
@@ -827,6 +899,19 @@ private fun AddProviderDialog(
                 )
             }
 
+            if (selectedKind.supportsMonthlyBudget) {
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = monthlyBudgetUsd,
+                    onValueChange = { monthlyBudgetUsd = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Monthly Budget ($)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+            }
+
             Spacer(Modifier.height(16.dp))
 
             Row(
@@ -838,7 +923,15 @@ private fun AddProviderDialog(
                 }
                 Spacer(Modifier.width(8.dp))
                 TextButton(
-                    onClick = { onAdd(selectedKind, apiKey.trim(), displayName.trim(), serverUrl.trim()) },
+                    onClick = {
+                        onAdd(
+                            selectedKind,
+                            apiKey.trim(),
+                            displayName.trim(),
+                            serverUrl.trim(),
+                            monthlyBudgetUsd.toDoubleOrNull()?.takeIf { it > 0 } ?: 0.0,
+                        )
+                    },
                     enabled = when (selectedKind) {
                         ProviderKind.CONNECTED_API -> serverUrl.isNotBlank()
                         ProviderKind.JUNIE -> true

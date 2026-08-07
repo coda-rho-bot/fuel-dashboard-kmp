@@ -64,18 +64,8 @@ class AnthropicProviderAdapter(
     override val displayName: String = customDisplayName ?: "Anthropic"
     override val providerType: ProviderType = ProviderType.SPEND_BUDGET
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    private val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    private val json = SharedHttpClient.json
+    private val client = SharedHttpClient.client
 
     companion object {
         private const val COST_REPORT_PATH = "/v1/organizations/cost_report"
@@ -363,9 +353,7 @@ class AnthropicProviderAdapter(
         }
     }
 
-    override fun close() {
-        client.close()
-    }
+    override fun close() = Unit
 }
 
 // -----------------------------------------------------------------------

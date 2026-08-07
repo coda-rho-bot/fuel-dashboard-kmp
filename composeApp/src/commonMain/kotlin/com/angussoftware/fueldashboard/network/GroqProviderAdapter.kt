@@ -47,18 +47,8 @@ class GroqProviderAdapter(
     override val displayName: String = customDisplayName ?: "Groq"
     override val providerType: ProviderType = ProviderType.RATE_LIMIT
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    private val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    private val json = SharedHttpClient.json
+    private val client = SharedHttpClient.client
 
     companion object {
         private const val MODELS_PATH = "/v1/models"
@@ -239,9 +229,7 @@ class GroqProviderAdapter(
         return if (totalMs > 0) totalMs.toLong() else 60_000L
     }
 
-    override fun close() {
-        client.close()
-    }
+    override fun close() = Unit
 }
 
 // -----------------------------------------------------------------------

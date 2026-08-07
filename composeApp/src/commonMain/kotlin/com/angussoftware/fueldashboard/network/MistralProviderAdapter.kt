@@ -74,18 +74,8 @@ class MistralProviderAdapter(
     override val displayName: String = customDisplayName ?: "Mistral AI"
     override val providerType: ProviderType = ProviderType.SPEND_BUDGET
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    private val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    private val json = SharedHttpClient.json
+    private val client = SharedHttpClient.client
 
     companion object {
         private const val USAGE_PATH = "/v1/admin/usage"
@@ -415,9 +405,7 @@ class MistralProviderAdapter(
         return (diffMs.toDouble() / (24.0 * 60 * 60 * 1000)).coerceAtLeast(1.0)
     }
 
-    override fun close() {
-        client.close()
-    }
+    override fun close() = Unit
 }
 
 // -----------------------------------------------------------------------

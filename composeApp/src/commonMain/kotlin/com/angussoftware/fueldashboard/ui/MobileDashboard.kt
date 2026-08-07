@@ -55,6 +55,7 @@ import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
 import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
+import com.angussoftware.fueldashboard.ui.components.formatLastUpdated
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
@@ -390,241 +391,18 @@ private fun MobileProviderCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-        ) {
-            // Header row: provider name + status badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = config.resolvedDisplayName(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                if (error != null) {
-                    Text(
-                        "\u26A0 Error",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                } else if (report != null && !report.available) {
-                    Text(
-                        "UNAVAILABLE",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            }
-
-            if (error != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                if (config.kind != com.angussoftware.fueldashboard.model.ProviderKind.JUNIE) return@Column
-            }
-
-            if (config.kind == com.angussoftware.fueldashboard.model.ProviderKind.JUNIE) {
-                Spacer(Modifier.height(12.dp))
-                JunieProviderBalance(
-                    report = report,
-                    isChecking = false,
-                    onCheckBalance = null,
-                )
-                return@Column
-            }
-
-            if (report == null) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Connecting...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                return@Column
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            when (report.type) {
-                ProviderType.SPEND_BUDGET -> {
-                    // Budget bar (dollar-based)
-                    val used = report.usedDollars
-                    val limit = report.limitDollars
-                    if (used != null) {
-                        BudgetBar(
-                            usedDollars = used,
-                            limitDollars = limit,
-                        )
-                    } else {
-                        Text(
-                            "No spend data (requires admin key for costs API)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    // Rate-limit windows rendered as compact bars
-                    val rateLimitWindows = report.windows.filter {
-                        it.name == "Requests/min" || it.name == "Tokens/min"
-                    }
-                    if (rateLimitWindows.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        rateLimitWindows.forEach { window ->
-                            MobileWindowRow(window = window, showHelp = showHelp)
-                        }
-                    }
-
-                    // Budget-remaining window (if present)
-                    val budgetWindow = report.windows.firstOrNull { it.name == "Monthly Budget" }
-                    if (budgetWindow != null) {
-                        Spacer(Modifier.height(8.dp))
-                        MobileWindowRow(window = budgetWindow, showHelp = showHelp)
-                    }
-                }
-
-                ProviderType.RATE_LIMIT -> {
-                    report.windows.forEach { window ->
-                        MobileWindowRow(window = window, showHelp = showHelp)
-                    }
-                }
-
-                ProviderType.WINDOW_CREDIT -> {
-                    if (report.windows.isNotEmpty()) {
-                        report.windows.forEach { window ->
-                            MobileWindowRow(window = window, showHelp = showHelp)
-                        }
-                    } else if (report.remainingPct != null) {
-                        FuelBar(remainingPct = report.remainingPct, label = "Remaining", showHelp = showHelp)
-                    } else {
-                        Text(
-                            "No usage data (unlimited or static)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    // Credit balance (Letta Cloud) — prominent display
-                    if (report.creditsTotal != null && report.creditsTotal > 0) {
-                        Spacer(Modifier.height(12.dp))
-                        MobileCreditBalance(report = report, showHelp = showHelp)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Mobile Window Row — compact rate-limit / window gauge
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun MobileWindowRow(window: ReportWindow, showHelp: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            window.remainingPct?.let { pct ->
-                FuelBar(remainingPct = pct, compact = true, label = window.name, showHelp = showHelp)
-            } ?: Text(
-                "\u2014",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Column(modifier = Modifier.padding(16.dp)) {
+            com.angussoftware.fueldashboard.ui.components.ProviderContent(
+                config = config,
+                report = report,
+                error = error,
+                showHelp = showHelp,
+                titleStyle = MaterialTheme.typography.titleMedium,
+                contentSpacing = 12.dp,
+                isChecking = false,
+                onCheckJunieBalance = null,
+                boxedCreditBalance = false,
             )
-        }
-        Spacer(Modifier.size(12.dp))
-        window.resetsAt?.let { resetTime ->
-            CountdownText(resetsAt = resetTime)
-            if (showHelp) {
-                Spacer(Modifier.width(4.dp))
-                HelpIcon("Time until quota resets")
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Mobile Credit Balance — styled credit info block inside the card
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun MobileCreditBalance(
-    report: ProviderReport,
-    showHelp: Boolean,
-) {
-    val criticallyLow = report.creditsTotal != null && report.creditsTotal < 1000
-    val containerColor = if (criticallyLow)
-        MaterialTheme.colorScheme.errorContainer
-    else
-        MaterialTheme.colorScheme.surfaceVariant
-    val contentColor = if (criticallyLow)
-        MaterialTheme.colorScheme.onErrorContainer
-    else
-        MaterialTheme.colorScheme.onSurface
-    val subColor = if (criticallyLow)
-        MaterialTheme.colorScheme.onErrorContainer
-    else
-        MaterialTheme.colorScheme.onSurfaceVariant
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(12.dp),
-    ) {
-        // Balance — big and prominent
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "${report.creditsTotal}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = contentColor,
-            )
-            if (showHelp) {
-                Spacer(Modifier.width(4.dp))
-                HelpIcon("Your purchased credits.")
-            }
-        }
-        Text(
-            text = "credits remaining",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = subColor,
-        )
-        // Monthly usage
-        if (report.creditsUsed != null && report.creditsLimit != null) {
-            Spacer(Modifier.height(6.dp))
-            val overLimit = report.creditsUsed > report.creditsLimit
-            Text(
-                text = if (overLimit) {
-                    "${report.creditsUsed} used (${report.creditsLimit} included monthly, rest pay-as-you-go)"
-                } else {
-                    "${report.creditsUsed} / ${report.creditsLimit} used this month"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = subColor,
-            )
-        }
-        // Reset date
-        if (report.creditsResetAt != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Quota resets ",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = subColor,
-                )
-                CountdownText(resetsAt = report.creditsResetAt)
-                if (showHelp) {
-                    Spacer(Modifier.width(4.dp))
-                    HelpIcon("Time until quota resets")
-                }
-            }
         }
     }
 }
@@ -649,17 +427,21 @@ private fun AgentsTabContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        AgentPanel(
-            agents = state.acpAgents,
-            onModelChange = onModelChange,
-            onModeChange = onModeChange,
-            onRemoveAgent = onRemoveAgent,
-            onAddAgent = onAddAgent,
-            syncData = syncData,
-            onImportSyncedSettings = onImportSyncedSettings,
-            hasConnectedOrchestrator = state.hasConnectedApi,
-            showHelp = state.showHelp,
-        )
+        if (state.acpAgents.isEmpty() && state.settings.providers.isEmpty()) {
+            MobileFleetEmptyState(onGoToSettings = onGoToSettings)
+        } else {
+            AgentPanel(
+                agents = state.acpAgents,
+                onModelChange = onModelChange,
+                onModeChange = onModeChange,
+                onRemoveAgent = onRemoveAgent,
+                onAddAgent = onAddAgent,
+                syncData = syncData,
+                onImportSyncedSettings = onImportSyncedSettings,
+                hasConnectedOrchestrator = state.hasConnectedApi,
+                showHelp = state.showHelp,
+            )
+        }
 
         if (state.hasConnectedApi) {
             AlertsPanel(alerts = state.alerts.toFuelAlerts())
@@ -722,15 +504,4 @@ private fun MobileFleetEmptyState(
             }
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Helper — format last updated timestamp
-// ---------------------------------------------------------------------------
-
-private fun formatLastUpdated(epochMs: Long): String {
-    if (epochMs == 0L) return ""
-    val instant = Instant.fromEpochMilliseconds(epochMs)
-    val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-    return "Updated ${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}:${local.second.toString().padStart(2, '0')}"
 }

@@ -76,6 +76,39 @@ class DashboardUiApiTest {
         }
     }
 
+    @Test
+    fun spendBudgetProvidersCanCollectAndApplyAnOptionalMonthlyBudget() {
+        val settings = sourceFile("ui/components/SettingsPanel.kt").readText()
+        val viewModel = sourceFile("presentation/FuelViewModel.kt").readText()
+        val config = sourceFile("model/ProviderConfig.kt").readText()
+
+        assertTrue(settings.contains("Monthly Budget ($)"))
+        assertTrue(config.contains("monthlyBudgetUsd: Double = 0.0"))
+        assertTrue(viewModel.contains("monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 }"))
+    }
+
+    @Test
+    fun desktopAndMobileLayoutsExposeDecisionAndEmptyFleetStates() {
+        val app = sourceFile("ui/App.kt").readText()
+        val mobile = sourceFile("ui/MobileDashboard.kt").readText()
+
+        assertTrue(app.contains("DecisionLog(decisions = decisions)"))
+        assertTrue(mobile.contains("MobileFleetEmptyState("))
+        assertTrue(mobile.contains("if (state.acpAgents.isEmpty() && state.settings.providers.isEmpty())"))
+    }
+
+    @Test
+    fun mobileAgentSyncAndImportUseTheSharedSettingsHandlers() {
+        val settings = sourceFile("ui/components/SettingsPanel.kt").readText()
+        val agentPanel = sourceFile("ui/components/AgentPanel.kt").readText()
+        val mobile = sourceFile("ui/MobileDashboard.kt").readText()
+
+        assertTrue(settings.contains("viewModel.importSyncedSettings(data)"))
+        assertTrue(agentPanel.contains("syncData = syncData"))
+        assertTrue(agentPanel.contains("onImportSyncedSettings(data)"))
+        assertTrue(mobile.contains("onImportSyncedSettings = viewModel::importSyncedSettings"))
+    }
+
     private fun sourceFile(relativePath: String): File = sequenceOf(
         File("src/commonMain/kotlin/com/angussoftware/fueldashboard/$relativePath"),
         File("composeApp/src/commonMain/kotlin/com/angussoftware/fueldashboard/$relativePath"),

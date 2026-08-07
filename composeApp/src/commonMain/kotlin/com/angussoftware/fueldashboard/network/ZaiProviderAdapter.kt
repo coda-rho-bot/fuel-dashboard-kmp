@@ -37,18 +37,7 @@ class ZaiProviderAdapter(
     override val displayName: String = customDisplayName ?: "z.ai"
     override val providerType: ProviderType = ProviderType.WINDOW_CREDIT
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
-
-    private val client: HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-    }
+    private val client = SharedHttpClient.client
 
     companion object {
         private const val QUOTA_PATH = "/api/monitor/usage/quota/limit"
@@ -128,7 +117,5 @@ class ZaiProviderAdapter(
         )
     }
 
-    override fun close() {
-        client.close()
-    }
+    override fun close() = Unit
 }

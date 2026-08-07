@@ -19,4 +19,14 @@ class ProviderConfigTest {
         assertEquals("", config.resolvedServerUrl())
         assertTrue(config.isConfigured)
     }
+
+    @Test
+    fun monthlyBudgetDefaultsToZeroAndIsSupportedBySpendBudgetProviders() {
+        val config = ProviderConfig(id = "openai", kind = ProviderKind.OPENAI)
+
+        assertEquals(0.0, config.monthlyBudgetUsd)
+        assertTrue(ProviderKind.OPENAI.supportsMonthlyBudget)
+        assertTrue(ProviderKind.ANTHROPIC.supportsMonthlyBudget)
+        assertTrue(ProviderKind.MISTRAL.supportsMonthlyBudget)
+    }
 }

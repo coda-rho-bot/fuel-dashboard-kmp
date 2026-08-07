@@ -81,6 +81,9 @@ data class DashboardState(
         get() = settings.providers.any { it.kind == ProviderKind.CONNECTED_API && it.isConfigured }
 }
 
+// TEMPORARY HEURISTIC: These model names are hardcoded and will drift as
+// providers update their model lineups. This should eventually be replaced
+// with dynamic model discovery from each provider's API.
 /**
  * Returns default model tiers for a provider kind — used by the decision engine
  * when no orchestrator is connected. This is a best-effort heuristic mapping
@@ -304,7 +307,13 @@ class FuelViewModel {
     /**
      * Adds a new provider to settings.
      */
-    fun addProvider(kind: ProviderKind, apiKey: String, displayName: String = "", serverUrl: String = "") {
+    fun addProvider(
+        kind: ProviderKind,
+        apiKey: String,
+        displayName: String = "",
+        serverUrl: String = "",
+        monthlyBudgetUsd: Double = 0.0,
+    ) {
         val current = _state.value.settings
         val newProvider = ProviderConfig(
             id = FuelSettingsStore.generateProviderId(),
@@ -312,6 +321,7 @@ class FuelViewModel {
             apiKey = apiKey,
             displayName = displayName,
             serverUrl = serverUrl,
+            monthlyBudgetUsd = monthlyBudgetUsd,
         )
         updateSettings(current.copy(providers = current.providers + newProvider))
     }
@@ -454,14 +464,14 @@ class FuelViewModel {
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
-                monthlyBudgetUsd = null,
+                monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.ANTHROPIC -> AnthropicProviderAdapter(
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
-                monthlyBudgetUsd = null,
+                monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.DEEPSEEK -> DeepSeekProviderAdapter(
@@ -480,7 +490,7 @@ class FuelViewModel {
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
-                monthlyBudgetUsd = null,
+                monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.JUNIE -> JunieProviderAdapter(
