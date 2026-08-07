@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Api
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
@@ -253,6 +254,8 @@ private fun ProvidersSection(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(8.dp))
+            ProviderMcpSetupGuide()
         }
     }
 
@@ -326,6 +329,116 @@ private fun ProvidersSection(
             onDismiss = { scannedSyncData = null },
         )
     }
+}
+
+@Composable
+private fun ProviderMcpSetupGuide() {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    ProviderExpandableSetupGuide(
+        title = "How agents can add providers via MCP",
+        isExpanded = isExpanded,
+        onToggle = { isExpanded = !isExpanded },
+    ) {
+        ProviderGuideText(
+            "Agents connected to the dashboard's MCP server can automatically add and remove LLM providers. " +
+                "No manual entry needed.",
+        )
+        ProviderGuideText("MCP server URL: http://localhost:8321/mcp")
+        ProviderGuideText(
+            "Available MCP tools for provider management:\n" +
+                "• add_provider: adds an LLM provider (kind, api_key, name)\n" +
+                "• remove_provider: removes a provider by name or ID\n" +
+                "• list_providers: lists all configured providers",
+        )
+        ProviderGuideText("Example — an agent adding a z.ai provider:")
+        ProviderCodeExample(
+            """
+            {
+              "name": "add_provider",
+              "arguments": {
+                "kind": "zai",
+                "api_key": "your-api-key",
+                "name": "z.ai (Work)"
+              }
+            }
+            """.trimIndent(),
+        )
+        ProviderGuideText("Supported provider kinds: zai, letta_cloud, openai, anthropic, deepseek, groq, mistral")
+        ProviderGuideText(
+            "When an agent adds a provider via MCP, it appears here automatically and starts polling for fuel data.",
+        )
+    }
+}
+
+@Composable
+private fun ProviderExpandableSetupGuide(
+    title: String,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Collapse $title" else "Expand $title",
+                    modifier = Modifier.graphicsLayer { rotationZ = if (isExpanded) 180f else 0f },
+                )
+            }
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    content()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderGuideText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+}
+
+@Composable
+private fun ProviderCodeExample(code: String) {
+    Text(
+        text = code,
+        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+            .padding(8.dp),
+    )
 }
 
 @Composable
