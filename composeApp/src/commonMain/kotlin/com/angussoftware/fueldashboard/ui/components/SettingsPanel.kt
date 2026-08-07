@@ -233,12 +233,23 @@ private fun ProvidersSection(
         }
     }
     if (showHelp) {
-        Text(
-            text = "Providers can also be added automatically by agents via MCP. Sync copies settings to another device. Import reads from another device.",
-            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+            Text(
+                text = "• Sync: copy settings to another device",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "• Import: read settings from another device",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "• Agents can also add providers automatically via MCP",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 
     AnimatedVisibility(
