@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +24,7 @@ fun RecommendationBanner(
     recommendedModel: String,
     burnRate: Double,
     surplusAlert: Boolean,
+    showHelp: Boolean,
 ) {
     val bannerColor = when {
         surplusAlert -> MaterialTheme.colorScheme.tertiaryContainer
@@ -47,11 +49,17 @@ fun RecommendationBanner(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "Recommended Model",
-                style = MaterialTheme.typography.bodySmall,
-                color = onBannerColor,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Recommended Model",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = onBannerColor,
+                )
+                if (showHelp) {
+                    Spacer(Modifier.width(4.dp))
+                    HelpIcon("Best model based on your current fuel levels")
+                }
+            }
             Text(
                 text = "${burnRate.format(1)}% / hr",
                 style = MaterialTheme.typography.bodySmall,

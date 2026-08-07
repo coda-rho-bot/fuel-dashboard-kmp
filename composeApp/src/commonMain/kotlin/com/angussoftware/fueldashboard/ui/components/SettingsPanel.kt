@@ -536,11 +536,17 @@ private fun AddProviderDialog(
         ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Add Provider",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Add Provider",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (showHelp) {
+                    Spacer(Modifier.width(4.dp))
+                    HelpIcon("Choose your LLM provider. Enter your API key to start monitoring fuel.")
+                }
+            }
             Spacer(Modifier.height(12.dp))
 
             // Provider type dropdown
@@ -739,6 +745,10 @@ private fun AgentsSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
             )
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("Agents auto-register via MCP or can be added manually")
+            }
         }
         TextButton(onClick = { showAddDialog = true }) {
             Icon(Icons.Default.Add, contentDescription = "Add agent", modifier = Modifier.size(16.dp))

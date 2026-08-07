@@ -226,6 +226,7 @@ private fun MobileFuelContent(
                             recommendedModel = fuel.recommendedModel,
                             burnRate = fuel.burnRatePctPerHr,
                             surplusAlert = fuel.surplusAlert,
+                            showHelp = state.showHelp,
                         )
                     }
                 }
@@ -237,6 +238,7 @@ private fun MobileFuelContent(
                         dataPoints = state.dataPointCount,
                         lastUpdated = state.lastUpdated,
                         errorCount = state.providerErrors.size,
+                        showHelp = state.showHelp,
                     )
                 }
 
@@ -312,20 +314,24 @@ private fun MobileStatusRow(
     dataPoints: Int,
     lastUpdated: Long,
     errorCount: Int,
+    showHelp: Boolean,
 ) {
     Column {
-        if (burnRate == null || dataPoints < 3) {
-            Text(
-                text = "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        val text = if (burnRate == null || dataPoints < 3) {
+            "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)"
         } else {
+            "Burn rate: ${"%.1f".format(burnRate)}% / hour ($dataPoints samples)"
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Burn rate: ${"%.1f".format(burnRate)}% / hour ($dataPoints samples)",
+                text = text,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("How fast you're consuming quota (per hour)")
+            }
         }
         Spacer(Modifier.height(2.dp))
         Row(
@@ -509,6 +515,10 @@ private fun MobileWindowRow(window: ReportWindow, showHelp: Boolean) {
         Spacer(Modifier.size(12.dp))
         window.resetsAt?.let { resetTime ->
             CountdownText(resetsAt = resetTime)
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("Time until quota resets")
+            }
         }
     }
 }
@@ -583,6 +593,10 @@ private fun MobileCreditBalance(
                     color = subColor,
                 )
                 CountdownText(resetsAt = report.creditsResetAt)
+                if (showHelp) {
+                    Spacer(Modifier.width(4.dp))
+                    HelpIcon("Time until quota resets")
+                }
             }
         }
     }

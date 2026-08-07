@@ -257,6 +257,7 @@ internal fun FuelColumnContent(
                             recommendedModel = fuel.recommendedModel,
                             burnRate = fuel.burnRatePctPerHr,
                             surplusAlert = fuel.surplusAlert,
+                            showHelp = state.showHelp,
                         )
                     }
                 }
@@ -266,6 +267,7 @@ internal fun FuelColumnContent(
                     BurnRateStatus(
                         burnRate = state.burnRate,
                         dataPoints = state.dataPointCount,
+                        showHelp = state.showHelp,
                     )
                 }
 
@@ -363,20 +365,24 @@ private fun EmptyState(
 private fun BurnRateStatus(
     burnRate: Double?,
     dataPoints: Int,
+    showHelp: Boolean,
 ) {
     Column {
-        if (burnRate == null || dataPoints < 3) {
-            Text(
-                text = "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        val text = if (burnRate == null || dataPoints < 3) {
+            "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)"
         } else {
+            "Burn rate: ${"%.1f".format(burnRate)}% / hour ($dataPoints samples)"
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Burn rate: ${"%.1f".format(burnRate)}% / hour ($dataPoints samples)",
+                text = text,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("How fast you're consuming quota (per hour)")
+            }
         }
     }
 }
@@ -569,6 +575,10 @@ private fun ProviderSection(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     CountdownText(resetsAt = report.creditsResetAt)
+                                    if (showHelp) {
+                                        Spacer(Modifier.width(4.dp))
+                                        HelpIcon("Time until quota resets")
+                                    }
                                 }
                             }
                         }
@@ -598,6 +608,10 @@ private fun ReportWindowRow(window: ReportWindow, showHelp: Boolean) {
         Spacer(Modifier.width(12.dp))
         window.resetsAt?.let { resetTime ->
             CountdownText(resetsAt = resetTime)
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("Time until quota resets")
+            }
         }
     }
 }
@@ -631,6 +645,10 @@ private fun RateLimitWindowRow(window: ReportWindow, showHelp: Boolean) {
         Spacer(Modifier.width(12.dp))
         window.resetsAt?.let { resetTime ->
             CountdownText(resetsAt = resetTime)
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("Time until quota resets")
+            }
         }
     }
 }
