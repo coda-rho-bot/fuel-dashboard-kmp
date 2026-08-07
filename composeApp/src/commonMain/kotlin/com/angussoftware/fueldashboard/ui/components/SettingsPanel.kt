@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsApplications
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -186,6 +188,8 @@ private fun ServerApiKeySection(
     apiKey: String,
     onCopy: () -> Unit,
 ) {
+    var keyVisible by remember { mutableStateOf(false) }
+
     Text(
         text = "Embedded Server API Key",
         style = MaterialTheme.typography.labelMedium,
@@ -205,15 +209,25 @@ private fun ServerApiKeySection(
         readOnly = true,
         singleLine = true,
         textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
-            TextButton(onClick = onCopy) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = "Copy API key",
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(4.dp))
-                Text("Copy")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { keyVisible = !keyVisible }) {
+                    Icon(
+                        imageVector = if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (keyVisible) "Hide API key" else "Show API key",
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                TextButton(onClick = onCopy) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Copy API key",
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Copy")
+                }
             }
         },
     )
