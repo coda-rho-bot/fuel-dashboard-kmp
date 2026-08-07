@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.SettingsApplications
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -751,8 +752,22 @@ private fun LiveAgentRow(
                 Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                 model?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace) }
             }
-            IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
+            var showConfirm by remember { mutableStateOf(false) }
+            IconButton(onClick = { showConfirm = true }, modifier = Modifier.size(24.dp)) {
                 Icon(Icons.Default.Delete, contentDescription = "Remove agent", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            }
+            if (showConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showConfirm = false },
+                    title = { Text("Remove $name?") },
+                    text = { Text("This will remove $name from the dashboard. They can re-register later.") },
+                    confirmButton = {
+                        TextButton(onClick = { onRemove(); showConfirm = false }) { Text("Remove") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showConfirm = false }) { Text("Cancel") }
+                    },
+                )
             }
         }
     }
