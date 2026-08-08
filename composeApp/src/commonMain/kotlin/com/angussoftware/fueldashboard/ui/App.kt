@@ -334,7 +334,9 @@ internal fun FuelColumnContent(
                             null
                         },
                     )
+                    Spacer(Modifier.height(12.dp))
                     HorizontalDivider()
+                    Spacer(Modifier.height(12.dp))
                 }
 
                 // Decisions (from connected API only)
