@@ -45,6 +45,14 @@ dependencyResolutionManagement {
                 password = forgejoToken
             }
         }
+        // angus-bot registry: Angus-Software-Theming published here (agent has write access)
+        maven {
+            url = uri("https://git.angussoftware.dev/api/packages/angus-bot/maven")
+            credentials {
+                username = "angus-bot"
+                password = forgejoToken
+            }
+        }
     }
 }
 

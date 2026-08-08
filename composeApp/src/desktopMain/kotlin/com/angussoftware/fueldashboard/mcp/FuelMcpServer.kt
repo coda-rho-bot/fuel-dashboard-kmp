@@ -1,0 +1,559 @@
+package com.angussoftware.fueldashboard.mcp
+
+import com.angussoftware.fueldashboard.database.AgentRegistry
+import com.angussoftware.fueldashboard.model.FuelResponse
+import com.angussoftware.fueldashboard.model.MultiProviderSettings
+import com.angussoftware.fueldashboard.model.ProviderConfig
+import com.angussoftware.fueldashboard.model.ProviderKind
+import com.angussoftware.fueldashboard.server.RegisteredAgent
+import com.angussoftware.fueldashboard.settings.FuelSettingsStore
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
+import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+
+internal data class SafeProvider(
+    val id: String,
+    val kind: String,
+    val name: String,
+    val serverUrl: String,
+)
+
+internal data class ProviderRemoval(
+    val settings: MultiProviderSettings,
+    val removed: ProviderConfig?,
+)
+
+internal fun addProviderToSettings(
+    settings: MultiProviderSettings,
+    provider: ProviderConfig,
+): MultiProviderSettings = settings.copy(providers = settings.providers + provider)
+
+internal fun removeProviderFromSettings(
+    settings: MultiProviderSettings,
+    id: String?,
+    name: String?,
+): ProviderRemoval {
+    val provider = if (!id.isNullOrBlank()) {
+        settings.providers.find { it.id == id }
+    } else {
+        settings.providers.find {
+            it.displayName.equals(name, ignoreCase = true) ||
+                it.resolvedDisplayName().equals(name, ignoreCase = true)
+        }
+    }
+    return if (provider == null) {
+        ProviderRemoval(settings, null)
+    } else {
+        ProviderRemoval(
+            settings = settings.copy(providers = settings.providers.filterNot { it.id == provider.id }),
+            removed = provider,
+        )
+    }
+}
+
+internal fun safeProviders(settings: MultiProviderSettings): List<SafeProvider> = settings.providers.map {
+    SafeProvider(
+        id = it.id,
+        kind = it.kind.name,
+        name = it.displayName,
+        serverUrl = it.serverUrl,
+    )
+}
+
+/**
+ * MCP server that exposes the Fuel Dashboard's agent registration and fuel state
+ * via the standard Model Context Protocol. Agents can self-register, update their
+ * model/status, and read fuel state through MCP tools and resources.
+ *
+ * Uses the same [registeredAgents] registry as the HTTP POST endpoints in [EmbeddedServer],
+ * ensuring a single source of truth for agent state.
+ */
+internal class FuelMcpServer(
+    private val registeredAgents: ConcurrentHashMap<String, RegisteredAgent>,
+    private val agentIdCounter: AtomicLong,
+    private val fuelStateProvider: () -> FuelResponse?,
+    private val agentRegistry: AgentRegistry? = null,
+    private val onProvidersChanged: () -> Unit = {},
+) {
+    private val json = Json { encodeDefaults = true; explicitNulls = false; ignoreUnknownKeys = true }
+
+    /**
+     * Creates and configures the MCP [Server] with tools and resources.
+     * Call this once and pass the result to `mcpStreamableHttp { server }`.
+     */
+    fun createServer(): Server = Server(
+        serverInfo = Implementation(
+            name = "fuel-dashboard",
+            version = "2.0.0",
+        ),
+        options = ServerOptions(
+            capabilities = ServerCapabilities(
+                tools = ServerCapabilities.Tools(listChanged = true),
+                resources = ServerCapabilities.Resources(listChanged = true, subscribe = true),
+            ),
+        ),
+    ) {
+        registerAgentTool()
+        updateModelTool()
+        updateStatusTool()
+        addProviderTool()
+        removeProviderTool()
+        listProvidersTool()
+        addOrchestratorTool()
+        currentFuelResource()
+        recommendationResource()
+    }
+
+    // ── Tools ────────────────────────────────────────────────────────────
+
+    /**
+     * Tool: register_agent
+     *
+     * Agents call this to self-register with the Fuel Dashboard.
+     * Returns a JSON response with the assigned agentId.
+     */
+    private fun Server.registerAgentTool() {
+        addTool(
+            name = "register_agent",
+            description = "Agent self-registers with the Fuel Dashboard. " +
+                "Returns a JSON object with 'status' and 'agentId'.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("name", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Human-readable agent name")
+                    })
+                    put("model", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Model handle (e.g., 'anthropic/claude-sonnet-5')")
+                    })
+                    put("framework", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Agent framework (e.g., 'letta', 'crewai', 'autogen')")
+                    })
+                    put("command", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Command to start the agent process")
+                    })
+                },
+            ),
+        ) { request ->
+            val args = request.arguments
+            val name = args?.get("name")?.jsonPrimitive?.content ?: "unknown"
+            val model = args?.get("model")?.jsonPrimitive?.content
+            val framework = args?.get("framework")?.jsonPrimitive?.content
+            val command = args?.get("command")?.jsonPrimitive?.content
+
+            val baseId = name.lowercase().replace("\\s+".toRegex(), "-")
+            // Check if already registered by name (case-insensitive) — update instead of duplicate
+            val existing = registeredAgents.values.find { it.name.equals(name, ignoreCase = true) }
+            val id = existing?.id ?: baseId.ifBlank { "agent-${agentIdCounter.incrementAndGet()}" }
+            val agent = RegisteredAgent(
+                id = id,
+                name = name,
+                model = model ?: existing?.model,
+                framework = framework ?: existing?.framework,
+                command = command ?: existing?.command,
+                registeredAt = existing?.registeredAt ?: System.currentTimeMillis(),
+            )
+            registeredAgents[id] = agent
+            // Persist to SQLite
+            agentRegistry?.upsert(id, agent.name, agent.model, agent.framework, agent.command, agent.status)
+            println("[MCP] Agent registered: ${agent.name} ($id)")
+
+            val responseJson = buildJsonObject {
+                put("status", "registered")
+                put("agentId", id)
+            }
+            CallToolResult(content = listOf(TextContent(text = responseJson.toString())))
+        }
+    }
+
+    /**
+     * Tool: update_model
+     *
+     * Agents call this to report that they have switched to a different model.
+     */
+    private fun Server.updateModelTool() {
+        addTool(
+            name = "update_model",
+            description = "Agent reports that it has switched to a different model. " +
+                "Requires 'agentId' and 'model'. Returns a JSON status.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("agentId", buildJsonObject {
+                        put("type", "string")
+                        put("description", "The agent's ID (returned from register_agent)")
+                    })
+                    put("model", buildJsonObject {
+                        put("type", "string")
+                        put("description", "New model handle (e.g., 'openai/gpt-4o')")
+                    })
+                },
+            ),
+        ) { request ->
+            val args = request.arguments
+            val agentId = args?.get("agentId")?.jsonPrimitive?.content
+            val model = args?.get("model")?.jsonPrimitive?.content
+
+            if (agentId == null || model == null) {
+                CallToolResult(
+                    content = listOf(TextContent(text = """{"error":"agentId and model are required"}""")),
+                    isError = true,
+                )
+            } else {
+                val existing = registeredAgents[agentId]
+                if (existing != null) {
+                    registeredAgents[agentId] = existing.copy(model = model)
+                    println("[MCP] Agent $agentId model updated to: $model")
+                    CallToolResult(content = listOf(TextContent(text = """{"status":"updated","agentId":"$agentId","model":"$model"}""")))
+                } else {
+                    CallToolResult(
+                        content = listOf(TextContent(text = """{"error":"agent not found: $agentId"}""")),
+                        isError = true,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Tool: update_status
+     *
+     * Agents call this to report their current operational status.
+     */
+    private fun Server.updateStatusTool() {
+        addTool(
+            name = "update_status",
+            description = "Agent reports its current operational status. " +
+                "Requires 'agentId' and 'status'. Returns a JSON status.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("agentId", buildJsonObject {
+                        put("type", "string")
+                        put("description", "The agent's ID (returned from register_agent)")
+                    })
+                    put("status", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Current status (e.g., 'idle', 'working', 'waiting', 'error')")
+                    })
+                },
+            ),
+        ) { request ->
+            val args = request.arguments
+            val agentId = args?.get("agentId")?.jsonPrimitive?.content
+            val status = args?.get("status")?.jsonPrimitive?.content
+
+            if (agentId == null || status == null) {
+                CallToolResult(
+                    content = listOf(TextContent(text = """{"error":"agentId and status are required"}""")),
+                    isError = true,
+                )
+            } else {
+                val existing = registeredAgents[agentId]
+                if (existing != null) {
+                    registeredAgents[agentId] = existing.copy(status = status)
+                    println("[MCP] Agent $agentId status updated to: $status")
+                    CallToolResult(content = listOf(TextContent(text = """{"status":"updated","agentId":"$agentId","agentStatus":"$status"}""")))
+                } else {
+                    CallToolResult(
+                        content = listOf(TextContent(text = """{"error":"agent not found: $agentId"}""")),
+                        isError = true,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Tool: add_provider
+     *
+     * Adds an LLM provider to the persisted multi-provider settings.
+     */
+    private fun Server.addProviderTool() {
+        addTool(
+            name = "add_provider",
+            description = "Adds an LLM provider to the Fuel Dashboard. Requires 'kind' and 'api_key'.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("kind", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Provider kind (e.g., 'OPENAI', 'ANTHROPIC', or 'ZAI')")
+                    })
+                    put("api_key", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Provider API key")
+                    })
+                    put("name", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Optional display name")
+                    })
+                    put("server_url", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Optional provider server URL override")
+                    })
+                },
+                required = listOf("kind", "api_key"),
+            ),
+        ) { request ->
+            val args = request.arguments
+            val kindName = args?.get("kind")?.jsonPrimitive?.content
+            val apiKey = args?.get("api_key")?.jsonPrimitive?.content
+            if (kindName.isNullOrBlank() || apiKey.isNullOrBlank()) {
+                return@addTool errorResult("kind and api_key are required")
+            }
+
+            val kind = parseProviderKind(kindName)
+                ?: return@addTool errorResult("unknown provider kind: $kindName")
+            val provider = ProviderConfig(
+                id = FuelSettingsStore.generateProviderId(),
+                kind = kind,
+                apiKey = apiKey,
+                displayName = args["name"]?.jsonPrimitive?.content ?: "",
+                serverUrl = args["server_url"]?.jsonPrimitive?.content ?: "",
+            )
+
+            runCatching {
+                val current = FuelSettingsStore.loadMultiProvider()
+                FuelSettingsStore.saveMultiProvider(
+                    addProviderToSettings(current, provider),
+                )
+                onProvidersChanged()
+            }.fold(
+                onSuccess = {
+                    successResult("provider added: ${provider.id}")
+                },
+                onFailure = { errorResult("failed to add provider: ${it.message ?: "unknown error"}") },
+            )
+        }
+    }
+
+    /**
+     * Tool: remove_provider
+     *
+     * Removes one provider by ID or display name.
+     */
+    private fun Server.removeProviderTool() {
+        addTool(
+            name = "remove_provider",
+            description = "Removes a configured provider by 'id' or 'name'. ID takes precedence when both are provided.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("id", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Provider ID")
+                    })
+                    put("name", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Provider display name")
+                    })
+                },
+            ),
+        ) { request ->
+            val args = request.arguments
+            val id = args?.get("id")?.jsonPrimitive?.content
+            val name = args?.get("name")?.jsonPrimitive?.content
+            if (id.isNullOrBlank() && name.isNullOrBlank()) {
+                return@addTool errorResult("id or name is required")
+            }
+
+            runCatching {
+                val current = FuelSettingsStore.loadMultiProvider()
+                val removal = removeProviderFromSettings(current, id, name)
+                if (removal.removed == null) {
+                    errorResult("provider not found")
+                } else {
+                    FuelSettingsStore.saveMultiProvider(removal.settings)
+                    onProvidersChanged()
+                    successResult("provider removed: ${removal.removed.id}")
+                }
+            }.getOrElse { errorResult("failed to remove provider: ${it.message ?: "unknown error"}") }
+        }
+    }
+
+    /**
+     * Tool: list_providers
+     *
+     * Lists configured providers without exposing API keys.
+     */
+    private fun Server.listProvidersTool() {
+        addTool(
+            name = "list_providers",
+            description = "Lists configured providers without API keys.",
+        ) {
+            val providers = safeProviders(FuelSettingsStore.loadMultiProvider())
+            val response = buildJsonObject {
+                put("providers", buildJsonArray {
+                    providers.forEach { provider ->
+                        add(buildJsonObject {
+                            put("id", provider.id)
+                            put("kind", provider.kind)
+                            put("name", provider.name)
+                            put("server_url", provider.serverUrl)
+                        })
+                    }
+                })
+            }
+            CallToolResult(content = listOf(TextContent(text = response.toString())))
+        }
+    }
+
+    /**
+     * Tool: add_orchestrator
+     *
+     * Adds a remote Fuel Dashboard server connection.
+     */
+    private fun Server.addOrchestratorTool() {
+        addTool(
+            name = "add_orchestrator",
+            description = "Adds a remote Fuel Dashboard server connection. Requires 'url'. " +
+                "Optional 'api_key' for the remote server's auth.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("url", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Remote Fuel Dashboard server URL")
+                    })
+                    put("api_key", buildJsonObject {
+                        put("type", "string")
+                        put("description", "API key for the remote dashboard's server (required if the remote dashboard has auth enabled)")
+                    })
+                },
+                required = listOf("url"),
+            ),
+        ) { request ->
+            val url = request.arguments?.get("url")?.jsonPrimitive?.content
+            if (url.isNullOrBlank()) {
+                return@addTool errorResult("url is required")
+            }
+            val apiKey = request.arguments?.get("api_key")?.jsonPrimitive?.content ?: ""
+
+            val provider = ProviderConfig(
+                id = FuelSettingsStore.generateProviderId(),
+                kind = ProviderKind.CONNECTED_API,
+                serverUrl = url,
+                apiKey = apiKey,
+                displayName = "Remote Dashboard",
+            )
+            runCatching {
+                val current = FuelSettingsStore.loadMultiProvider()
+                FuelSettingsStore.saveMultiProvider(
+                    addProviderToSettings(current, provider),
+                )
+                onProvidersChanged()
+            }.fold(
+                onSuccess = {
+                    successResult("remote dashboard added: ${provider.id}")
+                },
+                onFailure = { errorResult("failed to add remote dashboard: ${it.message ?: "unknown error"}") },
+            )
+        }
+    }
+
+    private fun parseProviderKind(value: String): ProviderKind? = runCatching {
+        ProviderKind.valueOf(value.trim().uppercase().replace('-', '_').replace(' ', '_'))
+    }.getOrNull()
+
+
+    private fun successResult(message: String): CallToolResult = CallToolResult(
+        content = listOf(
+            TextContent(
+                text = buildJsonObject {
+                    put("status", "success")
+                    put("message", message)
+                }.toString(),
+            ),
+        ),
+    )
+
+    private fun errorResult(message: String): CallToolResult =
+        CallToolResult(
+            content = listOf(
+                TextContent(
+                    text = buildJsonObject { put("error", message) }.toString(),
+                ),
+            ),
+            isError = true,
+        )
+
+    // ── Resources ─────────────────────────────────────────────────────────
+
+    /**
+     * Resource: fuel://current
+     *
+     * Returns the current fuel state as JSON.
+     */
+    private fun Server.currentFuelResource() {
+        addResource(
+            uri = "fuel://current",
+            name = "Current Fuel State",
+            description = "Current fuel levels, costs, and limits for all configured providers",
+            mimeType = "application/json",
+        ) { request ->
+            val state = fuelStateProvider()
+            val text = if (state != null) {
+                json.encodeToString(state)
+            } else {
+                """{"providers":{}}"""
+            }
+            ReadResourceResult(
+                contents = listOf(
+                    TextResourceContents(
+                        text = text,
+                        uri = request.uri,
+                        mimeType = "application/json",
+                    ),
+                ),
+            )
+        }
+    }
+
+    /**
+     * Resource: fuel://recommendation
+     *
+     * Returns the current recommended model based on fuel levels.
+     */
+    private fun Server.recommendationResource() {
+        addResource(
+            uri = "fuel://recommendation",
+            name = "Model Recommendation",
+            description = "Current model recommendation based on fuel levels, cost optimization, and headroom",
+            mimeType = "application/json",
+        ) { request ->
+            val state = fuelStateProvider()
+            val text = if (state != null) {
+                buildJsonObject {
+                    put("recommended_model", state.recommendedModel)
+                    put("burn_rate_pct_per_hr", state.burnRatePctPerHr)
+                    put("surplus_alert", state.surplusAlert)
+                }.toString()
+            } else {
+                """{"recommended_model":"","burn_rate_pct_per_hr":0.0,"surplus_alert":false}"""
+            }
+            ReadResourceResult(
+                contents = listOf(
+                    TextResourceContents(
+                        text = text,
+                        uri = request.uri,
+                        mimeType = "application/json",
+                    ),
+                ),
+            )
+        }
+    }
+}

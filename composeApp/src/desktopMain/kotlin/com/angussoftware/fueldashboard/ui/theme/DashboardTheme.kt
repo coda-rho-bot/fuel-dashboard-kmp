@@ -1,60 +1,75 @@
 package com.angussoftware.fueldashboard.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-
-// Angus brand colors for desktop (fallback when Angus-Software-Theming is not available)
-private val AngusDarkScheme = darkColorScheme(
-    primary = Color(0xFF82B1FF),
-    onPrimary = Color(0xFF003258),
-    primaryContainer = Color(0xFF00497D),
-    onPrimaryContainer = Color(0xFFD1E4FF),
-    secondary = Color(0xFF535F70),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFF3B4759),
-    onSecondaryContainer = Color(0xFFD7E3F7),
-    tertiary = Color(0xFF6E5676),
-    onTertiary = Color(0xFFFFFFFF),
-    background = Color(0xFF101418),
-    onBackground = Color(0xFFE2E2E5),
-    surface = Color(0xFF101418),
-    onSurface = Color(0xFFE2E2E5),
-    surfaceVariant = Color(0xFF43474E),
-    onSurfaceVariant = Color(0xFFC3C7CF),
-    error = Color(0xFFB3261E),
-    onError = Color(0xFFFFFFFF),
-)
-
-private val AngusLightScheme = lightColorScheme(
-    primary = Color(0xFF00497D),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFD1E4FF),
-    onPrimaryContainer = Color(0xFF001D34),
-    secondary = Color(0xFF535F70),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFD7E3F7),
-    onSecondaryContainer = Color(0xFF101C2B),
-    tertiary = Color(0xFF6E5676),
-    onTertiary = Color(0xFFFFFFFF),
-    background = Color(0xFFFDFCFF),
-    onBackground = Color(0xFF1A1C1E),
-    surface = Color(0xFFFDFCFF),
-    onSurface = Color(0xFF1A1C1E),
-    surfaceVariant = Color(0xFFDFE2EB),
-    onSurfaceVariant = Color(0xFF43474E),
-    error = Color(0xFFB3261E),
-    onError = Color(0xFFFFFFFF),
-)
+import androidx.compose.runtime.remember
+import com.angussoftware.fueldashboard.settings.ThemeController
+import com.angussoftware.theming.compose.ui.theme.AngusTheme
+import com.angussoftware.theming.compose.ui.theme.ThemeMode
+import java.io.File
 
 @Composable
-actual fun DashboardTheme(content: @Composable () -> Unit) {
-    val darkTheme = isSystemInDarkTheme()
-    MaterialTheme(
-        colorScheme = if (darkTheme) AngusDarkScheme else AngusLightScheme,
+actual fun DashboardTheme(
+    content: @Composable () -> Unit,
+) {
+    val darkTheme = when (ThemeController.themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> remember { isSystemDarkMode() }
+    }
+    AngusTheme(
+        darkTheme = darkTheme,
+        dynamicColor = false,
+        colorTheme = ThemeController.activeColorTheme,
         content = content,
     )
+}
+
+/**
+ * Detects system dark mode on Linux desktop (GNOME/KDE/etc).
+ * Compose's isSystemInDarkTheme() always returns false on JVM — this is a workaround.
+ * Checks gsettings (GNOME), then falls back to GTK theme name inspection.
+ */
+private fun isSystemDarkMode(): Boolean {
+    return try {
+        // GNOME: check org.gnome.desktop.interface color-scheme
+        val process = ProcessBuilder("gsettings", "get", "org.gnome.desktop.interface", "color-scheme")
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText().trim()
+        if (process.waitFor() == 0 && output.contains("dark", ignoreCase = true)) {
+            return true
+        }
+
+        // Fallback: check GTK_THEME env var or ~/.config/gtk-3.0/settings.ini
+        val gtkTheme = System.getenv("GTK_THEME") ?: ""
+        if (gtkTheme.contains("dark", ignoreCase = true) || gtkTheme.contains("-dark", ignoreCase = true)) {
+            return true
+        }
+
+        // Fallback: read GTK settings file
+        val gtkSettings = File(System.getProperty("user.home"), ".config/gtk-3.0/settings.ini")
+        if (gtkSettings.exists()) {
+            val content = gtkSettings.readText()
+            if (content.contains("gtk-application-prefer-dark-theme=1", ignoreCase = true)) {
+                return true
+            }
+        }
+
+        // KDE: check ~/.config/kdeglobals
+        val kdeGlobals = File(System.getProperty("user.home"), ".config/kdeglobals")
+        if (kdeGlobals.exists()) {
+            val content = kdeGlobals.readText()
+            // Look for dark color schemes
+            if (content.contains("ColorScheme=", ignoreCase = true) &&
+                content.lowercase().let {
+                    it.contains("dark") || it.contains("breeze-dark") || it.contains("night")
+                }) {
+                return true
+            }
+        }
+
+        false
+    } catch (_: Exception) {
+        false
+    }
 }

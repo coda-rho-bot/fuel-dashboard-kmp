@@ -21,6 +21,16 @@ data class FuelResponse(
     val modManaged: Map<String, Boolean> = emptyMap(),
     @SerialName("surplus_alert")
     val surplusAlert: Boolean = false,
+    /** Junie balance data, if available on the host. */
+    val junie: JunieBalanceData? = null,
+)
+
+@Serializable
+data class JunieBalanceData(
+    val balance: Double = 0.0,
+    val license: String? = null,
+    @SerialName("last_checked")
+    val lastChecked: Long? = null,
 )
 
 @Serializable
@@ -95,10 +105,18 @@ data class FleetAgent(
 
 @Serializable
 data class AlertsResponse(
-    val alerts: List<FuelAlert> = emptyList(),
-)
+    val alerts: List<String> = emptyList(),
+) {
+    fun toFuelAlerts(): List<FuelAlert> = alerts.map { raw ->
+        val severity = when {
+            raw.startsWith("CRITICAL", ignoreCase = true) -> "critical"
+            raw.startsWith("WARNING", ignoreCase = true) -> "warning"
+            else -> "info"
+        }
+        FuelAlert(message = raw, severity = severity)
+    }
+}
 
-@Serializable
 data class FuelAlert(
     val message: String = "",
     val severity: String = "info",
