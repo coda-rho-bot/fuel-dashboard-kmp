@@ -14,19 +14,33 @@ data class JunieBalanceInfo(
 )
 
 fun parseJunieBalance(output: String): JunieBalanceInfo? {
-    val balance = Regex("Balance left: \\$(\\d+(?:\\.\\d+)?)").find(output)?.groupValues?.get(1)?.toDoubleOrNull()
+    // Try "Balance left: $XX.XX" format first
+    var balance = Regex("Balance left: \\$(\\d+(?:\\.\\d+)?)").find(output)?.groupValues?.get(1)?.toDoubleOrNull()
+    // Try "$XX.XX remaining" format (from task result line)
+    if (balance == null) {
+        balance = Regex("\\$(\\d+(?:\\.\\d+)?)\\s*remaining").find(output)?.groupValues?.get(1)?.toDoubleOrNull()
+    }
+    // Try "remaining" with just the dollar amount on the same line
+    if (balance == null) {
+        val remainingLine = output.lineSequence().firstOrNull { it.contains("remaining", ignoreCase = true) && it.contains("$") }
+        if (remainingLine != null) {
+            balance = Regex("\\$(\\d+(?:\\.\\d+)?)").find(remainingLine)?.groupValues?.get(1)?.toDoubleOrNull()
+        }
+    }
     val license = Regex("License: (.+)").find(output)?.groupValues?.get(1)?.trim()
+        ?: Regex("license[:\\s]+(\\w+)", RegexOption.IGNORE_CASE).find(output)?.groupValues?.get(1)?.trim()
     return balance?.let { JunieBalanceInfo(it, license) }
 }
 
 /**
  * Provides Junie's last-known monthly balance.
  *
- * Balance checking requires the `junie-credits` helper script to be installed in PATH.
- * The standard Junie CLI (`junie`) does not expose balance information non-interactively,
- * so this helper script is a separate dependency. Polling is intentionally cache-only
- * because invoking junie-credits charges for a check; [checkBalance] is called only by
- * an explicit user action.
+ * Balance checking requires: (1) the Junie CLI installed (junie or junie-auth in PATH),
+ * (2) python3 with pexpect, and (3) ~/.junie/auth present.
+ * The balance checker script (junie-credits.py) is bundled with this app as a resource.
+ * It runs the Junie CLI interactively to call /usage and parse the balance.
+ * Polling is intentionally cache-only because each check costs money;
+ * [checkBalance] is called only by an explicit user action.
  */
 class JunieProviderAdapter(
     override val providerId: String,

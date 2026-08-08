@@ -99,6 +99,18 @@ data class AcpAgentConfig(
                     ),
                     cwd = home,
                 ),
+                AcpAgentConfig(
+                    id = "linus",
+                    name = "Linus",
+                    command = acpPath,
+                    env = mapOf(
+                        "LETTA_ACP_BACKEND" to "remote",
+                        "LETTA_AGENT_ID" to "agent-8c1f9353-481d-414c-8e35-2da9c16db269",
+                        "LETTA_APP_SERVER_URL" to "ws://127.0.0.1:14606",
+                        "NODE_OPTIONS" to "--experimental-websocket",
+                    ),
+                    cwd = home,
+                ),
             )
         }
 

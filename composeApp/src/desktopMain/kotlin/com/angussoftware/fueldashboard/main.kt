@@ -16,6 +16,7 @@ import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.server.EmbeddedServer
+import com.angussoftware.fueldashboard.settings.AgentSettingsStore
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.FuelDashboardApp
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
@@ -138,6 +139,24 @@ fun main() = application {
     val initialAgentSettings = viewModel.state.value.agentSettings
     if (initialAgentSettings.agents.isNotEmpty()) {
         agentManager.startMonitoring(toAcpConfigs(initialAgentSettings.agents))
+    } else {
+        // First launch: seed default fleet agents
+        val defaultConfigs = AcpAgentConfig.defaultFleet()
+        if (defaultConfigs.isNotEmpty()) {
+            val seededSettings = AgentSettings(
+                agents = defaultConfigs.map { acp ->
+                    AgentConfig(
+                        id = acp.id,
+                        name = acp.name,
+                        command = acp.command,
+                        args = acp.args.joinToString(" "),
+                        env = acp.env,
+                    )
+                },
+            )
+            AgentSettingsStore.save(seededSettings)
+            agentManager.startMonitoring(defaultConfigs)
+        }
     }
 
     // Push agent manager state → ViewModel whenever it changes

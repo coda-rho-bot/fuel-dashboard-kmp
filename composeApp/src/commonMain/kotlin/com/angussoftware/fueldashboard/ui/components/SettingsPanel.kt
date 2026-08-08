@@ -693,7 +693,7 @@ private fun ProviderConfigRow(
                     Spacer(Modifier.height(8.dp))
                 } else {
                     Text(
-                        text = "Requires the junie-credits helper script in PATH. No API key or server URL is needed.",
+                        text = "Requires Junie CLI installed and ~/.junie/auth present. The balance checker script is bundled with the app (needs python3 + pexpect).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -936,7 +936,7 @@ private fun AddProviderDialog(
                 )
             } else {
                 Text(
-                    text = "Requires Junie CLI and the junie-credits helper script in PATH. Balance checks are manual and cost about $0.20.",
+                    text = "Requires Junie CLI installed (junie or junie-auth in PATH) and ~/.junie/auth present. The balance checker script is bundled with this app (needs python3 + pexpect). Each check costs ~$0.05-0.20.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -2,25 +2,56 @@ package com.angussoftware.fueldashboard.network
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 
 internal actual suspend fun runJunieCredits(): String = withContext(Dispatchers.IO) {
-    val process = ProcessBuilder("junie-credits")
+    val script = extractBundledScript()
+    val process = ProcessBuilder("python3", script.absolutePath)
         .redirectErrorStream(true)
         .start()
     val output = process.inputStream.bufferedReader().use { it.readText() }
     if (process.waitFor() != 0) {
-        throw IllegalStateException(output.ifBlank { "junie-credits failed" })
+        throw IllegalStateException(output.ifBlank { "junie-credits script failed" })
     }
     output
 }
 
 /**
- * Checks whether the `junie-credits` helper script is available in PATH.
- *
- * The Junie CLI itself (`junie`) does not expose balance information non-interactively,
- * so the `junie-credits` helper script is required for balance checking.
+ * Extracts the bundled junie-credits.py to a temp file and returns its path.
+ * The script is shipped as a resource inside the app.
  */
-internal actual val canCheckJunieBalance: Boolean = isBinaryInPath("junie-credits")
+private fun extractBundledScript(): File {
+    val tempFile = File.createTempFile("junie-credits", ".py")
+    tempFile.deleteOnExit()
+    val resource = Thread.currentThread().contextClassLoader
+        .getResourceAsStream("junie-credits.py")
+        ?: throw IllegalStateException("Bundled junie-credits.py not found")
+    resource.use { input ->
+        tempFile.outputStream().use { output ->
+            input.copyTo(output)
+        }
+    }
+    return tempFile
+}
+
+/**
+ * Whether this platform can check the Junie balance.
+ *
+ * Requires: python3 with pexpect, the Junie CLI, and ~/.junie/auth.
+ * The junie-credits.py script is bundled with the app.
+ */
+internal actual val canCheckJunieBalance: Boolean =
+    isBinaryInPath("python3") && hasJunieCli()
+
+/**
+ * Checks if the Junie CLI (junie or junie-auth) is available.
+ */
+internal fun hasJunieCli(): Boolean {
+    return isBinaryInPath("junie-auth") || isBinaryInPath("junie") || run {
+        val home = System.getProperty("user.home")
+        File("$home/.local/bin/junie-auth").exists() || File("$home/.local/bin/junie").exists()
+    }
+}
 
 /**
  * Returns true if the given binary name is found in the system PATH.
