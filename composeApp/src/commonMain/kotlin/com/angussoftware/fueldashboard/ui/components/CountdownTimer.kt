@@ -21,16 +21,17 @@ fun CountdownText(
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
 ) {
     if (resetsAt == null) return
-    // Tick every 30 seconds to update the countdown
-    var tick by remember { mutableLongStateOf(0L) }
+    // Tick every 30 seconds to update the countdown.
+    // tick MUST be read in the composable body (not just written) to trigger recomposition.
+    var tick by remember { mutableLongStateOf(epochMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
-            tick = epochMillis()
             delay(30_000L)
+            tick = epochMillis()
         }
     }
     androidx.compose.material3.Text(
-        text = formatCountdown(resetsAt),
+        text = formatCountdown(resetsAt, tick),
         style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
         color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier,
