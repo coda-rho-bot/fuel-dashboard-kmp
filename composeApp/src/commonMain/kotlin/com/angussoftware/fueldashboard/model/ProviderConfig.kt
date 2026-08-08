@@ -14,14 +14,14 @@ enum class ProviderCategory(val label: String) {
 }
 
 enum class ProviderKind(val displayName: String, val category: ProviderCategory) {
-    ZAI("z.ai", ProviderCategory.LLM_PROVIDER),
-    LETTA_CLOUD("Letta Cloud", ProviderCategory.LLM_PROVIDER),
-    OPENAI("OpenAI", ProviderCategory.LLM_PROVIDER),
     ANTHROPIC("Anthropic", ProviderCategory.LLM_PROVIDER),
     DEEPSEEK("DeepSeek", ProviderCategory.LLM_PROVIDER),
     GROQ("Groq", ProviderCategory.LLM_PROVIDER),
-    MISTRAL("Mistral AI", ProviderCategory.LLM_PROVIDER),
     JUNIE("Junie", ProviderCategory.LLM_PROVIDER),
+    LETTA_CLOUD("Letta Cloud", ProviderCategory.LLM_PROVIDER),
+    MISTRAL("Mistral AI", ProviderCategory.LLM_PROVIDER),
+    OPENAI("OpenAI", ProviderCategory.LLM_PROVIDER),
+    ZAI("z.ai", ProviderCategory.LLM_PROVIDER),
     CONNECTED_API("Remote Dashboard", ProviderCategory.AGENT_BACKEND),
 }
 
