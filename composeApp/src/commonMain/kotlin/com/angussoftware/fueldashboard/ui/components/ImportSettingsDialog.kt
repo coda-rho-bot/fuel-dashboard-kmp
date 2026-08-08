@@ -298,7 +298,7 @@ fun ImportSettingsDialog(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "This will replace all current settings.",
+                        text = "This will replace all current settings, including API keys.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )

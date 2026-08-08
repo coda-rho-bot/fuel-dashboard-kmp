@@ -501,6 +501,7 @@ class FuelViewModel {
                 providerId = config.id,
                 baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
+                apiKey = config.apiKey,
             )
         }
     }

@@ -51,7 +51,7 @@ class DashboardUiApiTest {
         assertTrue(source.contains("add_provider: adds an LLM provider (kind, api_key; optional name, server_url)"))
         assertTrue(source.contains("remove_provider: removes a provider by name or ID"))
         assertTrue(source.contains("list_providers: lists all configured providers"))
-        assertTrue(source.contains("add_orchestrator: connects to a remote dashboard (url)"))
+        assertTrue(source.contains("add_orchestrator: connects to a remote dashboard (url; optional api_key)"))
         assertTrue(source.contains("\"kind\": \"zai\""))
         assertTrue(source.contains("\"api_key\": \"your-api-key\""))
         assertTrue(source.contains("\"name\": \"z.ai (Work)\""))

@@ -197,7 +197,7 @@ private fun ServerApiKeySection(
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        text = "Required for POST, DELETE, and MCP requests. Send it as a Bearer token.",
+        text = "Required for ALL requests (except GET /health). Send it as a Bearer token.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -413,7 +413,7 @@ private fun ProviderMcpSetupGuide() {
         )
         ProviderGuideText("MCP server URL: http://localhost:8321/mcp")
         ProviderGuideText(
-            "Authentication: All write operations (POST, DELETE, MCP tool calls) require the Embedded Server API Key " +
+            "Authentication: ALL requests (except GET /health) require the Embedded Server API Key " +
                 "(shown above in Settings). Pass it as an Authorization header:\n" +
                 "Authorization: Bearer <your-api-key>",
         )
@@ -422,7 +422,7 @@ private fun ProviderMcpSetupGuide() {
                 "• add_provider: adds an LLM provider (kind, api_key; optional name, server_url)\n" +
                 "• remove_provider: removes a provider by name or ID\n" +
                 "• list_providers: lists all configured providers\n" +
-                "• add_orchestrator: connects to a remote dashboard (url)",
+                "• add_orchestrator: connects to a remote dashboard (url; optional api_key)",
         )
         ProviderGuideText("Example — an agent adding a z.ai provider:")
         ProviderCodeExample(
@@ -632,10 +632,22 @@ private fun ProviderConfigRow(
                         modifier = Modifier.fillMaxWidth(),
                         label = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("API Key")
+                                Text(
+                                    if (config.kind == ProviderKind.CONNECTED_API) {
+                                        "Server API Key (optional)"
+                                    } else {
+                                        "API Key"
+                                    },
+                                )
                                 if (showHelp) {
                                     Spacer(Modifier.width(4.dp))
-                                    HelpIcon("Stored locally, never shared.")
+                                    HelpIcon(
+                                        if (config.kind == ProviderKind.CONNECTED_API) {
+                                            "API key for the remote dashboard's server (required if the remote dashboard has auth enabled)"
+                                        } else {
+                                            "Stored locally, never shared."
+                                        },
+                                    )
                                 }
                             }
                         },
@@ -844,17 +856,29 @@ private fun AddProviderDialog(
             Spacer(Modifier.height(4.dp))
 
             // API key — required for most providers, optional for Connected API
-            if (selectedKind != ProviderKind.CONNECTED_API && selectedKind != ProviderKind.JUNIE) {
+            if (selectedKind != ProviderKind.JUNIE) {
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = { apiKey = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${selectedKind.displayName} API Key")
+                            Text(
+                                if (selectedKind == ProviderKind.CONNECTED_API) {
+                                    "Server API Key (optional)"
+                                } else {
+                                    "${selectedKind.displayName} API Key"
+                                },
+                            )
                             if (showHelp) {
                                 Spacer(Modifier.width(4.dp))
-                                HelpIcon("Stored locally, never shared.")
+                                HelpIcon(
+                                    if (selectedKind == ProviderKind.CONNECTED_API) {
+                                        "API key for the remote dashboard's server (required if the remote dashboard has auth enabled)"
+                                    } else {
+                                        "Stored locally, never shared."
+                                    },
+                                )
                             }
                         }
                     },
@@ -895,7 +919,7 @@ private fun AddProviderDialog(
                             Spacer(Modifier.width(4.dp))
                             HelpIcon(
                                 if (selectedKind == ProviderKind.CONNECTED_API) {
-                                    "Connects to another Fuel Dashboard instance to monitor its providers. Only needs the server URL — read access is open. Use this to aggregate multiple machines."
+                                    "Connects to another Fuel Dashboard instance to monitor its providers. Enter the server API key above if the remote dashboard has auth enabled."
                                 } else {
                                     "Optional - only change for self-hosted endpoints."
                                 },

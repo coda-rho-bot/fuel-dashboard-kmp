@@ -421,12 +421,17 @@ internal class FuelMcpServer(
     private fun Server.addOrchestratorTool() {
         addTool(
             name = "add_orchestrator",
-            description = "Adds a remote Fuel Dashboard server connection. Requires 'url'.",
+            description = "Adds a remote Fuel Dashboard server connection. Requires 'url'. " +
+                "Optional 'api_key' for the remote server's auth.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("url", buildJsonObject {
                         put("type", "string")
                         put("description", "Remote Fuel Dashboard server URL")
+                    })
+                    put("api_key", buildJsonObject {
+                        put("type", "string")
+                        put("description", "API key for the remote dashboard's server (required if the remote dashboard has auth enabled)")
                     })
                 },
                 required = listOf("url"),
@@ -436,11 +441,13 @@ internal class FuelMcpServer(
             if (url.isNullOrBlank()) {
                 return@addTool errorResult("url is required")
             }
+            val apiKey = request.arguments?.get("api_key")?.jsonPrimitive?.content ?: ""
 
             val provider = ProviderConfig(
                 id = FuelSettingsStore.generateProviderId(),
                 kind = ProviderKind.CONNECTED_API,
                 serverUrl = url,
+                apiKey = apiKey,
                 displayName = "Remote Dashboard",
             )
             runCatching {

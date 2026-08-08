@@ -39,7 +39,6 @@ import io.ktor.server.routing.routing
 import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.lang.management.ManagementFactory
 import java.net.NetworkInterface
 import java.security.SecureRandom
 import java.util.Base64
@@ -49,6 +48,10 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * Embedded HTTP server — desktop app IS the orchestrator.
  * Serves fuel data to mobile devices on the same LAN.
+ *
+ * SECURITY: The server binds to [DEFAULT_HOST] (0.0.0.0) so it is reachable
+ * from any device on the LAN.  All endpoints except `/health` require a Bearer
+ * API key.  If LAN access is not needed, bind to `127.0.0.1` instead.
  */
 class EmbeddedServer(
     private val repository: DecisionRepository? = null,
@@ -59,13 +62,13 @@ class EmbeddedServer(
 ) {
     companion object {
         const val DEFAULT_PORT = 8321
+        /** Bind to all interfaces so LAN devices can reach the server. */
         const val DEFAULT_HOST = "0.0.0.0"
         private const val GRACE_PERIOD_MS = 500L
         private const val TIMEOUT_MS = 1_000L
     }
 
     private var server: KtorServer<*, *>? = null
-    private val startTimeMs = System.currentTimeMillis()
     private val apiKey = ServerApiKeyStore.loadOrCreate(::generateApiKey)
 
     /** Thread-safe registry of agents that self-registered via POST /agents/register or MCP register_agent. */
@@ -175,13 +178,20 @@ class EmbeddedServer(
     }
 
     private fun Application.configureRouting() {
+        // CORS: anyHost() is safe because credentials are NOT enabled.
+        // MCP clients and browsers from any origin can connect, but they still
+        // need a valid Bearer API key for every endpoint except /health.
         install(CORS) { anyHost() }
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false })
         }
 
+        // Global auth intercept — every endpoint except /health requires the API key.
+        // CORS preflight (OPTIONS) requests are handled earlier in the pipeline and
+        // never reach this intercept.
         intercept(ApplicationCallPipeline.Call) {
-            if (call.request.path() == "/mcp" && !call.requireApiKey()) {
+            if (call.request.path() == "/health") return@intercept
+            if (!call.requireApiKey()) {
                 finish()
             }
         }
@@ -197,7 +207,7 @@ class EmbeddedServer(
 
         routing {
             get("/") {
-                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /health", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
+                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
             }
 
             get("/fuel") {
@@ -234,7 +244,6 @@ class EmbeddedServer(
             get("/agents") { call.respond(AgentsResponse(mergedAgents())) }
 
             post("/agents/register") {
-                if (!call.requireApiKey()) return@post
                 val req = call.receive<RegisterAgentRequest>()
                 val baseId = req.name.lowercase().replace("\\s+".toRegex(), "-")
                 // Dedup by name — update existing instead of creating duplicate
@@ -256,7 +265,6 @@ class EmbeddedServer(
             }
 
             post("/agents/{id}/state") {
-                if (!call.requireApiKey()) return@post
                 val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing agent id"))
                 val req = call.receive<UpdateAgentStateRequest>()
                 val existing = registeredAgents[id]
@@ -270,7 +278,6 @@ class EmbeddedServer(
             }
 
             delete("/agents/{id}") {
-                if (!call.requireApiKey()) return@delete
                 val id = call.parameters["id"] ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing agent id"))
                 val removed = registeredAgents.remove(id)
                 if (removed != null) {
@@ -284,9 +291,9 @@ class EmbeddedServer(
 
             get("/alerts") { call.respond(AlertsResponse(alerts)) }
 
+            // Lightweight health check — no auth required (for uptime monitors).
             get("/health") {
-                val uptimeSec = (System.currentTimeMillis() - startTimeMs) / 1000
-                call.respond(HealthResponse("ok", uptimeSec, currentPid()))
+                call.respondText("""{"status":"ok"}""", ContentType.Application.Json)
             }
         }
 
@@ -305,12 +312,6 @@ class EmbeddedServer(
 
         respond(HttpStatusCode.Unauthorized, ErrorResponse(error))
         return false
-    }
-
-    private fun currentPid(): Long = try {
-        ProcessHandle.current().pid()
-    } catch (e: Exception) {
-        ManagementFactory.getRuntimeMXBean().name.substringBefore('@').toLongOrNull() ?: -1
     }
 
     private fun generateApiKey(): String = ByteArray(32)
@@ -389,4 +390,3 @@ internal data class RegisteredAgent(
 // ── Existing private models ────────────────────────────────────────────
 
 @Serializable private data class ServiceInfo(val service: String, val version: String, val endpoints: List<String>)
-@Serializable private data class HealthResponse(val status: String, val uptime: Long, val pid: Long)
