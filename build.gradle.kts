@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlinSerialization) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.angusGradleTools)
+    alias(libs.plugins.sqldelight) apply false
 }
 
 version = (findProperty("version") as String?) ?: version

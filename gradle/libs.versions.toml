@@ -1,21 +1,32 @@
 [versions]
 agp = "8.12.3"
-android-compileSdk = "35"
+android-compileSdk = "36"
 android-minSdk = "26"
-android-targetSdk = "35"
-androidx-activity = "1.11.0"
+android-targetSdk = "36"
+androidx-activity = "1.13.0"
 androidx-lifecycle = "2.10.0"
 composeMultiplatform = "1.9.0"
 kotlin = "2.3.21"
 kover = "0.9.8"
-angusSoftware-theming = "0.10.3"
+angusSoftware-theming = "0.10.4"
 angusSoftware-gradle = "0.3.0"
 ktor = "3.4.3"
 kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.10.0"
 kotlinx-datetime = "0.7.1"
+qrcode-kotlin = "4.5.0"
+sqldelight = "2.0.2"
+zxing-android-embedded = "4.3.0"
+acp-kotlin = "0.24.0"
+mcp-kotlin = "0.8.4"
 
 [libraries]
+# Ktor server (desktop only)
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
+
 # Ktor client
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
@@ -40,8 +51,25 @@ androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:life
 androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 
+# QR Code
+qrcode-kotlin = { module = "io.github.g0dkar:qrcode-kotlin", version.ref = "qrcode-kotlin" }
+
 # Angus Software
 angusSoftware-theming-compose = { module = "com.angussoftware.theming:compose", version.ref = "angusSoftware-theming" }
+
+# QR Scanner (Android only)
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing-android-embedded" }
+
+# SQLDelight
+sqldelight-jvm = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqldelight-android = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+
+# ACP (Agent Client Protocol) — desktop only
+acp-kotlin = { module = "com.agentclientprotocol:acp", version.ref = "acp-kotlin" }
+acp-kotlin-ktor-client = { module = "com.agentclientprotocol:acp-ktor-client", version.ref = "acp-kotlin" }
+
+# MCP (Model Context Protocol) — desktop only (agents connect to us)
+mcp-kotlin-server = { module = "io.modelcontextprotocol:kotlin-sdk-server", version.ref = "mcp-kotlin" }
 
 # Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -56,3 +84,4 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 angusGradleTools = { id = "com.angussoftware.gradle-tools", version.ref = "angusSoftware-gradle" }
 angusGradleTools-coverage = { id = "com.angussoftware.gradle-tools.coverage" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
