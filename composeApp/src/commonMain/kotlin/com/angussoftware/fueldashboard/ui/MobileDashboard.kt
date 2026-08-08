@@ -105,7 +105,7 @@ fun MobileDashboard(
                         viewModel.onAgentModeChange?.invoke(agentId, mode)
                     },
                     onRemoveAgent = { agentId ->
-                        viewModel.onRemoveAgent?.invoke(agentId)
+                        viewModel.removeAgent(agentId)
                     },
                     onAddAgent = viewModel::addAgent,
                     syncData = SettingsSyncData.from(

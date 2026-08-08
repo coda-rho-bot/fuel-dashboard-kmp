@@ -516,6 +516,8 @@ private fun AgentCard(
     onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -558,6 +560,17 @@ private fun AgentCard(
                 }
 
                 StatusDot(status = agent.status)
+
+                Spacer(Modifier.width(4.dp))
+
+                IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Remove agent",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -604,6 +617,27 @@ private fun AgentCard(
                 }
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Remove Agent") },
+            text = { Text("Remove \"${agent.name}\" from the dashboard? This stops monitoring the agent but does not delete it from Letta.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onRemoveAgent(agent.id)
+                }) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
