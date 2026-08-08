@@ -1,0 +1,37 @@
+when:
+  - event: [push, pull_request]
+    branch: [main, master]
+
+steps:
+  build:
+    image: localhost:5000/ci-theming:latest
+    commands:
+      - mkdir -p ~/.gradle
+      - echo "forgejo.token=${FORGEJO_TOKEN}" >> ~/.gradle/gradle.properties
+      - chmod +x gradlew
+      - ./gradlew --no-daemon :composeApp:compileKotlinDesktop :composeApp:test :composeApp:koverXmlReport
+    environment:
+      GRADLE_USER_HOME: /root/.gradle
+    volumes:
+      - gradle-cache-fuel-dashboard:/root/.gradle/caches
+      - gradle-wrapper-fuel-dashboard:/root/.gradle/wrapper
+
+  commitlint:
+    image: alpine:latest
+    when:
+      event: pull_request
+    commands:
+      - apk add --no-cache git bash
+      - git clone https://x-access-token:${GPR_TOKEN}@github.com/RhoMancer/ci-scripts.git /tmp/ci-scripts
+      - bash /tmp/ci-scripts/scripts/validate-commits.sh "origin/main...HEAD"
+
+  auto-tag:
+    image: alpine:latest
+    when:
+      event: push
+      branch: [main, master]
+    commands:
+      - apk add --no-cache git bash curl
+      - git clone https://x-access-token:${GPR_TOKEN}@github.com/RhoMancer/ci-scripts.git /tmp/ci-scripts
+      - git fetch --tags "https://x-access-token:${GPR_TOKEN}@github.com/RhoMancer/fuel-dashboard-kmp.git" 2>&1 || true
+      - REPO=RhoMancer/fuel-dashboard-kmp sh /tmp/ci-scripts/scripts/auto-tag.sh
