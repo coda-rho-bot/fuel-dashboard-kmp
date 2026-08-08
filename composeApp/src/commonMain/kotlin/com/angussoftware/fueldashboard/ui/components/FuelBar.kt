@@ -94,10 +94,10 @@ fun FuelBar(
 }
 
 fun fuelColor(pct: Int): Color {
-    return when {
-        pct > 50 -> Color(0xFF4CAF50)  // green
-        pct > 25 -> Color(0xFFFFC107)  // yellow
-        pct > 10 -> Color(0xFFFF9800)  // orange
-        else -> Color(0xFFEF5350)      // red
-    }
+    val clamped = pct.coerceIn(0, 100)
+    // R: 0 at 100%, ramps to 255 at 50%, stays 255 below 50%
+    val r = ((100 - clamped) / 50f).coerceIn(0f, 1f)
+    // G: 255 above 50%, ramps from 255 to 0 between 50% and 0%
+    val g = (clamped / 50f).coerceIn(0f, 1f)
+    return Color(r, g, 0f)
 }
