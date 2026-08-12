@@ -1,20 +1,26 @@
 package com.angussoftware.fueldashboard.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -72,7 +78,7 @@ fun ProviderContent(
         Spacer(Modifier.height(contentSpacing))
         when (report.type) {
             ProviderType.SPEND_BUDGET -> {
-                report.usedDollars?.let { BudgetBar(it, report.limitDollars) } ?: Text(
+                report.usedDollars?.let { BudgetBar(it, report.limitDollars, showHelp = showHelp) } ?: Text(
                     "No spend data (requires admin key for costs API)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -80,17 +86,33 @@ fun ProviderContent(
                 val rateLimitWindows = report.windows.filter { it.name == "Requests/min" || it.name == "Tokens/min" }
                 if (rateLimitWindows.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
-                    rateLimitWindows.forEach { ProviderWindowRow(it, showHelp) }
+                    rateLimitWindows.forEachIndexed { idx, w ->
+                        if (idx > 0) Spacer(Modifier.height(10.dp))
+                        ProviderWindowRow(w, showHelp)
+                    }
                 }
                 report.windows.firstOrNull { it.name == "Monthly Budget" }?.let {
                     Spacer(Modifier.height(8.dp))
                     ProviderWindowRow(it, showHelp)
                 }
             }
-            ProviderType.RATE_LIMIT -> report.windows.forEach { ProviderWindowRow(it, showHelp) }
+            ProviderType.RATE_LIMIT -> report.windows.forEachIndexed { idx, w ->
+                if (idx > 0) Spacer(Modifier.height(10.dp))
+                ProviderWindowRow(w, showHelp)
+            }
             ProviderType.WINDOW_CREDIT -> {
-                if (report.windows.isNotEmpty()) {
-                    report.windows.forEach { ProviderWindowRow(it, showHelp) }
+                if (config.kind == ProviderKind.CONNECTED_API) {
+                    // Remote Dashboard: show custom text instead of "no usage data"
+                    Text(
+                        "Connected to remote dashboard",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else if (report.windows.isNotEmpty()) {
+                    report.windows.forEachIndexed { idx, w ->
+                        if (idx > 0) Spacer(Modifier.height(10.dp))
+                        ProviderWindowRow(w, showHelp)
+                    }
                 } else if (report.remainingPct != null) {
                     FuelBar(report.remainingPct, label = "Remaining", showHelp = showHelp)
                 } else {
@@ -107,18 +129,39 @@ fun ProviderContent(
 
 @Composable
 private fun ProviderWindowRow(window: ReportWindow, showHelp: Boolean) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            window.remainingPct?.let { FuelBar(it, compact = true, label = window.name, showHelp = showHelp) } ?: Text(
-                "—", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.width(12.dp))
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Fuel bar row
+        window.remainingPct?.let { FuelBar(it, compact = true, label = window.name, showHelp = showHelp) } ?: Text(
+            "—", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        // Timer row (below fuel bar)
         window.resetsAt?.let { resetTime ->
-            CountdownText(resetTime)
-            if (showHelp) {
-                Spacer(Modifier.width(4.dp))
-                HelpIcon("Time until quota resets")
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TimerBar(
+                    resetsAt = resetTime,
+                    windowMs = (window.windowHours * 3_600_000).toLong(),
+                    showHelp = showHelp,
+                    modifier = Modifier.weight(1f),
+                )
+                if (window.resetEstimated) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Estimated timer",
+                        tint = Color(0xFFFFC107),
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+            if (window.resetEstimated) {
+                Text(
+                    "Timer estimated — provider did not return a reset value. This may indicate the window resets on next request or a connectivity issue.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFFFC107),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
         }
     }
@@ -167,14 +210,14 @@ private fun ProviderCreditBalance(report: ProviderReport, showHelp: Boolean, box
             )
         }
         report.creditsResetAt?.let { resetAt ->
+            Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Quota resets ", style = MaterialTheme.typography.bodyMedium, color = subColor)
-                CountdownText(resetAt)
-                if (showHelp) {
-                    Spacer(Modifier.width(4.dp))
-                    HelpIcon("Time until quota resets")
-                }
             }
+            TimerBar(
+                resetsAt = resetAt,
+                windowMs = 2_592_000_000L, // 30 days default
+            )
         }
     }
 }

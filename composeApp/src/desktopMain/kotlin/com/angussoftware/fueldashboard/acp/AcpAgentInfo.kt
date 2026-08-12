@@ -14,6 +14,8 @@ package com.angussoftware.fueldashboard.acp
  * @param capabilities Agent capabilities from the initialize response
  * @param status Connection status of this agent
  * @param errorMessage Error message if status is ERROR
+ * @param retryCount Number of consecutive connection retries attempted (0 = fresh/connected)
+ * @param nextRetryMs Epoch millis when the next retry will be attempted (0 = no retry scheduled)
  */
 data class AcpAgentInfo(
     val id: String,
@@ -25,6 +27,8 @@ data class AcpAgentInfo(
     val capabilities: List<String> = emptyList(),
     val status: AcpAgentStatus = AcpAgentStatus.DISCONNECTED,
     val errorMessage: String? = null,
+    val retryCount: Int = 0,
+    val nextRetryMs: Long = 0L,
 )
 
 /**

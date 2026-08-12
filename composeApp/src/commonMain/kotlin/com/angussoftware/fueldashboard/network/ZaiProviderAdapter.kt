@@ -77,7 +77,10 @@ class ZaiProviderAdapter(
         // Parse token limit
         val tokensUsedPct = tokensLimit?.percentage ?: 0
         val tokensRemaining = (100 - tokensUsedPct).coerceIn(0, 100)
-        val resetMs = tokensLimit?.nextResetTime
+        // Fallback: if API doesn't return nextResetTime, compute from window size
+        val tokenResetTime = tokensLimit?.nextResetTime
+        val resetMs = tokenResetTime ?: (now + WINDOW_MS)
+        val tokenResetEstimated = tokenResetTime == null
 
         if (tokensLimit != null) {
             windows.add(
@@ -86,6 +89,7 @@ class ZaiProviderAdapter(
                     remainingPct = tokensRemaining,
                     resetsAt = resetMs,
                     windowHours = WINDOW_HOURS,
+                    resetEstimated = tokenResetEstimated,
                 ),
             )
         }
@@ -93,12 +97,14 @@ class ZaiProviderAdapter(
         if (sessionLimit != null) {
             val sessionUsed = sessionLimit.percentage
             val sessionRemaining = (100 - sessionUsed).coerceIn(0, 100)
+            val sessionResetTime = sessionLimit.nextResetTime
             windows.add(
                 ReportWindow(
                     name = "Session",
                     remainingPct = sessionRemaining,
-                    resetsAt = sessionLimit.nextResetTime,
+                    resetsAt = sessionResetTime ?: (now + WINDOW_MS),
                     windowHours = WINDOW_HOURS,
+                    resetEstimated = sessionResetTime == null,
                 ),
             )
         }
@@ -110,6 +116,7 @@ class ZaiProviderAdapter(
             remainingPct = tokensRemaining,
             resetsAt = resetMs,
             windowHours = WINDOW_HOURS,
+            resetEstimated = tokenResetEstimated,
             available = windows.isNotEmpty(),
             windows = windows,
             rawDisplay = "tokens:${tokensUsedPct}%" +

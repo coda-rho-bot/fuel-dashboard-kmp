@@ -1,0 +1,63 @@
+site_name: Fuel Dashboard
+site_description: Cross-platform fuel monitoring for AI providers
+site_url: https://git.angussoftware.dev/coda/fuel-dashboard-kmp
+repo_url: https://git.angussoftware.dev/coda/fuel-dashboard-kmp
+repo_name: coda/fuel-dashboard-kmp
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - scheme: default
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/git-alt
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Decision Engine: architecture/decision-engine.md
+      - Data Flow: architecture/data-flow.md
+  - API Reference:
+      - HTTP Endpoints: api-reference/http-endpoints.md
+      - MCP Tools: api-reference/mcp-tools.md
+  - Providers: providers/index.md
+  - Guides:
+      - QR Sync: guides/qr-sync.md
+      - Security: guides/security.md
+      - Agent Setup: guides/agent-setup.md
+  - Research: research/index.md

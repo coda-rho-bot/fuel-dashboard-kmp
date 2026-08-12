@@ -284,7 +284,7 @@ private fun MobileFuelContent(
                 if (decisions.isNotEmpty()) {
                     item {
                         Spacer(Modifier.height(4.dp))
-                        DecisionLog(decisions = decisions)
+                        DecisionLog(decisions = decisions, showHelp = state.showHelp)
                     }
                 }
             }
@@ -444,12 +444,12 @@ private fun AgentsTabContent(
         }
 
         if (state.hasConnectedApi) {
-            AlertsPanel(alerts = state.alerts.toFuelAlerts())
+            AlertsPanel(alerts = state.alerts.toFuelAlerts(), showHelp = state.showHelp)
 
             // Show decision history on agents tab too
             val decisions = state.decisions.decisions
             if (decisions.isNotEmpty()) {
-                DecisionLog(decisions = decisions)
+                DecisionLog(decisions = decisions, showHelp = state.showHelp)
             }
         }
     }

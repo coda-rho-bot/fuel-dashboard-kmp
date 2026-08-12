@@ -85,7 +85,9 @@ import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import com.angussoftware.fueldashboard.model.SettingsSyncData
 import androidx.compose.runtime.collectAsState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
+import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
+import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.rememberQrScanner
 import com.angussoftware.fueldashboard.ui.supportsQrScanning
@@ -158,11 +160,11 @@ fun SettingsPanel(
             Spacer(Modifier.height(8.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Show Help",
                         style = MaterialTheme.typography.labelMedium,
@@ -255,7 +257,7 @@ private fun ProvidersSection(
     // QR scanner — only functional on Android (no-op on desktop)
     val qrScanner = rememberQrScanner { scannedText ->
         if (scannedText != null) {
-            SettingsSyncData.fromJson(scannedText)?.let { parsed ->
+            SettingsSyncData.fromQrData(scannedText)?.let { parsed ->
                 scannedSyncData = parsed
                 showImportEntryDialog = false
             }
@@ -370,6 +372,10 @@ private fun ProvidersSection(
                 agentSettings = agentSettings,
                 themeController = themeController,
                 serverUrl = serverUrl,
+                serverApiKey = ServerApiKeyStore.load().ifBlank { null },
+                junieBalance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull(),
+                junieLicense = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null },
+                junieLastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull(),
             ),
             onDismiss = { showQrSyncDialog = false },
         )
@@ -411,7 +417,7 @@ private fun ProviderMcpSetupGuide() {
             "Agents connected to the dashboard's MCP server can automatically manage LLM providers and connect a remote dashboard. " +
                 "No manual entry needed.",
         )
-        ProviderGuideText("MCP server URL: http://localhost:8321/mcp")
+        ProviderGuideText("MCP server URL: http://localhost:8322/mcp")
         ProviderGuideText(
             "Authentication: ALL requests (except GET /health) require the Embedded Server API Key " +
                 "(shown above in Settings). Pass it as an Authorization header:\n" +
@@ -905,7 +911,7 @@ private fun AddProviderDialog(
                 ProviderKind.GROQ -> "https://api.groq.com/openai"
                 ProviderKind.MISTRAL -> "https://api.mistral.ai"
                 ProviderKind.JUNIE -> ""
-                ProviderKind.CONNECTED_API -> "http://127.0.0.1:8321"
+                ProviderKind.CONNECTED_API -> "http://127.0.0.1:8322"
             }
             if (selectedKind != ProviderKind.JUNIE) {
                 OutlinedTextField(
@@ -1049,7 +1055,7 @@ private fun AgentsSection(
         Column(modifier = Modifier.padding(top = 8.dp)) {
             if (liveAgents.isEmpty() && agentSettings.agents.isEmpty()) {
                 if (showHelp) {
-                    HelpText("Agents can self-register via MCP (http://localhost:8321/mcp, requires server API key as Bearer token). Or add an agent manually below.")
+                    HelpText("Agents can self-register via MCP (http://localhost:8322/mcp, requires server API key as Bearer token). Or add an agent manually below.")
                 }
             } else {
                 // Show live (MCP/HTTP-registered) agents

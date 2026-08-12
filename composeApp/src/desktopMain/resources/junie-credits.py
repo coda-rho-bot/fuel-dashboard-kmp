@@ -101,7 +101,10 @@ def main():
     child.sendcontrol("c")
     time.sleep(0.3)
     child.sendcontrol("c")
-    child.close(force=True)
+    try:
+        child.close(force=True)
+    except Exception:
+        pass  # pexpect close can fail if process is already dead
 
     # Strip ANSI escape sequences
     ansi_re = re.compile(

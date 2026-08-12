@@ -28,6 +28,8 @@ data class ProviderReport(
     val remainingPct: Int? = null,
     val resetsAt: Long? = null,
     val windowHours: Double = 0.0,
+    /** True when the top-level resetsAt was computed from a fallback. */
+    val resetEstimated: Boolean = false,
     val usedDollars: Double? = null,
     val limitDollars: Double? = null,
     val available: Boolean = true,
@@ -52,6 +54,8 @@ data class ReportWindow(
     val remainingPct: Int?,
     val resetsAt: Long?,
     val windowHours: Double,
+    /** True when resetsAt was computed from a fallback (API didn't return the real value). */
+    val resetEstimated: Boolean = false,
 )
 
 /**

@@ -58,7 +58,7 @@ data class ProviderConfig(
         ProviderKind.GROQ -> serverUrl.ifBlank { "https://api.groq.com/openai" }
         ProviderKind.MISTRAL -> serverUrl.ifBlank { "https://api.mistral.ai" }
         ProviderKind.JUNIE -> ""
-        ProviderKind.CONNECTED_API -> serverUrl.ifBlank { "http://127.0.0.1:8321" }
+        ProviderKind.CONNECTED_API -> serverUrl.ifBlank { "http://127.0.0.1:8322" }
     }
 
     /**

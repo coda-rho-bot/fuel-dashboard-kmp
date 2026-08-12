@@ -19,8 +19,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -53,9 +51,9 @@ fun QrSyncDialog(
     syncData: SettingsSyncData,
     onDismiss: () -> Unit,
 ) {
-    val code = remember(syncData) { syncData.toCode() }
-    val json = remember(syncData) { syncData.toJson() }
-    val capacity = remember(json) { estimateQrCapacity(json) }
+    val code = syncData.toCode()
+    val json = syncData.toQrData()
+    val capacity = estimateQrCapacity(json)
     val clipboardManager = LocalClipboardManager.current
 
     AlertDialog(
@@ -83,18 +81,10 @@ fun QrSyncDialog(
                         color = MaterialTheme.colorScheme.error,
                     )
                 } else {
-                    Card(
-                        modifier = Modifier.padding(4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                        ),
-                    ) {
-                        QrCodeCanvas(
-                            data = json,
-                            size = 260.dp,
-                        )
-                    }
+                    QrCodeCanvas(
+                        data = json,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
 
                     Spacer(Modifier.height(8.dp))
 

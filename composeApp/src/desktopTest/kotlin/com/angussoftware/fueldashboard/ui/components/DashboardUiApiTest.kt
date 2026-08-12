@@ -30,7 +30,7 @@ class DashboardUiApiTest {
         assertTrue(source.contains("How to connect agents via MCP (recommended)"))
         assertTrue(source.contains("How to connect agents via ACP (advanced)"))
         assertTrue(source.contains("How to see agents on mobile"))
-        assertTrue(source.contains("http://localhost:8321/mcp"))
+        assertTrue(source.contains("http://localhost:8322/mcp"))
         assertTrue(source.contains("register_agent (register name, model, framework)"))
         assertTrue(source.contains("fuel://recommendation (read recommended model)"))
         assertTrue(source.contains("ACP-compatible agents: Letta Code, Claude Code, Codex CLI, GitHub Copilot, Gemini CLI."))
@@ -47,7 +47,7 @@ class DashboardUiApiTest {
         assertTrue(source.contains("How agents can add providers via MCP"))
         assertTrue(source.contains("Agents connected to the dashboard's MCP server can automatically manage LLM providers and connect a remote dashboard."))
         assertTrue(source.contains("No manual entry needed."))
-        assertTrue(source.contains("MCP server URL: http://localhost:8321/mcp"))
+        assertTrue(source.contains("MCP server URL: http://localhost:8322/mcp"))
         assertTrue(source.contains("add_provider: adds an LLM provider (kind, api_key; optional name, server_url)"))
         assertTrue(source.contains("remove_provider: removes a provider by name or ID"))
         assertTrue(source.contains("list_providers: lists all configured providers"))
@@ -72,8 +72,10 @@ class DashboardUiApiTest {
 
             assertTrue(source.contains(expectedEmptyState))
             assertTrue(source.contains("Connecting to providers..."))
-            assertTrue(source.contains("Providers managed in Settings"))
         }
+
+        // Mobile dashboard additionally shows a "managed in Settings" hint
+        assertTrue(sourceFile("ui/MobileDashboard.kt").readText().contains("Providers managed in Settings"))
     }
 
     @Test
@@ -92,7 +94,7 @@ class DashboardUiApiTest {
         val app = sourceFile("ui/App.kt").readText()
         val mobile = sourceFile("ui/MobileDashboard.kt").readText()
 
-        assertTrue(app.contains("DecisionLog(decisions = decisions)"))
+        assertTrue(app.contains("DecisionLog(decisions = decisions, showHelp = state.showHelp)"))
         assertTrue(mobile.contains("MobileFleetEmptyState("))
         assertTrue(mobile.contains("if (state.acpAgents.isEmpty() && state.settings.providers.isEmpty())"))
     }

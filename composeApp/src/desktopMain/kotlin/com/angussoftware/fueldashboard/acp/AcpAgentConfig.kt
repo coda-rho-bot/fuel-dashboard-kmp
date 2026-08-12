@@ -30,7 +30,7 @@ data class AcpAgentConfig(
          *
          * These spawn `letta-acp` processes that connect to the Letta server
          * backends on ports 14601-14605. The ports are only active when the
-         * Letta Code desktop app is running.
+         * Letta Code desktop app is running for each agent.
          *
          * Agent IDs come from the consortium agents.yaml configuration.
          */
@@ -99,18 +99,9 @@ data class AcpAgentConfig(
                     ),
                     cwd = home,
                 ),
-                AcpAgentConfig(
-                    id = "linus",
-                    name = "Linus",
-                    command = acpPath,
-                    env = mapOf(
-                        "LETTA_ACP_BACKEND" to "remote",
-                        "LETTA_AGENT_ID" to "agent-8c1f9353-481d-414c-8e35-2da9c16db269",
-                        "LETTA_APP_SERVER_URL" to "ws://127.0.0.1:14606",
-                        "NODE_OPTIONS" to "--experimental-websocket",
-                    ),
-                    cwd = home,
-                ),
+                // NOTE: "linus" (port 14606) is intentionally omitted — no Letta Code
+                // server listens on that port. Linus is not an active fleet agent.
+                // Re-add it when a Letta Code instance is configured for port 14606.
             )
         }
 

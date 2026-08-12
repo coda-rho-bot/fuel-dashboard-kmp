@@ -30,13 +30,20 @@ import kotlinx.datetime.toLocalDateTime
 fun DecisionLog(
     decisions: List<Decision>,
     modifier: Modifier = Modifier,
+    showHelp: Boolean = false,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = "Decision History",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Decision History",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("Model recommendations logged by the decision engine based on current fuel levels, burn rate, and task complexity")
+            }
+        }
         Spacer(Modifier.height(8.dp))
 
         decisions.forEach { decision ->

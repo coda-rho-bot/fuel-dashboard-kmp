@@ -53,7 +53,9 @@ import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.network.canCheckJunieBalance
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
+import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.ThemeController
+import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
@@ -161,12 +163,7 @@ private fun DesktopLayout(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SettingsPanel(
-                themeController = themeController,
-                settings = state.settings,
-                viewModel = viewModel,
-            )
-
+            // Agents first
             AgentPanel(
                 agents = state.acpAgents,
                 onModelChange = { agentId, model ->
@@ -176,23 +173,37 @@ private fun DesktopLayout(
                     viewModel.onAgentModeChange?.invoke(agentId, mode)
                 },
                 onRemoveAgent = { agentId ->
-                    viewModel.onRemoveAgent?.invoke(agentId)
+                    viewModel.removeAgent(agentId)
                 },
                 onAddAgent = viewModel::addAgent,
-                syncData = SettingsSyncData.from(
-                    settings = state.settings,
-                    agentSettings = state.agentSettings,
-                    themeController = themeController,
-                    serverUrl = state.serverUrl,
-                ),
+                syncData = run {
+                    val key = viewModel.getServerApiKey()
+                    val junie = viewModel.getJunieBalance()
+                    SettingsSyncData.from(
+                        settings = state.settings,
+                        agentSettings = state.agentSettings,
+                        themeController = themeController,
+                        serverUrl = state.serverUrl,
+                        serverApiKey = key.ifBlank { null },
+                        junieBalance = junie,
+                        junieLicense = viewModel.getJunieLicense(),
+                        junieLastChecked = viewModel.getJunieLastChecked(),
+                    )
+                },
                 onImportSyncedSettings = viewModel::importSyncedSettings,
                 hasConnectedOrchestrator = state.hasConnectedApi,
                 showHelp = state.showHelp,
             )
 
-            if (state.hasConnectedApi) {
-                AlertsPanel(alerts = state.alerts.toFuelAlerts())
-            }
+            // Divider between agents and settings
+            HorizontalDivider()
+
+            // Settings below agents
+            SettingsPanel(
+                themeController = themeController,
+                settings = state.settings,
+                viewModel = viewModel,
+            )
         }
     }
 }
@@ -263,17 +274,15 @@ internal fun FuelColumnContent(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (state.providerReports.isNotEmpty() || state.fuel != null) {
+                // Alerts at the top
+                if (state.alerts.alerts.isNotEmpty()) {
                     item {
-                        Text(
-                            text = "Providers managed in Settings",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        AlertsPanel(alerts = state.alerts.toFuelAlerts(), showHelp = state.showHelp)
                     }
+                    item { HorizontalDivider() }
                 }
 
-                // Orchestrator fuel data (if connected)
+                // Recommendation banner
                 state.fuel?.let { fuel ->
                     item {
                         RecommendationBanner(
@@ -294,6 +303,11 @@ internal fun FuelColumnContent(
                     )
                 }
 
+                // Divider between dashboard overview and provider sections
+                if (state.activeProviders.isNotEmpty()) {
+                    item { HorizontalDivider() }
+                }
+
                 // Last updated timestamp
                 item {
                     Row(
@@ -306,6 +320,10 @@ internal fun FuelColumnContent(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (state.showHelp) {
+                            Spacer(Modifier.width(4.dp))
+                            HelpIcon("Last time provider data was polled. Updates every 30 seconds.")
+                        }
                         val totalErrors = state.providerErrors.size
                         if (totalErrors > 0) {
                             Text(
@@ -334,7 +352,6 @@ internal fun FuelColumnContent(
                             null
                         },
                     )
-                    HorizontalDivider()
                 }
 
                 // Decisions (from connected API only)
@@ -342,7 +359,7 @@ internal fun FuelColumnContent(
                 if (decisions.isNotEmpty()) {
                     item {
                         Spacer(Modifier.height(4.dp))
-                        DecisionLog(decisions = decisions)
+                        DecisionLog(decisions = decisions, showHelp = state.showHelp)
                     }
                 }
             }

@@ -308,6 +308,7 @@ class MistralProviderAdapter(
                         remainingPct = 100, // RPS is a throughput cap, not a depleting budget
                         resetsAt = epochMillis() + 1000,
                         windowHours = 1.0 / 3600.0, // ~1 second window
+                        resetEstimated = true,
                     ),
                 )
             }
@@ -318,6 +319,7 @@ class MistralProviderAdapter(
                         remainingPct = 100, // TPM is a throughput cap, not a depleting budget
                         resetsAt = epochMillis() + 60_000,
                         windowHours = 1.0 / 60.0, // ~1 minute window
+                        resetEstimated = true,
                     ),
                 )
             }

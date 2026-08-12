@@ -70,7 +70,7 @@ fun FuelBar(
                     color = animatedColor,
                 )
             }
-            Spacer(Modifier.height(3.dp))
+            Spacer(Modifier.height(6.dp))
         }
 
         // Background track

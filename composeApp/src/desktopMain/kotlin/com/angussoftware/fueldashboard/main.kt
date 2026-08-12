@@ -12,6 +12,7 @@ import com.angussoftware.fueldashboard.acp.AcpAgentStatus
 import com.angussoftware.fueldashboard.database.AgentRegistry
 import com.angussoftware.fueldashboard.database.DatabaseDriverFactory
 import com.angussoftware.fueldashboard.database.DecisionRepository
+import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
@@ -184,6 +185,23 @@ fun main() = application {
     viewModel.onDecisionLogged = { agentId, modelHandle, provider, tier, complexity, utilizationRatio, headroom, reason ->
         serverScope.launch {
             repository.insert(agentId, modelHandle, provider, tier, complexity, utilizationRatio, headroom, reason)
+        }
+    }
+
+    viewModel.onFetchDecisions = {
+        repository.getRecent(10).map { record ->
+            Decision(
+                id = record.id,
+                agentId = record.agentId,
+                modelHandle = record.modelHandle,
+                provider = record.provider,
+                tier = record.tier,
+                complexity = record.complexity,
+                utilizationRatio = record.utilizationRatio,
+                headroom = record.headroom.toInt(),
+                reason = record.reason,
+                timestamp = record.timestamp,
+            )
         }
     }
 

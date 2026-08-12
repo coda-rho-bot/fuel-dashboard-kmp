@@ -61,7 +61,7 @@ class EmbeddedServer(
     private val onProvidersChanged: () -> Unit = {},
 ) {
     companion object {
-        const val DEFAULT_PORT = 8321
+        const val DEFAULT_PORT = 8322
         /** Bind to all interfaces so LAN devices can reach the server. */
         const val DEFAULT_HOST = "0.0.0.0"
         private const val GRACE_PERIOD_MS = 500L
@@ -335,13 +335,13 @@ fun getLanUrl(): String {
             if (!iface.isUp || iface.isLoopback) continue
             for (addr in iface.inetAddresses) {
                 if (!addr.isLoopbackAddress && addr.isSiteLocalAddress) {
-                    return "http://${addr.hostAddress}:8321"
+                    return "http://${addr.hostAddress}:8322"
                 }
             }
         }
-        "http://localhost:8321"
+        "http://localhost:8322"
     } catch (e: Exception) {
-        "http://localhost:8321"
+        "http://localhost:8322"
     }
 }
 

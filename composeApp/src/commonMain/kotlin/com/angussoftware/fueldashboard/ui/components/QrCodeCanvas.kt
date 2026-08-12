@@ -1,120 +1,120 @@
 package com.angussoftware.fueldashboard.ui.components
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import qrcode.raw.ErrorCorrectionLevel
 import qrcode.raw.QRCodeProcessor
 
 /**
- * Renders a QR code from a string using [QRCodeProcessor] and Compose [Canvas].
+ * Renders a QR code from a string.
  *
- * Uses LOW error correction to maximize data capacity. Each module is drawn as a
- * filled rectangle — black for dark modules, white for light modules. The QR code
- * includes a 4-module quiet-zone border for scannability.
+ * Uses platform-specific rendering (see [renderQrBitmap] actual implementations).
  *
  * @param data The string to encode in the QR code
- * @param size Display size of the QR code (square)
- * @param darkColor Color for dark modules (default black)
- * @param lightColor Color for light modules (default white)
+ * @param modifier Modifier for sizing
+ * @param moduleSize Pixel size per module (platform-specific default)
+ * @param margin Quiet-zone modules around the code
  */
 @Composable
 fun QrCodeCanvas(
     data: String,
-    size: Dp = 240.dp,
-    darkColor: Color = Color.Black,
-    lightColor: Color = Color.White,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    moduleSize: Int = 20,
+    margin: Int = 4,
 ) {
-    // Encode QR data once and cache
-    val modules = remember(data) {
-        runCatching {
-            QRCodeProcessor(
-                data = data,
-                errorCorrectionLevel = ErrorCorrectionLevel.LOW,
-            ).encode()
-        }.getOrNull()
+    val bitmap = remember(data, moduleSize, margin) {
+        renderQrBitmap(data, moduleSize, margin, minimumInformationDensity(data))
     }
 
-    Canvas(modifier = Modifier.size(size)) {
-        val canvasSize = this.size.minDimension
-
-        if (modules == null) {
-            // Error state — draw white background with a red X
-            drawRect(lightColor)
-            val center = canvasSize / 2f
-            drawLine(
-                color = Color.Red,
-                start = Offset(center - 40f, center - 40f),
-                end = Offset(center + 40f, center + 40f),
-                strokeWidth = 4f,
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White)
+            .padding(8.dp),
+    ) {
+        bitmap?.let {
+            Image(
+                bitmap = it,
+                contentDescription = "QR code for settings sync",
+                contentScale = ContentScale.FillWidth,
+                // Nearest-neighbour sampling: the QR bitmap is rendered at a much
+                // higher resolution than it is displayed, so the default (linear)
+                // filtering blurs the sharp module edges into grey and makes the
+                // code unscannable. FilterQuality.None keeps every module crisp.
+                filterQuality = FilterQuality.None,
             )
-            drawLine(
-                color = Color.Red,
-                start = Offset(center + 40f, center - 40f),
-                end = Offset(center - 40f, center + 40f),
-                strokeWidth = 4f,
-            )
-            return@Canvas
-        }
-
-        val moduleCount = modules.size
-        // Include a 4-module quiet zone on each side (QR spec standard)
-        val quietZone = 4
-        val totalModules = moduleCount + quietZone * 2
-        val pixelPerModule = canvasSize / totalModules
-
-        // Draw background (includes quiet zone)
-        drawRect(color = lightColor)
-
-        // Draw dark modules only (light modules are already white from background)
-        for (row in 0 until moduleCount) {
-            for (col in 0 until moduleCount) {
-                if (modules[row][col].dark) {
-                    drawRect(
-                        color = darkColor,
-                        topLeft = Offset(
-                            x = (col + quietZone) * pixelPerModule,
-                            y = (row + quietZone) * pixelPerModule,
-                        ),
-                        size = Size(pixelPerModule, pixelPerModule),
-                    )
-                }
-            }
-        }
+        } ?: Box(
+            modifier = Modifier.fillMaxWidth().height(200.dp)
+                .background(Color.White),
+        )
     }
 }
 
 /**
- * Checks if the given data can fit in a QR code at LOW error correction.
- * Maximum capacity at version 40, LOW ECL is ~2,953 bytes.
+ * Platform-specific QR code rendering. Returns an ImageBitmap or null on failure.
+ *
+ * @param informationDensity the QR "version" (1..40) to encode at. Callers should
+ * pass [minimumInformationDensity] so the code stays as low-density (easy to scan)
+ * as possible.
+ */
+expect fun renderQrBitmap(
+    data: String,
+    moduleSize: Int,
+    margin: Int,
+    informationDensity: Int,
+): ImageBitmap?
+
+/**
+ * Finds the smallest QR "version" (information density, 1..40) that can hold [data]
+ * at the given [errorCorrectionLevel].
+ *
+ * qrcode-kotlin's own [QRCodeProcessor.infoDensityForDataAndECL] only searches up to
+ * [ErrorCorrectionLevel.maxTypeNum] (e.g. version 20 for LOW) and otherwise jumps
+ * straight to the maximum, version 40. That produces a needlessly dense 177x177
+ * module code for payloads only slightly above the version-20 limit, which is
+ * effectively unscannable off a screen. Searching the full range keeps the code as
+ * small as the data actually requires.
+ */
+fun minimumInformationDensity(
+    data: String,
+    errorCorrectionLevel: ErrorCorrectionLevel = ErrorCorrectionLevel.LOW,
+): Int {
+    val processor = QRCodeProcessor(data, errorCorrectionLevel)
+    for (version in 1..QRCodeProcessor.MAXIMUM_INFO_DENSITY) {
+        if (runCatching { processor.encode(version) }.isSuccess) return version
+    }
+    return QRCodeProcessor.MAXIMUM_INFO_DENSITY
+}
+
+/**
+ * Checks if the given data can fit in a QR code at LOW error correction, and reports
+ * the smallest QR version that would be used.
  */
 fun estimateQrCapacity(data: String): QrCapacityResult {
     val byteLength = data.toByteArray(Charsets.UTF_8).size
-    return runCatching {
-        val density = QRCodeProcessor.infoDensityForDataAndECL(
-            data,
-            ErrorCorrectionLevel.LOW,
-        )
-        if (density >= 40) {
-            // At version 40, check if it actually fits
-            val maxBytes = 2953 // Approximate max byte capacity at LOW ECL
-            if (byteLength > maxBytes) {
-                QrCapacityResult(tooLarge = true, byteLength = byteLength, maxBytes = maxBytes)
-            } else {
-                QrCapacityResult(tooLarge = false, byteLength = byteLength, version = 40)
-            }
-        } else {
-            QrCapacityResult(tooLarge = false, byteLength = byteLength, version = density)
-        }
-    }.getOrElse {
-        QrCapacityResult(tooLarge = true, byteLength = byteLength, maxBytes = 2953)
+    val maxBytes = 2953
+    val processor = QRCodeProcessor(data, ErrorCorrectionLevel.LOW)
+    val version = (1..QRCodeProcessor.MAXIMUM_INFO_DENSITY).firstOrNull { v ->
+        runCatching { processor.encode(v) }.isSuccess
+    }
+    return if (version == null) {
+        QrCapacityResult(tooLarge = true, byteLength = byteLength, maxBytes = maxBytes)
+    } else {
+        QrCapacityResult(tooLarge = false, byteLength = byteLength, version = version)
     }
 }
 

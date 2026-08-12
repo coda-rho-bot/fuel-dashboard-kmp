@@ -33,7 +33,6 @@ data class FuelProviderConfig(
     val name: String,
     val priority: Int = 99,
     val models: List<FuelModel> = emptyList(),
-    val unlimited: Boolean = false,
 )
 
 /**
@@ -43,7 +42,6 @@ data class ProviderStateInfo(
     val name: String,
     val remainingPct: Int? = null,
     val available: Boolean = true,
-    val windowPosition: Double? = null,
     val resetsAt: Map<String, Long?> = emptyMap(),
 )
 
@@ -79,26 +77,12 @@ private fun Complexity.upgrade(n: Int): Complexity {
     return Complexity.ORDER[min(3, idx + n)]
 }
 
-private fun getWindowStrategy(windowPosition: Double?): String {
-    if (windowPosition == null) return "balanced"
-    if (windowPosition < 0.2) return "aggressive"
-    if (windowPosition > 0.9) return "spend-down"
-    return "balanced"
-}
-
 private fun selectTier(
     floor: Complexity,
     utilizationRatio: Double?,
     benefit: Double,
-    windowPosition: Double?,
 ): Complexity {
     if (utilizationRatio == null) return floor
-
-    val ws = getWindowStrategy(windowPosition)
-    if (ws == "aggressive" || ws == "spend-down") {
-        if (benefit >= 0.3) return floor.upgrade(1)
-        return floor
-    }
 
     return when {
         utilizationRatio < 0.5 -> {
@@ -145,27 +129,35 @@ private data class Assessment(
     val remaining: Double,
     val utilizationRatio: Double?,
     val projectedRemaining: Double,
-    val windowPosition: Double?,
 )
 
+/**
+ * Assesses a provider's fuel state, computing utilization ratio and projected remaining.
+ *
+ * NOTE: burnRate is a single global value (aggregated across all providers), not
+ * per-provider. This means the utilization ratio is computed by dividing a global
+ * burn rate by each provider's individual optimal burn rate. This is an inherent
+ * limitation — providers have different billing cycles (window-credit vs spend-budget),
+ * so the ratio is only meaningful for providers that share the same reset window.
+ * A per-provider burn rate would require tracking consumption per provider, which
+ * is an architectural change beyond the current scope.
+ */
 private fun assessProvider(
     provider: FuelProviderConfig,
     remainingPct: Int?,
     available: Boolean,
-    windowPosition: Double?,
     resetsAt: Map<String, Long?>,
     burnRate: Double?,
 ): Assessment {
     val remaining = when {
-        provider.unlimited -> 100.0
         remainingPct != null -> remainingPct.toDouble()
-        else -> 50.0
+        else -> 50.0 // unknown — neutral default, not 100%
     }
 
     var utilizationRatio: Double? = null
     var projectedRemaining = remaining
 
-    if (!provider.unlimited && burnRate != null) {
+    if (burnRate != null) {
         var hoursToReset: Double? = null
         val now = com.angussoftware.fueldashboard.util.epochMillis()
 
@@ -185,7 +177,7 @@ private fun assessProvider(
         }
     }
 
-    return Assessment(provider, remaining, utilizationRatio, projectedRemaining, windowPosition)
+    return Assessment(provider, remaining, utilizationRatio, projectedRemaining)
 }
 
 /**
@@ -216,18 +208,16 @@ fun decideModel(
             provider = provider,
             remainingPct = state?.remainingPct,
             available = state?.available ?: true,
-            windowPosition = state?.windowPosition,
             resetsAt = state?.resetsAt ?: emptyMap(),
             burnRate = burnRate,
         )
 
-        if (!provider.unlimited && assessment.projectedRemaining <= 0) continue
+        if (assessment.projectedRemaining <= 0) continue
 
         val tier = selectTier(
             taskFloor,
             assessment.utilizationRatio,
             upgradeBenefit,
-            assessment.windowPosition,
         )
 
         val model = findModelForTier(provider, tier)
@@ -283,29 +273,4 @@ private fun buildReason(
     return parts.joinToString(", ")
 }
 
-/**
- * Estimates task complexity from message text.
- *
- * @param text the incoming message
- * @return pair of (minimum tier, upgrade benefit 0.0-1.0)
- */
-fun estimateComplexity(text: String): Pair<Complexity, Double> {
-    if (text.isEmpty()) return Complexity.MEDIUM to 0.6
 
-    val hasCode = text.contains("```") || text.contains("def ") || text.contains("fun ")
-    val hasCodeLang = Regex("```(kotlin|python|typescript|java|rust)", RegexOption.IGNORE_CASE).containsMatchIn(text)
-    val heavyKw = Regex(
-        "\\b(review|refactor|architect|design|debug|implement|build|create|fix|error|crash|broken|failing|migration|analyze|race|concurrent|leak|optimize)\\b",
-        RegexOption.IGNORE_CASE,
-    )
-
-    return when {
-        hasCodeLang || (hasCode && text.length > 500) -> Complexity.HEAVY to 0.0
-        heavyKw.containsMatchIn(text) && text.length > 100 -> Complexity.HEAVY to 0.0
-        heavyKw.containsMatchIn(text) -> Complexity.MEDIUM to 0.6
-        hasCode || text.length > 1000 -> Complexity.MEDIUM to 0.6
-        text.length < 100 -> Complexity.TRIVIAL to 0.0
-        text.length < 300 -> Complexity.LIGHT to 0.2
-        else -> Complexity.MEDIUM to 0.6
-    }
-}

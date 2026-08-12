@@ -15,6 +15,8 @@ import com.agentclientprotocol.model.PermissionOptionId
 import com.agentclientprotocol.model.PermissionOptionKind
 import com.agentclientprotocol.model.RequestPermissionOutcome
 import com.agentclientprotocol.model.RequestPermissionResponse
+import com.agentclientprotocol.model.SessionConfigOption
+import com.agentclientprotocol.model.SessionConfigSelectOptions
 import com.agentclientprotocol.model.SessionModeId
 import com.agentclientprotocol.model.SessionUpdate
 import com.agentclientprotocol.protocol.Protocol
@@ -22,7 +24,9 @@ import com.agentclientprotocol.protocol.ProtocolOptions
 import com.agentclientprotocol.transport.StdioTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,6 +71,15 @@ class AcpAgentManager {
     /** Active agent connections: agentId -> AcpConnection */
     private val connections = mutableMapOf<String, AcpConnection>()
 
+    /** Agent configs stored for retries: agentId -> AcpAgentConfig */
+    private val agentConfigs = mutableMapOf<String, AcpAgentConfig>()
+
+    /** Agent IDs that currently have a retry coroutine in-flight */
+    private val retryingAgents = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /** Background health-check coroutine job */
+    private var healthCheckJob: Job? = null
+
     @Volatile
     private var monitoring = false
 
@@ -82,6 +95,13 @@ class AcpAgentManager {
         if (monitoring) stopMonitoring()
         monitoring = true
 
+        // Store configs for retries and health checks
+        synchronized(this.agentConfigs) {
+            for (config in agentConfigs) {
+                this.agentConfigs[config.id] = config
+            }
+        }
+
         _agents.value = agentConfigs.map { config ->
             AcpAgentInfo(id = config.id, name = config.name, status = AcpAgentStatus.CONNECTING)
         }
@@ -89,6 +109,8 @@ class AcpAgentManager {
         for (config in agentConfigs) {
             scope.launch { connectAgent(config) }
         }
+
+        startHealthCheck()
     }
 
     /**
@@ -96,10 +118,14 @@ class AcpAgentManager {
      */
     fun stopMonitoring() {
         monitoring = false
+        healthCheckJob?.cancel()
+        healthCheckJob = null
         synchronized(connections) {
             for ((_, conn) in connections) conn.close()
             connections.clear()
         }
+        synchronized(agentConfigs) { agentConfigs.clear() }
+        retryingAgents.clear()
         _agents.value = _agents.value.map { it.copy(status = AcpAgentStatus.DISCONNECTED) }
     }
 
@@ -120,21 +146,88 @@ class AcpAgentManager {
 
     // ─── Internal: agent connection lifecycle ──────────────────────────
 
+    /**
+     * Connect to an agent with automatic retry on failure.
+     *
+     * Uses exponential backoff: 10s → 30s → 60s → 120s (max).
+     * Retries indefinitely while [monitoring] is true. Each agent has its
+     * own coroutine, so failures are isolated.
+     *
+     * The periodic health check ([startHealthCheck]) acts as a safety net
+     * in case a retry coroutine is cancelled or missed.
+     */
     private suspend fun connectAgent(config: AcpAgentConfig) {
-        try {
-            val connection = spawnAndInitialize(config)
-            synchronized(connections) { connections[config.id] = connection }
+        var retryCount = 0
+        while (monitoring) {
+            try {
+                val connection = spawnAndInitialize(config)
+                synchronized(connections) { connections[config.id] = connection }
 
-            val info = readAgentInfo(config, connection)
-            updateAgentInfo(config.id) { info.copy(status = AcpAgentStatus.CONNECTED) }
-        } catch (e: Exception) {
-            updateAgentInfo(config.id) {
-                AcpAgentInfo(
-                    id = config.id,
-                    name = config.name,
-                    status = AcpAgentStatus.ERROR,
-                    errorMessage = e.message ?: e.javaClass.simpleName,
-                )
+                val info = readAgentInfo(config, connection)
+                updateAgentInfo(config.id) {
+                    info.copy(
+                        status = AcpAgentStatus.CONNECTED,
+                        retryCount = 0,
+                        nextRetryMs = 0L,
+                        errorMessage = null,
+                    )
+                }
+                retryingAgents.remove(config.id)
+                return // Success — exit retry loop
+            } catch (e: Exception) {
+                retryCount++
+                val delayMs = calculateRetryDelay(retryCount)
+
+                updateAgentInfo(config.id) {
+                    it.copy(
+                        status = AcpAgentStatus.ERROR,
+                        errorMessage = "${e.message ?: e.javaClass.simpleName}" +
+                            (if (retryCount > 1) " (retry #$retryCount)" else ""),
+                        retryCount = retryCount,
+                        nextRetryMs = System.currentTimeMillis() + delayMs,
+                    )
+                }
+
+                retryingAgents.add(config.id)
+                delay(delayMs)
+            }
+        }
+        retryingAgents.remove(config.id)
+    }
+
+    /**
+     * Calculate retry delay using exponential backoff.
+     * Schedule: 10s → 30s → 60s → 120s (max).
+     */
+    private fun calculateRetryDelay(retryCount: Int): Long = when {
+        retryCount <= 1 -> RETRY_DELAY_INITIAL_MS
+        retryCount == 2 -> 30_000L
+        retryCount == 3 -> 60_000L
+        else -> RETRY_DELAY_MAX_MS
+    }
+
+    /**
+     * Periodically check for agents in ERROR state that don't have an
+     * active retry coroutine and attempt to reconnect them.
+     * This acts as a safety net alongside the per-agent retry loop.
+     */
+    private fun startHealthCheck() {
+        healthCheckJob = scope.launch {
+            while (monitoring) {
+                delay(HEALTH_CHECK_INTERVAL_MS)
+                if (!monitoring) break
+
+                for (info in _agents.value) {
+                    if (info.status == AcpAgentStatus.ERROR && info.id !in retryingAgents) {
+                        val config = synchronized(agentConfigs) { agentConfigs[info.id] }
+                        if (config != null) {
+                            updateAgentInfo(info.id) {
+                                it.copy(status = AcpAgentStatus.CONNECTING, errorMessage = null)
+                            }
+                            scope.launch { connectAgent(config) }
+                        }
+                    }
+                }
             }
         }
     }
@@ -150,42 +243,52 @@ class AcpAgentManager {
 
         val process = pb.start()
 
-        // Create ACP transport over the process's stdin/stdout
-        val transport = StdioTransport(
-            scope,
-            Dispatchers.IO,
-            process.inputStream.asSource().buffered(),
-            process.outputStream.asSink().buffered(),
-            "acp-${config.id}",
-        )
-
-        val protocol = Protocol(scope, transport, ProtocolOptions())
-
-        // Create the client — no global elicitation handler needed
-        val client = Client(protocol, null as GlobalElicitationHandler?)
-
-        // Start the protocol
-        protocol.start()
-
-        // Initialize: negotiate capabilities with the agent
-        val agentInfo = withTimeoutOrNull(INITIALIZE_TIMEOUT_MS) {
-            client.initialize(ClientInfo())
-        } ?: throw RuntimeException("ACP initialize timed out after ${INITIALIZE_TIMEOUT_MS}ms")
-
-        // Create session operations factory that auto-approves permissions
-        val operationsFactory = ClientOperationsFactory { sessionId, sessionResponse ->
-            AutoApproveSessionOperations()
-        }
-
-        // Create a monitoring session
-        val session = withTimeoutOrNull(SESSION_TIMEOUT_MS) {
-            client.newSession(
-                SessionCreationParameters(cwd = config.cwd, mcpServers = emptyList()),
-                operationsFactory,
+        try {
+            // Create ACP transport over the process's stdin/stdout
+            val transport = StdioTransport(
+                scope,
+                Dispatchers.IO,
+                process.inputStream.asSource().buffered(),
+                process.outputStream.asSink().buffered(),
+                "acp-${config.id}",
             )
-        } ?: throw RuntimeException("ACP session/new timed out after ${SESSION_TIMEOUT_MS}ms")
 
-        return AcpConnection(config, process, protocol, client, session, agentInfo)
+            val protocol = Protocol(scope, transport, ProtocolOptions())
+
+            // Create the client — no global elicitation handler needed
+            val client = Client(protocol, null as GlobalElicitationHandler?)
+
+            // Start the protocol
+            protocol.start()
+
+            // Initialize: negotiate capabilities with the agent
+            val agentInfo = withTimeoutOrNull(INITIALIZE_TIMEOUT_MS) {
+                client.initialize(ClientInfo())
+            } ?: throw RuntimeException("ACP initialize timed out after ${INITIALIZE_TIMEOUT_MS}ms")
+
+            // Create session operations factory that auto-approves permissions
+            val operationsFactory = ClientOperationsFactory { sessionId, sessionResponse ->
+                AutoApproveSessionOperations()
+            }
+
+            // Create a monitoring session
+            val session = withTimeoutOrNull(SESSION_TIMEOUT_MS) {
+                client.newSession(
+                    SessionCreationParameters(cwd = config.cwd, mcpServers = emptyList()),
+                    operationsFactory,
+                )
+            } ?: throw RuntimeException("ACP session/new timed out after ${SESSION_TIMEOUT_MS}ms")
+
+            return AcpConnection(config, process, protocol, client, session, agentInfo)
+        } catch (e: Exception) {
+            // Clean up the spawned process to avoid leaks (~100MB each)
+            process.destroy()
+            if (process.isAlive) {
+                Thread.sleep(100)
+                process.destroyForcibly()
+            }
+            throw e
+        }
     }
 
     private fun readAgentInfo(config: AcpAgentConfig, conn: AcpConnection): AcpAgentInfo {
@@ -221,14 +324,32 @@ class AcpAgentManager {
         var currentMode: String? = null
         var availableModes = emptyList<String>()
 
+        // Read model from configOptions (preferred by letta-acp and modern agents).
+        // letta-acp exposes the model as a config option with id: "model".
         try {
-            if (session.modelsSupported) {
-                val modelId: ModelId = session.currentModel.value
-                currentModel = modelId.toString()
-                availableModels = session.availableModels.map { it.name ?: it.toString() }
+            if (session.configOptionsSupported) {
+                val modelOption = session.configOptions.value
+                    .firstOrNull { it.id.value == "model" }
+                if (modelOption != null) {
+                    currentModel = extractConfigOptionValue(modelOption)
+                    availableModels = extractConfigOptionAvailableValues(modelOption)
+                }
             }
         } catch (_: Exception) {
-            // Model info not available
+            // configOptions not available
+        }
+
+        // Fallback: some agents use the older models API instead of configOptions.
+        if (currentModel == null) {
+            try {
+                if (session.modelsSupported) {
+                    val modelId: ModelId = session.currentModel.value
+                    currentModel = modelId.toString()
+                    availableModels = session.availableModels.map { it.name ?: it.toString() }
+                }
+            } catch (_: Exception) {
+                // Model info not available
+            }
         }
 
         try {
@@ -242,6 +363,31 @@ class AcpAgentManager {
         }
 
         return ModelModeInfo(currentModel, availableModels, currentMode, availableModes)
+    }
+
+    /**
+     * Extracts the current value from a [SessionConfigOption].
+     * For Select options this is [SessionConfigOption.Select.currentValue];
+     * for Boolean options it is the boolean converted to a string.
+     */
+    private fun extractConfigOptionValue(option: SessionConfigOption): String? =
+        when (option) {
+            is SessionConfigOption.Select -> option.currentValue.value.ifBlank { null }
+            is SessionConfigOption.BooleanOption -> option.currentValue.toString()
+        }
+
+    /**
+     * Extracts the list of available values from a [SessionConfigOption.Select].
+     * Returns an empty list for non-select options.
+     */
+    private fun extractConfigOptionAvailableValues(option: SessionConfigOption): List<String> {
+        return when (option) {
+            is SessionConfigOption.Select -> when (val opts = option.options) {
+                is SessionConfigSelectOptions.Flat -> opts.options.map { it.name }
+                is SessionConfigSelectOptions.Grouped -> opts.groups.flatMap { g -> g.options.map { it.name } }
+            }
+            is SessionConfigOption.BooleanOption -> emptyList()
+        }
     }
 
     // ─── Internal: state updates ────────────────────────────────────────
@@ -308,5 +454,14 @@ class AcpAgentManager {
     companion object {
         private const val INITIALIZE_TIMEOUT_MS = 30_000L
         private const val SESSION_TIMEOUT_MS = 60_000L
+
+        /** Initial retry delay after first connection failure */
+        private const val RETRY_DELAY_INITIAL_MS = 10_000L
+
+        /** Maximum retry delay (exponential backoff cap) */
+        private const val RETRY_DELAY_MAX_MS = 120_000L
+
+        /** Interval for periodic health check of ERROR agents */
+        private const val HEALTH_CHECK_INTERVAL_MS = 60_000L
     }
 }

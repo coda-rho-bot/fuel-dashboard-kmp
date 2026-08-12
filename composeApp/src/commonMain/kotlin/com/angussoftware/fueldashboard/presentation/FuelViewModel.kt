@@ -10,6 +10,7 @@ import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.model.AgentsResponse
 import com.angussoftware.fueldashboard.model.AlertsResponse
+import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FuelResponse
 import com.angussoftware.fueldashboard.model.FuelSnapshot
@@ -31,6 +32,7 @@ import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
 import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
 import com.angussoftware.fueldashboard.settings.AgentSettingsStore
 import com.angussoftware.fueldashboard.settings.FuelSettingsStore
+import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.settings.saveStringSetting
@@ -69,12 +71,17 @@ data class DashboardState(
     val acpAgents: List<AcpAgentDisplay> = emptyList(),
     val agentSettings: AgentSettings = AgentSettings(),
     val serverUrl: String? = null,
+    val serverApiKey: String? = null,
+    val junieBalance: Double? = null,
+    val junieLicense: String? = null,
+    val junieLastChecked: Long? = null,
     val showHelp: Boolean = true,
     val checkingProviderIds: Set<String> = emptySet(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
         get() = settings.providers.filter { it.isConfigured }
+            .sortedByDescending { it.kind == ProviderKind.CONNECTED_API }
 
     /** Whether any connected API (orchestrator) is active — used for agents/alerts panel visibility. */
     val hasConnectedApi: Boolean
@@ -146,14 +153,24 @@ class FuelViewModel {
     init {
         val settings = FuelSettingsStore.loadMultiProvider()
         val agents = AgentSettingsStore.load()
+        val serverKey = ServerApiKeyStore.load()
         _state.value = _state.value.copy(
             settings = settings,
             agentSettings = agents,
+            serverApiKey = serverKey.ifBlank { null },
+            junieBalance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull(),
+            junieLicense = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null },
+            junieLastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull(),
         )
         if (settings.hasAnyConfig) {
             activateAdapters(settings)
         }
     }
+
+    fun getServerApiKey(): String = ServerApiKeyStore.load()
+    fun getJunieBalance(): Double? = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull()
+    fun getJunieLicense(): String? = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null }
+    fun getJunieLastChecked(): Long? = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull()
 
     fun startPolling() {
         if (pollJob?.isActive == true) return
@@ -217,6 +234,12 @@ class FuelViewModel {
         headroom: Int,
         reason: String,
     ) -> Unit)? = null
+
+    /**
+     * Callback to fetch recent decisions from local storage (desktop only).
+     * Called after each poll to populate the DecisionLog.
+     */
+    var onFetchDecisions: (() -> List<Decision>)? = null
 
     /**
      * Push ACP agent display data into dashboard state. Called from main.kt
@@ -392,14 +415,61 @@ class FuelViewModel {
      * Replaces all current providers, agent configurations, and theme with the imported data.
      */
     fun importSyncedSettings(syncData: com.angussoftware.fueldashboard.model.SettingsSyncData) {
-        updateSettings(syncData.toMultiProviderSettings())
+        // Merge: take synced providers AND add/update a Remote Dashboard provider with the server API key
+        val providers = syncData.providers.toMutableList()
+        syncData.serverUrl?.let { url ->
+            val key = syncData.serverApiKey.orEmpty()
+            // Remove any existing CONNECTED_API and add fresh one
+            providers.removeAll { it.kind == com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API }
+            providers.add(
+                com.angussoftware.fueldashboard.model.ProviderConfig(
+                    id = "synced-orchestrator",
+                    kind = com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API,
+                    apiKey = key,
+                    displayName = "Remote Dashboard",
+                    serverUrl = url,
+                ),
+            )
+        }
+        updateSettings(com.angussoftware.fueldashboard.model.MultiProviderSettings(providers = providers))
 
         AgentSettingsStore.save(syncData.agentSettings)
         _state.value = _state.value.copy(agentSettings = syncData.agentSettings)
         onAgentSettingsChanged?.invoke(syncData.agentSettings)
 
+        // Populate agent display list from synced configs (for mobile — no live ACP available)
+        if (_state.value.acpAgents.isEmpty() && syncData.agentSettings.agents.isNotEmpty()) {
+            _state.value = _state.value.copy(
+                acpAgents = syncData.agentSettings.agents.map { config ->
+                    AcpAgentDisplay(
+                        id = config.id,
+                        name = config.name,
+                        currentModel = "unknown",
+                        availableModels = emptyList(),
+                        currentMode = null,
+                        availableModes = emptyList(),
+                        status = "synced",
+                        capabilities = emptyList(),
+                        lastSeen = null,
+                    )
+                },
+            )
+        }
+
         // Apply theme settings
         val themeController = com.angussoftware.fueldashboard.settings.ThemeController
+
+        // Apply Junie balance data (synced from desktop)
+        syncData.junieBalance?.let { balance ->
+            saveStringSetting(FuelSettingsKeys.JUNIE_BALANCE, balance.toString())
+        }
+        syncData.junieLicense?.let { license ->
+            saveStringSetting(FuelSettingsKeys.JUNIE_LICENSE, license)
+        }
+        syncData.junieLastChecked?.let { checked ->
+            saveStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, checked.toString())
+        }
+
         runCatching {
             val mode = com.angussoftware.theming.compose.ui.theme.ThemeMode.valueOf(syncData.themeMode)
             themeController.updateThemeMode(mode)
@@ -413,27 +483,7 @@ class FuelViewModel {
             themeController.updateDarkColorTheme(dark)
         }
 
-        // If the sync data includes a server URL, auto-add an Orchestrator provider
-        // so mobile can connect to the desktop immediately
-        syncData.serverUrl?.let { url ->
-            val currentSettings = _state.value.settings
-            val hasOrchestrator = currentSettings.providers.any {
-                it.kind == ProviderKind.CONNECTED_API && it.serverUrl == url
-            }
-            if (!hasOrchestrator) {
-                val newProvider = ProviderConfig(
-                    id = "synced-orchestrator",
-                    kind = ProviderKind.CONNECTED_API,
-                    apiKey = "",
-                    displayName = "Remote Dashboard",
-                    serverUrl = url,
-                )
-                val updated = currentSettings.copy(
-                    providers = currentSettings.providers + newProvider,
-                )
-                updateSettings(updated)
-            }
-        }
+        // Remote Dashboard provider is already added above in the providers list
     }
 
     // --- Internals ---
@@ -562,8 +612,19 @@ class FuelViewModel {
                 decisions = adapter.lastDecisions
                 agents = adapter.lastAgents
                 alerts = adapter.lastAlerts
+                // Sync Junie balance from remote dashboard to local settings
+                adapter.lastFuel?.junie?.let { junie ->
+                    junie.balance?.let { saveStringSetting(FuelSettingsKeys.JUNIE_BALANCE, it.toString()) }
+                    junie.license?.let { saveStringSetting(FuelSettingsKeys.JUNIE_LICENSE, it) }
+                    junie.lastChecked?.let { saveStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, it.toString()) }
+                }
                 break
             }
+        }
+
+        // ── Load local decisions if no ConnectedApi provided them ──────
+        if (decisions.decisions.isEmpty()) {
+            decisions = DecisionsResponse(decisions = onFetchDecisions?.invoke() ?: emptyList())
         }
 
         // ── Standalone alert generation ──────────────────────────────────
@@ -719,13 +780,6 @@ class FuelViewModel {
                 models = config?.kind?.let { kind ->
                     defaultModelsFor(kind)
                 } ?: emptyList(),
-                unlimited = config?.kind in listOf(
-                    ProviderKind.OPENAI,
-                    ProviderKind.ANTHROPIC,
-                    ProviderKind.DEEPSEEK,
-                    ProviderKind.GROQ,
-                    ProviderKind.MISTRAL,
-                ),
             )
         }
         return FuelConfig(providers = providers)

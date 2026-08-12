@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
@@ -46,6 +47,7 @@ fun BudgetBar(
     usedDollars: Double,
     limitDollars: Double?,
     modifier: Modifier = Modifier,
+    showHelp: Boolean = false,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         // Label row
@@ -68,6 +70,10 @@ fun BudgetBar(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (showHelp) {
+                    Spacer(Modifier.width(4.dp))
+                    HelpIcon("Dollar amount spent this billing period vs your monthly budget limit")
+                }
             }
             Text(
                 text = if (limitDollars != null && limitDollars > 0) {

@@ -67,28 +67,7 @@ class DecisionEngineTest {
     }
 
     @Test
-    fun selectTierUsesAggressiveAndSpendDownStrategiesOutsideBalancedWindow() {
-        val earlyWindow = decisionFor(
-            provider = provider(models = allTierModels()),
-            state = state(remainingPct = 100, windowPosition = 0.1),
-            burnRate = 6.0,
-            taskFloor = Complexity.MEDIUM,
-            upgradeBenefit = 0.3,
-        )
-        val lateWindow = decisionFor(
-            provider = provider(models = allTierModels()),
-            state = state(remainingPct = 100, windowPosition = 0.95),
-            burnRate = 6.0,
-            taskFloor = Complexity.MEDIUM,
-            upgradeBenefit = 0.3,
-        )
-
-        assertEquals(Complexity.HEAVY, earlyWindow.tier)
-        assertEquals(Complexity.HEAVY, lateWindow.tier)
-    }
-
-    @Test
-    fun decideModelUsesPriorityThenSkipsUnavailableAndExhaustedLimitedProviders() {
+    fun decideModelUsesPriorityThenSkipsUnavailableAndExhaustedProviders() {
         val unavailable = provider(name = "unavailable", priority = 1, models = allTierModels())
         val exhausted = provider(name = "exhausted", priority = 2, models = allTierModels())
         val available = provider(name = "available", priority = 3, models = allTierModels())
@@ -133,34 +112,34 @@ class DecisionEngineTest {
     }
 
     @Test
-    fun assessProviderTreatsUnlimitedProvidersAsFullAndLimitedProvidersAsProjectedFuel() {
-        val unlimited = provider(name = "unlimited", priority = 1, unlimited = true, models = allTierModels())
-        val limited = provider(name = "limited", priority = 2, models = allTierModels())
+    fun assessProviderSkipsExhaustedProvidersAndUsesProjectedFuelForAvailableOnes() {
+        val exhausted = provider(name = "exhausted", priority = 1, models = allTierModels())
+        val available = provider(name = "available", priority = 2, models = allTierModels())
 
-        val unlimitedDecision = assertNotNull(
+        // Exhausted provider (0% remaining) should be skipped due to projected depletion.
+        // Burn rate of 5%/hr over ~10hr window: 0% → -50 (skipped), 80% → 30 (viable).
+        val decision = assertNotNull(
             decideModel(
-                config = FuelConfig(listOf(unlimited, limited)),
+                config = FuelConfig(listOf(exhausted, available)),
                 providerStates = mapOf(
-                    "unlimited" to state(remainingPct = 0),
-                    "limited" to state(remainingPct = 80),
+                    "exhausted" to state(remainingPct = 0),
+                    "available" to state(remainingPct = 80),
                 ),
-                burnRate = 100.0,
+                burnRate = 5.0,
                 taskFloor = Complexity.MEDIUM,
                 upgradeBenefit = 0.0,
             ),
         )
-        val limitedDecision = decisionFor(
-            provider = limited,
+        val availableDecision = decisionFor(
+            provider = available,
             state = state(remainingPct = 80),
             burnRate = 2.0,
             taskFloor = Complexity.MEDIUM,
         )
 
-        assertEquals("unlimited", unlimitedDecision.provider)
-        assertNull(unlimitedDecision.utilizationRatio)
-        assertEquals(100.0, unlimitedDecision.projectedRemaining)
-        assertTrue(limitedDecision.utilizationRatio != null)
-        assertTrue(limitedDecision.projectedRemaining < 80.0)
+        assertEquals("available", decision.provider)
+        assertTrue(availableDecision.utilizationRatio != null)
+        assertTrue(availableDecision.projectedRemaining < 80.0)
     }
 
     @Test
@@ -195,22 +174,6 @@ class DecisionEngineTest {
         assertNull(noModels)
     }
 
-    @Test
-    fun estimateComplexityClassifiesEmptyShortTextAndCodeMessages() {
-        assertEquals(Complexity.MEDIUM to 0.6, estimateComplexity(""))
-        assertEquals(Complexity.TRIVIAL to 0.0, estimateComplexity("hello"))
-        assertEquals(Complexity.MEDIUM to 0.6, estimateComplexity("fun greet() = println(\"hi\")"))
-        assertEquals(Complexity.HEAVY to 0.0, estimateComplexity("```kotlin\nfun greet() = println(\"hi\")\n```"))
-    }
-
-    @Test
-    fun estimateComplexityUsesKeywordsAndLengthBoundaries() {
-        assertEquals(Complexity.MEDIUM to 0.6, estimateComplexity("Please debug this."))
-        assertEquals(Complexity.HEAVY to 0.0, estimateComplexity("debug " + "x".repeat(100)))
-        assertEquals(Complexity.LIGHT to 0.2, estimateComplexity("x".repeat(100)))
-        assertEquals(Complexity.MEDIUM to 0.6, estimateComplexity("x".repeat(300)))
-    }
-
     private fun decisionFor(
         provider: FuelProviderConfig,
         state: ProviderStateInfo? = null,
@@ -231,18 +194,15 @@ class DecisionEngineTest {
         name: String = "provider",
         priority: Int = 1,
         models: List<FuelModel>,
-        unlimited: Boolean = false,
-    ) = FuelProviderConfig(name, priority, models, unlimited)
+    ) = FuelProviderConfig(name, priority, models)
 
     private fun state(
         remainingPct: Int = 100,
         available: Boolean = true,
-        windowPosition: Double? = null,
     ) = ProviderStateInfo(
         name = "state",
         remainingPct = remainingPct,
         available = available,
-        windowPosition = windowPosition,
         resetsAt = mapOf("window" to epochMillis() + 36_000_000),
     )
 

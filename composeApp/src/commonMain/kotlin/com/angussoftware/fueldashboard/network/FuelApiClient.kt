@@ -14,7 +14,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
 class FuelApiClient(
-    baseUrl: String = "http://127.0.0.1:8321",
+    baseUrl: String = "http://127.0.0.1:8322",
     private val apiKey: String = "",
 ) {
     val client: HttpClient

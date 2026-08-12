@@ -108,7 +108,7 @@ fun AgentPanel(
     var scannedSyncData by remember { mutableStateOf<SettingsSyncData?>(null) }
     val qrScanner = rememberQrScanner { scannedText ->
         if (scannedText != null) {
-            SettingsSyncData.fromJson(scannedText)?.let { parsed ->
+            SettingsSyncData.fromQrData(scannedText)?.let { parsed ->
                 scannedSyncData = parsed
                 showImportEntryDialog = false
             }
@@ -121,7 +121,13 @@ fun AgentPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = "Agents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Agents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (showHelp) {
+                    Spacer(Modifier.width(4.dp))
+                    HelpIcon("AI agents connected to the dashboard. Agents can self-register via MCP or be added manually. The dashboard monitors their model, mode, and status via ACP.")
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { showQrSyncDialog = true }) {
                     Icon(Icons.Default.QrCode2, contentDescription = "Sync agents", modifier = Modifier.size(16.dp))
@@ -183,6 +189,7 @@ fun AgentPanel(
                     onModelChange = onModelChange,
                     onModeChange = onModeChange,
                     onRemoveAgent = onRemoveAgent,
+                    showHelp = showHelp,
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -250,14 +257,14 @@ private fun McpSetupGuide() {
                 "Your dashboard includes a built-in MCP server that agents can connect to.",
         )
         GuideText("1. The dashboard MCP server runs at:")
-        CodeExample("Desktop: http://localhost:8321/mcp\nLAN: http://[your-IP]:8321/mcp")
+        CodeExample("Desktop: http://localhost:8322/mcp\nLAN: http://[your-IP]:8322/mcp")
         GuideText("2. Add the MCP server to Letta Code settings.json mcpServers:")
         CodeExample(
             """
             {
               "mcpServers": {
                 "fuel-dashboard": {
-                  "url": "http://localhost:8321/mcp"
+                  "url": "http://localhost:8322/mcp"
                 }
               }
             }
@@ -269,7 +276,7 @@ private fun McpSetupGuide() {
             {
               "mcpServers": {
                 "fuel-dashboard": {
-                  "url": "http://localhost:8321/mcp"
+                  "url": "http://localhost:8322/mcp"
                 }
               }
             }
@@ -337,7 +344,7 @@ private fun MobileSyncGuide() {
         GuideText("1. On your phone, go to Settings → Add Provider.")
         GuideText("2. Select 'Remote Dashboard' under Agent Backend.")
         GuideText("3. Enter your desktop's URL:")
-        CodeExample("https://fuel.angussoftware.dev\nhttp://192.168.x.x:8321")
+        CodeExample("https://fuel.angussoftware.dev\nhttp://192.168.x.x:8322")
         GuideText("4. The phone polls the desktop every 30 seconds for agent data.")
         GuideText("5. Agents appear in the Agents tab on mobile.")
         GuideText(
@@ -515,7 +522,10 @@ private fun AgentCard(
     onModelChange: (agentId: String, model: String) -> Unit,
     onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
+    showHelp: Boolean = false,
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -558,6 +568,17 @@ private fun AgentCard(
                 }
 
                 StatusDot(status = agent.status)
+
+                Spacer(Modifier.width(4.dp))
+
+                IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Remove agent",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -567,6 +588,7 @@ private fun AgentCard(
                 currentModel = agent.currentModel,
                 availableModels = agent.availableModels,
                 onModelSelected = { model -> onModelChange(agent.id, model) },
+                showHelp = showHelp,
             )
 
             // --- Mode row (only if modes are available) ---
@@ -576,6 +598,7 @@ private fun AgentCard(
                     currentMode = agent.currentMode,
                     availableModes = agent.availableModes,
                     onModeSelected = { mode -> onModeChange(agent.id, mode) },
+                    showHelp = showHelp,
                 )
             }
 
@@ -604,6 +627,27 @@ private fun AgentCard(
                 }
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Remove Agent") },
+            text = { Text("Remove \"${agent.name}\" from the dashboard? This stops monitoring the agent but does not delete it from Letta.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onRemoveAgent(agent.id)
+                }) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
@@ -664,6 +708,7 @@ private fun ModelRow(
     currentModel: String?,
     availableModels: List<String>,
     onModelSelected: (String) -> Unit,
+    showHelp: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -673,6 +718,10 @@ private fun ModelRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (showHelp) {
+            Spacer(Modifier.width(4.dp))
+            HelpIcon("The LLM model this agent is currently using. Click to change from available models reported by the agent.")
+        }
         Spacer(Modifier.width(6.dp))
 
         if (availableModels.isNotEmpty()) {
@@ -731,6 +780,7 @@ private fun ModeRow(
     currentMode: String?,
     availableModes: List<String>,
     onModeSelected: (String) -> Unit,
+    showHelp: Boolean = false,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -738,6 +788,10 @@ private fun ModeRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (showHelp) {
+            Spacer(Modifier.width(4.dp))
+            HelpIcon("Agent interaction mode (e.g., YOLO, Plan, Code). Controls how the agent handles permissions and autonomy.")
+        }
         Spacer(Modifier.width(6.dp))
         availableModes.forEach { mode ->
             ModeChip(
