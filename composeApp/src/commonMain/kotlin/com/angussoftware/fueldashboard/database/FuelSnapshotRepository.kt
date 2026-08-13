@@ -3,6 +3,16 @@ package com.angussoftware.fueldashboard.database
 import com.angussoftware.fueldashboard.util.epochMillis
 import app.cash.sqldelight.db.SqlDriver
 
+data class ModelDrainRate(
+    val model: String,
+    val totalFuelConsumed: Double,
+    val sampleCount: Int,
+    val activeAgentCountAvg: Double,
+    val firstSeen: Long,
+    val lastUpdated: Long,
+    val avgDrainPerHr: Double,
+)
+
 data class FuelSnapshotRecord(
     val id: Long,
     val timestamp: Long,
@@ -30,6 +40,11 @@ class FuelSnapshotRepository(driver: SqlDriver) {
         activeModels: String?,
         resetAt: Long?,
     ) {
+        // Before inserting, check the previous snapshot for fuel-drop attribution
+        if (tokensPct != null) {
+            attributeFuelDelta(tokensPct, activeModels, activeAgentCount)
+        }
+
         queries.insertFuelSnapshot(
             timestamp = epochMillis(),
             tokens_pct = tokensPct,
@@ -38,6 +53,74 @@ class FuelSnapshotRepository(driver: SqlDriver) {
             active_models = activeModels,
             reset_at = resetAt,
         )
+    }
+
+    /**
+     * Compares current fuel to the previous snapshot. If fuel dropped, attributes
+     * the consumption to the models active during that interval.
+     *
+     * Attribution is proportional: if 2 models were active, each gets half the
+     * delta credited. This is a heuristic — true per-model attribution would
+     * require per-turn token tracking. Over time, models that consistently
+     * appear during high-drain periods accumulate more cost.
+     */
+    private fun attributeFuelDelta(currentPct: Double, activeModels: String?, activeAgentCount: Int) {
+        val prev = queries.selectRecentFuelSnapshots(1).executeAsList().firstOrNull() ?: return
+        val prevPct = prev.tokens_pct ?: return
+
+        // Only attribute actual drops (not resets or increases from window sliding)
+        val delta = prevPct - currentPct
+        if (delta <= 0.5) return // ignore noise (<0.5% change)
+
+        val models = activeModels?.split(",")?.filter { it.isNotBlank() } ?: return
+        if (models.isEmpty()) return
+
+        val perModelDelta = delta / models.size
+        val now = epochMillis()
+
+        for (model in models) {
+            // Try increment existing record
+            val existing = queries.selectAllModelDrainRates().executeAsList()
+                .find { it.model == model }
+
+            if (existing != null) {
+                queries.incrementModelDrainRate(
+                    delta = perModelDelta,
+                    agent_count = activeAgentCount.toDouble(),
+                    timestamp = now,
+                    model = model,
+                )
+            } else {
+                // First time seeing this model
+                val hoursActive = 0.1 // minimum to avoid div-by-zero
+                queries.upsertModelDrainRate(
+                    model = model,
+                    total_fuel_consumed = perModelDelta,
+                    sample_count = 1,
+                    active_agent_count_avg = activeAgentCount.toDouble(),
+                    first_seen = now,
+                    last_updated = now,
+                    avg_drain_per_hr = perModelDelta / hoursActive,
+                )
+            }
+        }
+    }
+
+    /**
+     * Returns all model drain rates sorted by total consumption.
+     */
+    fun getModelDrainRates(): List<ModelDrainRate> {
+        return queries.selectAllModelDrainRates().executeAsList().map { row ->
+            ModelDrainRate(
+                model = row.model,
+                totalFuelConsumed = row.total_fuel_consumed,
+                sampleCount = row.sample_count.toInt(),
+                activeAgentCountAvg = row.active_agent_count_avg,
+                firstSeen = row.first_seen,
+                lastUpdated = row.last_updated,
+                avgDrainPerHr = row.avg_drain_per_hr,
+            )
+        }
     }
 
     fun getRecent(limit: Int = 100): List<FuelSnapshotRecord> {

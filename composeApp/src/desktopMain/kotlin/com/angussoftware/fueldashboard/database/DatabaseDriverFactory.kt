@@ -17,6 +17,7 @@ actual class DatabaseDriverFactory {
         }
         // Ensure new tables added after initial schema are created (no migration framework)
         ensureFuelSnapshotsTable(driver)
+        ensureModelDrainRatesTable(driver)
         return driver
     }
 
@@ -33,6 +34,28 @@ actual class DatabaseDriverFactory {
                     active_agent_count INTEGER NOT NULL DEFAULT 0,
                     active_models TEXT,
                     reset_at INTEGER
+                )
+                """.trimIndent(),
+                0,
+            )
+        } catch (e: Exception) {
+            // Table already exists or other non-fatal error
+        }
+    }
+
+    private fun ensureModelDrainRatesTable(driver: SqlDriver) {
+        try {
+            driver.execute(
+                null,
+                """
+                CREATE TABLE IF NOT EXISTS model_drain_rates (
+                    model TEXT NOT NULL PRIMARY KEY,
+                    total_fuel_consumed REAL NOT NULL DEFAULT 0,
+                    sample_count INTEGER NOT NULL DEFAULT 0,
+                    active_agent_count_avg REAL NOT NULL DEFAULT 0,
+                    first_seen INTEGER NOT NULL,
+                    last_updated INTEGER NOT NULL,
+                    avg_drain_per_hr REAL NOT NULL DEFAULT 0
                 )
                 """.trimIndent(),
                 0,
