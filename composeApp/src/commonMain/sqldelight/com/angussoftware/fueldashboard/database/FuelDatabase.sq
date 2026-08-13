@@ -64,6 +64,36 @@ SELECT * FROM fuel_snapshots WHERE timestamp >= :since ORDER BY timestamp ASC;
 deleteOldFuelSnapshots:
 DELETE FROM fuel_snapshots WHERE timestamp < :cutoff;
 
+CREATE TABLE provider_fuel_snapshots (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,
+    provider_id TEXT NOT NULL,
+    provider_name TEXT NOT NULL,
+    provider_type TEXT NOT NULL,
+    remaining_pct REAL,
+    reset_at INTEGER,
+    window_hours REAL
+);
+
+insertProviderFuelSnapshot:
+INSERT INTO provider_fuel_snapshots (timestamp, provider_id, provider_name, provider_type, remaining_pct, reset_at, window_hours)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+selectProviderFuelSnapshots:
+SELECT * FROM provider_fuel_snapshots WHERE provider_id = :providerId AND timestamp >= :since ORDER BY timestamp ASC;
+
+selectLatestProviderSnapshot:
+SELECT * FROM provider_fuel_snapshots WHERE provider_id = :providerId ORDER BY timestamp DESC LIMIT 1;
+
+selectAllLatestProviderSnapshots:
+SELECT DISTINCT provider_id FROM provider_fuel_snapshots;
+
+selectRecentProviderSnapshots:
+SELECT * FROM provider_fuel_snapshots ORDER BY timestamp DESC LIMIT :limit;
+
+deleteOldProviderFuelSnapshots:
+DELETE FROM provider_fuel_snapshots WHERE timestamp < :cutoff;
+
 CREATE TABLE model_drain_rates (
     model TEXT NOT NULL PRIMARY KEY,
     total_fuel_consumed REAL NOT NULL DEFAULT 0,

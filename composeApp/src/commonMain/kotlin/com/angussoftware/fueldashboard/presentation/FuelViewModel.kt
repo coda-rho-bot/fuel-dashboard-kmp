@@ -79,6 +79,27 @@ data class ModelDrainRateDisplay(
     val avgDrainPerHr: Double,
 )
 
+data class ProviderSnapshotInput(
+    val providerId: String,
+    val providerName: String,
+    val providerType: String,
+    val remainingPct: Double?,
+    val resetAt: Long?,
+    val windowHours: Double?,
+)
+
+data class ProviderBurnRateDisplay(
+    val providerId: String,
+    val providerName: String,
+    val currentPct: Double?,
+    val burnRatePerHr: Double?,
+    val hoursUntilReset: Double,
+    val hoursUntilExhaustion: Double?,
+    val projectedRemainingAtReset: Double,
+    val willMakeIt: Boolean,
+    val history: List<Double>,
+)
+
 data class DashboardState(
     val settings: MultiProviderSettings = MultiProviderSettings(),
     val providerReports: Map<String, ProviderReport> = emptyMap(),
@@ -103,6 +124,7 @@ data class DashboardState(
     val fuelProjection: FuelProjection? = null,
     val modelDrainRates: List<ModelDrainRateDisplay> = emptyList(),
     val fuelHistory: List<Double> = emptyList(),
+    val providerBurnRates: List<ProviderBurnRateDisplay> = emptyList(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -303,6 +325,16 @@ class FuelViewModel {
      * Callback to fetch recent fuel percentages for sparkline chart.
      */
     var onGetFuelHistory: (() -> List<Double>)? = null
+
+    /**
+     * Callback to log all provider fuel states per poll cycle.
+     */
+    var onLogProviderSnapshots: ((List<ProviderSnapshotInput>) -> Unit)? = null
+
+    /**
+     * Callback to get per-provider burn rates and projections.
+     */
+    var onGetProviderBurnRates: (() -> List<ProviderBurnRateDisplay>)? = null
 
     /**
      * Push ACP agent display data into dashboard state. Called from main.kt
@@ -710,28 +742,48 @@ class FuelViewModel {
             alerts = AlertsResponse(alerts.alerts + generatedAlerts)
         }
 
-        // ── Real fuel tracking ────────────────────────────────────────────
-        // Log a fuel snapshot for real burn-rate analysis.
-        // No fake decision engine — just honest data collection.
+        // ── Real fuel tracking — ALL providers ─────────────────────────────
+        // Log every provider's fuel state, not just the first one.
         val activeAgents = _state.value.acpAgents.filter { it.status == "connected" }
         val activeModels = activeAgents.mapNotNull { it.currentModel }.distinct().sorted()
-        val windowCreditReport = reports.values.firstOrNull { it.type == ProviderType.WINDOW_CREDIT }
-        val tokensPct = windowCreditReport?.remainingPct?.toDouble()
-        val resetAt = windowCreditReport?.resetsAt
-        val sessionPct = reports.values.firstOrNull { it.type == ProviderType.SPEND_BUDGET }?.remainingPct?.toDouble()
 
+        // Build per-provider snapshot inputs for ALL providers with fuel data
+        val providerSnapshots = reports.mapNotNull { (providerId, report) ->
+            if (report.remainingPct == null) return@mapNotNull null
+            val config = _state.value.settings.providers.find { it.id == providerId }
+            ProviderSnapshotInput(
+                providerId = providerId,
+                providerName = config?.resolvedDisplayName() ?: report.displayName,
+                providerType = report.type.name,
+                remainingPct = report.remainingPct.toDouble(),
+                resetAt = report.resetsAt,
+                windowHours = report.windowHours,
+            )
+        }
+
+        // Log all provider snapshots
+        if (providerSnapshots.isNotEmpty()) {
+            onLogProviderSnapshots?.invoke(providerSnapshots)
+        }
+
+        // Also log legacy single-provider snapshot (for backward compat with drain attribution)
+        val primaryReport = providerSnapshots.firstOrNull()
+        val tokensPct = primaryReport?.remainingPct
+        val resetAt = primaryReport?.resetAt
         onLogFuelSnapshot?.invoke(
             tokensPct,
-            sessionPct,
+            null,
             activeAgents.size,
             activeModels.joinToString(","),
             resetAt,
         )
 
-        // Compute real fuel projection from stored snapshots
-        val realBurnRate = onComputeBurnRate?.invoke()
-        var fuelProjection: FuelProjection? = null
+        // Compute per-provider burn rates
+        val providerBurnRates = onGetProviderBurnRates?.invoke() ?: emptyList()
 
+        // Use primary provider for the legacy projection (backward compat)
+        val realBurnRate = providerBurnRates.firstOrNull()?.burnRatePerHr
+        var fuelProjection: FuelProjection? = null
         if (tokensPct != null) {
             fuelProjection = onGetProjection?.invoke(tokensPct, resetAt, realBurnRate ?: 0.0)
             if (fuelProjection != null) {
@@ -790,6 +842,7 @@ class FuelViewModel {
             fuelProjection = fuelProjection,
             modelDrainRates = onGetModelDrainRates?.invoke() ?: emptyList(),
             fuelHistory = onGetFuelHistory?.invoke() ?: emptyList(),
+            providerBurnRates = providerBurnRates,
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel

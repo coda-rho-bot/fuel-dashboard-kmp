@@ -291,6 +291,7 @@ internal fun FuelColumnContent(
                         projection = state.fuelProjection,
                         showHelp = state.showHelp,
                         fuelHistory = state.fuelHistory,
+                        providerBurnRates = state.providerBurnRates,
                     )
                 }
 

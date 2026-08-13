@@ -3,6 +3,29 @@ package com.angussoftware.fueldashboard.database
 import com.angussoftware.fueldashboard.util.epochMillis
 import app.cash.sqldelight.db.SqlDriver
 
+data class ProviderFuelSnapshot(
+    val id: Long,
+    val timestamp: Long,
+    val providerId: String,
+    val providerName: String,
+    val providerType: String,
+    val remainingPct: Double?,
+    val resetAt: Long?,
+    val windowHours: Double?,
+)
+
+data class ProviderBurnRate(
+    val providerId: String,
+    val providerName: String,
+    val currentPct: Double?,
+    val burnRatePerHr: Double?,
+    val hoursUntilReset: Double,
+    val hoursUntilExhaustion: Double?,
+    val projectedRemainingAtReset: Double,
+    val willMakeIt: Boolean,
+    val history: List<Double>,
+)
+
 data class ModelDrainRate(
     val model: String,
     val totalFuelConsumed: Double,
@@ -212,6 +235,77 @@ class FuelSnapshotRepository(driver: SqlDriver) {
      */
     fun cleanup(olderThanMs: Long = 7 * 24 * 3_600_000L) { // 7 days default
         queries.deleteOldFuelSnapshots(epochMillis() - olderThanMs)
+        queries.deleteOldProviderFuelSnapshots(epochMillis() - olderThanMs)
+    }
+
+    // ── Per-provider tracking ──────────────────────────────────────────
+
+    fun insertProviderSnapshot(
+        providerId: String,
+        providerName: String,
+        providerType: String,
+        remainingPct: Double?,
+        resetAt: Long?,
+        windowHours: Double?,
+    ) {
+        queries.insertProviderFuelSnapshot(
+            timestamp = epochMillis(),
+            provider_id = providerId,
+            provider_name = providerName,
+            provider_type = providerType,
+            remaining_pct = remainingPct,
+            reset_at = resetAt,
+            window_hours = windowHours,
+        )
+    }
+
+    fun getAllProviderBurnRates(windowMs: Long = 3_600_000): List<ProviderBurnRate> {
+        val providerIds = queries.selectAllLatestProviderSnapshots().executeAsList()
+        val now = epochMillis()
+        return providerIds.mapNotNull { pid ->
+            val snapshots = queries.selectProviderFuelSnapshots(pid, now - windowMs).executeAsList()
+                .filter { it.remaining_pct != null }
+            if (snapshots.isEmpty()) return@mapNotNull null
+
+            val latest = snapshots.last()
+            val currentPct = latest.remaining_pct ?: return@mapNotNull null
+
+            // Compute burn rate
+            var burnRate: Double? = null
+            if (snapshots.size >= 3) {
+                val first = snapshots.first()
+                val timeSpanMs = latest.timestamp - first.timestamp
+                if (timeSpanMs >= 600_000) {
+                    val delta = (first.remaining_pct ?: return@mapNotNull null) - currentPct
+                    val hours = timeSpanMs / 3_600_000.0
+                    if (hours > 0) burnRate = delta / hours
+                }
+            }
+
+            // Compute reset timing
+            val msUntilReset = latest.reset_at?.let { maxOf(0L, it - now) } ?: windowMs
+            val hoursUntilReset = msUntilReset / 3_600_000.0
+
+            // Project exhaustion
+            val hoursUntilExhaustion = if (burnRate != null && burnRate > 0) currentPct / burnRate else null
+            val projectedRemaining = if (burnRate != null && burnRate > 0) {
+                currentPct - burnRate * hoursUntilReset
+            } else {
+                currentPct
+            }
+
+            ProviderBurnRate(
+                providerId = pid,
+                providerName = latest.provider_name,
+                currentPct = currentPct,
+                burnRatePerHr = burnRate,
+                hoursUntilReset = hoursUntilReset,
+                hoursUntilExhaustion = hoursUntilExhaustion,
+                projectedRemainingAtReset = projectedRemaining,
+                willMakeIt = projectedRemaining > 0,
+                history = snapshots.map { it.remaining_pct ?: 0.0 },
+            )
+        }
     }
 }
 

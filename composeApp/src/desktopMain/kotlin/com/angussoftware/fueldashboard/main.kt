@@ -238,6 +238,37 @@ fun main() = application {
             .reversed()
     }
 
+    viewModel.onLogProviderSnapshots = { snapshots ->
+        serverScope.launch {
+            for (s in snapshots) {
+                fuelSnapshotRepo.insertProviderSnapshot(
+                    providerId = s.providerId,
+                    providerName = s.providerName,
+                    providerType = s.providerType,
+                    remainingPct = s.remainingPct,
+                    resetAt = s.resetAt,
+                    windowHours = s.windowHours,
+                )
+            }
+        }
+    }
+
+    viewModel.onGetProviderBurnRates = {
+        fuelSnapshotRepo.getAllProviderBurnRates().map { br ->
+            com.angussoftware.fueldashboard.presentation.ProviderBurnRateDisplay(
+                providerId = br.providerId,
+                providerName = br.providerName,
+                currentPct = br.currentPct,
+                burnRatePerHr = br.burnRatePerHr,
+                hoursUntilReset = br.hoursUntilReset,
+                hoursUntilExhaustion = br.hoursUntilExhaustion,
+                projectedRemainingAtReset = br.projectedRemainingAtReset,
+                willMakeIt = br.willMakeIt,
+                history = br.history,
+            )
+        }
+    }
+
     viewModel.onGetProjection = { currentPct, resetAt, burnRate ->
         fuelSnapshotRepo.projectExhaustion(currentPct, resetAt, burnRate)?.let { proj ->
             val now = com.angussoftware.fueldashboard.util.epochMillis()

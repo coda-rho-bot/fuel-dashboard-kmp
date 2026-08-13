@@ -34,6 +34,7 @@ fun FuelStatusCard(
     projection: FuelProjection?,
     showHelp: Boolean,
     fuelHistory: List<Double> = emptyList(),
+    providerBurnRates: List<com.angussoftware.fueldashboard.presentation.ProviderBurnRateDisplay> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     if (projection == null) {
@@ -215,6 +216,85 @@ fun FuelStatusCard(
             trackColor = onGaugeColor.copy(alpha = 0.2f),
         )
     }
+
+    // Per-provider breakdown for ALL quota'd providers
+    if (providerBurnRates.size > 1) {
+        Spacer(Modifier.height(8.dp))
+        providerBurnRates.forEach { br ->
+            ProviderFuelRow(br)
+        }
+    }
+}
+
+@Composable
+private fun ProviderFuelRow(
+    br: com.angussoftware.fueldashboard.presentation.ProviderBurnRateDisplay,
+) {
+    val pct = br.currentPct?.roundToInt() ?: return
+    val rowColor = if (br.willMakeIt) {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    } else {
+        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(rowColor)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = br.providerName,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = "$pct%",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        // Sparkline for this provider
+        if (br.history.size >= 3) {
+            Spacer(Modifier.height(4.dp))
+            FuelSparkline(
+                values = br.history,
+                color = if (br.willMakeIt) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                modifier = Modifier.height(24.dp).fillMaxWidth(),
+            )
+        }
+
+        // Burn rate + projection
+        if (br.burnRatePerHr != null && br.burnRatePerHr > 0) {
+            Spacer(Modifier.height(2.dp))
+            val projText = if (br.willMakeIt) {
+                "${formatRate(br.burnRatePerHr)}%/hr · resets in ${formatHours(br.hoursUntilReset)} · ${br.projectedRemainingAtReset.roundToInt()}% headroom"
+            } else {
+                "${formatRate(br.burnRatePerHr)}%/hr · exhausts in ${br.hoursUntilExhaustion?.let { formatHours(it) } ?: "?"} · resets in ${formatHours(br.hoursUntilReset)}"
+            }
+            Text(
+                text = projText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!br.willMakeIt) {
+                Text(
+                    text = "⚠ Will run out before reset",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(4.dp))
 }
 
 private fun formatRate(rate: Double): String {
