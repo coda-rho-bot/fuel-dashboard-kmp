@@ -72,6 +72,13 @@ data class FuelProjection(
     val activeModels: List<String>,
 )
 
+data class ModelDrainRateDisplay(
+    val model: String,
+    val totalFuelConsumed: Double,
+    val sampleCount: Int,
+    val avgDrainPerHr: Double,
+)
+
 data class DashboardState(
     val settings: MultiProviderSettings = MultiProviderSettings(),
     val providerReports: Map<String, ProviderReport> = emptyMap(),
@@ -94,6 +101,7 @@ data class DashboardState(
     val showHelp: Boolean = true,
     val checkingProviderIds: Set<String> = emptySet(),
     val fuelProjection: FuelProjection? = null,
+    val modelDrainRates: List<ModelDrainRateDisplay> = emptyList(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -283,6 +291,12 @@ class FuelViewModel {
      * Callback to fetch recent fuel snapshots for projection computation.
      */
     var onGetProjection: ((currentPct: Double, resetAt: Long?, burnRate: Double) -> FuelProjection?)? = null
+
+    /**
+     * Callback to fetch per-model drain rates (desktop only).
+     * Returns measured fuel consumption attributed to each model.
+     */
+    var onGetModelDrainRates: (() -> List<ModelDrainRateDisplay>)? = null
 
     /**
      * Push ACP agent display data into dashboard state. Called from main.kt
@@ -768,6 +782,7 @@ class FuelViewModel {
             burnRate = if (burnRate != null && burnRate > 0) burnRate else null,
             dataPointCount = dataPoints,
             fuelProjection = fuelProjection,
+            modelDrainRates = onGetModelDrainRates?.invoke() ?: emptyList(),
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel

@@ -56,6 +56,7 @@ import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
 import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.FuelBar
+import com.angussoftware.fueldashboard.ui.components.ModelDrainRatesPanel
 import com.angussoftware.fueldashboard.ui.components.formatLastUpdated
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
@@ -135,16 +136,22 @@ fun MobileDashboard(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    // Model consumption breakdown
+                    if (state.modelDrainRates.isNotEmpty()) {
+                        ModelDrainRatesPanel(rates = state.modelDrainRates)
+                    }
+
+                    // Decision history
                     val decisions = state.decisions.decisions
                     if (decisions.isNotEmpty()) {
                         DecisionLog(decisions = decisions, showHelp = state.showHelp)
-                    } else {
+                    } else if (state.modelDrainRates.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = "No decisions yet",
+                                text = "Collecting data...",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

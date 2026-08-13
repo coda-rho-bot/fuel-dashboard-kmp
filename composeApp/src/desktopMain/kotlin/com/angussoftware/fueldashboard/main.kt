@@ -221,6 +221,17 @@ fun main() = application {
         fuelSnapshotRepo.computeBurnRate()
     }
 
+    viewModel.onGetModelDrainRates = {
+        fuelSnapshotRepo.getModelDrainRates().map { rate ->
+            com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay(
+                model = rate.model,
+                totalFuelConsumed = rate.totalFuelConsumed,
+                sampleCount = rate.sampleCount,
+                avgDrainPerHr = rate.avgDrainPerHr,
+            )
+        }
+    }
+
     viewModel.onGetProjection = { currentPct, resetAt, burnRate ->
         fuelSnapshotRepo.projectExhaustion(currentPct, resetAt, burnRate)?.let { proj ->
             val now = com.angussoftware.fueldashboard.util.epochMillis()
