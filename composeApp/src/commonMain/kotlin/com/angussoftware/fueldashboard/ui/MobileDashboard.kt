@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Settings
@@ -69,6 +70,7 @@ import kotlinx.datetime.toLocalDateTime
 private enum class MobileTab(val label: String) {
     FUEL("Fuel"),
     AGENTS("Agents"),
+    DECISIONS("Decisions"),
     SETTINGS("Settings"),
 }
 
@@ -123,6 +125,33 @@ fun MobileDashboard(
                 )
             }
 
+            MobileTab.DECISIONS -> {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    val decisions = state.decisions.decisions
+                    if (decisions.isNotEmpty()) {
+                        DecisionLog(decisions = decisions, showHelp = state.showHelp)
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "No decisions yet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
             MobileTab.SETTINGS -> {
                 Column(
                     modifier = Modifier
@@ -152,6 +181,7 @@ fun MobileDashboard(
                             imageVector = when (tab) {
                                 MobileTab.FUEL -> Icons.Default.LocalGasStation
                                 MobileTab.AGENTS -> Icons.Default.Person
+                                MobileTab.DECISIONS -> Icons.Default.History
                                 MobileTab.SETTINGS -> Icons.Default.Settings
                             },
                             contentDescription = tab.label,
@@ -285,15 +315,6 @@ private fun MobileFuelContent(
                         error = error,
                         showHelp = state.showHelp,
                     )
-                }
-
-                // Decisions (from connected API only)
-                val decisions = state.decisions.decisions
-                if (decisions.isNotEmpty()) {
-                    item {
-                        Spacer(Modifier.height(4.dp))
-                        DecisionLog(decisions = decisions, showHelp = state.showHelp)
-                    }
                 }
             }
         }
