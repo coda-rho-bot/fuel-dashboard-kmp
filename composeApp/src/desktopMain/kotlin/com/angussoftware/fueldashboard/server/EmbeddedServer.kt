@@ -215,7 +215,7 @@ class EmbeddedServer(
 
         routing {
             get("/") {
-                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
+                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /sync", "POST /sync", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
             }
 
             get("/fuel") {
@@ -315,6 +315,51 @@ class EmbeddedServer(
                 )
                 call.respondText(
                     text = """{"sync_code":"${syncData.toCode()}","server_url":"${serverUrl ?: ""}"}""",
+                    contentType = ContentType.Application.Json,
+                )
+            }
+
+            // Apply sync code from another instance — POST /sync
+            post("/sync") {
+                if (!call.requireApiKey()) return@post
+                val body = call.receive<Map<String, String>>()
+                val code = body["sync_code"]
+                if (code.isNullOrBlank()) {
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("sync_code is required"))
+                    return@post
+                }
+
+                val syncData = SettingsSyncData.fromCode(code)
+                if (syncData == null) {
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid sync code"))
+                    return@post
+                }
+
+                // Apply providers + add Remote Dashboard
+                val providers = syncData.providers.toMutableList()
+                syncData.serverUrl?.let { url ->
+                    providers.removeAll { it.kind == com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API }
+                    providers.add(
+                        com.angussoftware.fueldashboard.model.ProviderConfig(
+                            id = "synced-orchestrator",
+                            kind = com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API,
+                            apiKey = syncData.serverApiKey.orEmpty(),
+                            displayName = "Remote Dashboard",
+                            serverUrl = url,
+                        ),
+                    )
+                }
+                FuelSettingsStore.saveMultiProvider(
+                    com.angussoftware.fueldashboard.model.MultiProviderSettings(providers = providers),
+                )
+                AgentSettingsStore.save(syncData.agentSettings)
+                syncData.serverApiKey?.takeIf { it.isNotBlank() }?.let { key ->
+                    ServerApiKeyStore.save(key)
+                }
+                onProvidersChanged()
+
+                call.respondText(
+                    text = """{"status":"synced","providers_imported":${syncData.providers.size},"agents_imported":${syncData.agentSettings.agents.size}}""",
                     contentType = ContentType.Application.Json,
                 )
             }

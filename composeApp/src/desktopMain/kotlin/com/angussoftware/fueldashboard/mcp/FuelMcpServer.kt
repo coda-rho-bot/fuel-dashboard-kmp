@@ -121,6 +121,7 @@ internal class FuelMcpServer(
         listProvidersTool()
         addOrchestratorTool()
         getSyncDataTool()
+        applySyncDataTool()
         currentFuelResource()
         recommendationResource()
     }
@@ -511,6 +512,73 @@ internal class FuelMcpServer(
                 put("sync_code", syncCode)
                 put("server_url", url ?: "")
                 put("provider_count", settings.providers.size)
+            }
+            CallToolResult(content = listOf(TextContent(text = response.toString())))
+        }
+    }
+
+    /**
+     * Tool: apply_sync_data
+     *
+     * Applies a base64 sync code (from another Fuel Dashboard's get_sync_data)
+     * to this instance. Imports all providers, agent settings, server URL, and
+     * API key. Also adds a Remote Dashboard provider pointing at the source
+     * instance.
+     */
+    private fun Server.applySyncDataTool() {
+        addTool(
+            name = "apply_sync_data",
+            description = "Applies a base64 sync code from another Fuel Dashboard instance. " +
+                "Imports providers, agent settings, and server connection. Requires 'sync_code'.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("sync_code", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Base64 sync code from another instance's get_sync_data")
+                    })
+                },
+                required = listOf("sync_code"),
+            ),
+        ) { request ->
+            val code = request.arguments?.get("sync_code")?.jsonPrimitive?.content
+            if (code.isNullOrBlank()) {
+                return@addTool errorResult("sync_code is required")
+            }
+
+            val syncData = SettingsSyncData.fromCode(code)
+                ?: return@addTool errorResult("invalid sync code")
+
+            // Apply providers — merge synced providers and add Remote Dashboard
+            val providers = syncData.providers.toMutableList()
+            syncData.serverUrl?.let { url ->
+                providers.removeAll { it.kind == ProviderKind.CONNECTED_API }
+                providers.add(
+                    ProviderConfig(
+                        id = "synced-orchestrator",
+                        kind = ProviderKind.CONNECTED_API,
+                        apiKey = syncData.serverApiKey.orEmpty(),
+                        displayName = "Remote Dashboard",
+                        serverUrl = url,
+                    ),
+                )
+            }
+            FuelSettingsStore.saveMultiProvider(MultiProviderSettings(providers = providers))
+
+            // Apply agent settings
+            AgentSettingsStore.save(syncData.agentSettings)
+
+            // Apply server API key locally
+            syncData.serverApiKey?.takeIf { it.isNotBlank() }?.let { key ->
+                ServerApiKeyStore.save(key)
+            }
+
+            onProvidersChanged()
+
+            val response = buildJsonObject {
+                put("status", "synced")
+                put("providers_imported", syncData.providers.size)
+                put("agents_imported", syncData.agentSettings.agents.size)
+                put("server_url", syncData.serverUrl ?: "")
             }
             CallToolResult(content = listOf(TextContent(text = response.toString())))
         }

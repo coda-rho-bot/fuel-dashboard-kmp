@@ -4,6 +4,8 @@ package com.angussoftware.fueldashboard.settings
 object ServerApiKeyStore {
     fun load(): String = loadStringSetting(FuelSettingsKeys.SERVER_API_KEY, "")
 
+    fun save(key: String) = saveStringSetting(FuelSettingsKeys.SERVER_API_KEY, key)
+
     fun loadOrCreate(generate: () -> String): String = loadOrCreateApiKey(
         load = ::load,
         save = { saveStringSetting(FuelSettingsKeys.SERVER_API_KEY, it) },
