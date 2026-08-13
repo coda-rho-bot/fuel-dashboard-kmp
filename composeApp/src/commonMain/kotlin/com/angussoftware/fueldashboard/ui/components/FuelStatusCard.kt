@@ -1,6 +1,7 @@
 package com.angussoftware.fueldashboard.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import kotlin.math.roundToInt
 fun FuelStatusCard(
     projection: FuelProjection?,
     showHelp: Boolean,
+    fuelHistory: List<Double> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     if (projection == null) {
@@ -115,13 +117,26 @@ fun FuelStatusCard(
 
         Spacer(Modifier.height(8.dp))
 
-        // Big fuel percentage
-        Text(
-            text = "${projection.currentPct.roundToInt()}%",
-            style = MaterialTheme.typography.displaySmall,
-            color = onGaugeColor,
-            fontWeight = FontWeight.Bold,
-        )
+        // Big fuel percentage + sparkline side by side
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text(
+                text = "${projection.currentPct.roundToInt()}%",
+                style = MaterialTheme.typography.displaySmall,
+                color = onGaugeColor,
+                fontWeight = FontWeight.Bold,
+            )
+            if (fuelHistory.size >= 3) {
+                Spacer(Modifier.weight(1f))
+                FuelSparkline(
+                    values = fuelHistory,
+                    color = onGaugeColor,
+                    modifier = Modifier.height(40.dp).width(120.dp),
+                )
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -215,5 +230,32 @@ private fun formatHours(hours: Double): String {
         hours < 1 -> "${(hours * 60).roundToInt()} min"
         hours < 10 -> "${hours.roundToInt()}h"
         else -> "${hours.roundToInt()}h"
+    }
+}
+
+@Composable
+private fun FuelSparkline(
+    values: List<Double>,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier) {
+        if (values.size < 2) return@Canvas
+
+        val min = values.min()
+        val max = values.max()
+        val range = (max - min).coerceAtLeast(1.0)
+
+        val stepX = size.width / (values.size - 1)
+
+        val path = androidx.compose.ui.graphics.Path().apply {
+            for (i in values.indices) {
+                val x = i * stepX
+                val y = size.height - ((values[i] - min) / range).toFloat() * size.height
+                if (i == 0) moveTo(x, y) else lineTo(x, y)
+            }
+        }
+
+        drawPath(path, color = color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f))
     }
 }

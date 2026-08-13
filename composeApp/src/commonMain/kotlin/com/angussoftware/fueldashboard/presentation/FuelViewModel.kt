@@ -102,6 +102,7 @@ data class DashboardState(
     val checkingProviderIds: Set<String> = emptySet(),
     val fuelProjection: FuelProjection? = null,
     val modelDrainRates: List<ModelDrainRateDisplay> = emptyList(),
+    val fuelHistory: List<Double> = emptyList(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -297,6 +298,11 @@ class FuelViewModel {
      * Returns measured fuel consumption attributed to each model.
      */
     var onGetModelDrainRates: (() -> List<ModelDrainRateDisplay>)? = null
+
+    /**
+     * Callback to fetch recent fuel percentages for sparkline chart.
+     */
+    var onGetFuelHistory: (() -> List<Double>)? = null
 
     /**
      * Push ACP agent display data into dashboard state. Called from main.kt
@@ -783,6 +789,7 @@ class FuelViewModel {
             dataPointCount = dataPoints,
             fuelProjection = fuelProjection,
             modelDrainRates = onGetModelDrainRates?.invoke() ?: emptyList(),
+            fuelHistory = onGetFuelHistory?.invoke() ?: emptyList(),
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel

@@ -294,6 +294,7 @@ private fun MobileFuelContent(
                     FuelStatusCard(
                         projection = state.fuelProjection,
                         showHelp = state.showHelp,
+                        fuelHistory = state.fuelHistory,
                     )
                 }
 

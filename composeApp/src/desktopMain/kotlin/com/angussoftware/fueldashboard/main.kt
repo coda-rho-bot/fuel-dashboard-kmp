@@ -232,6 +232,12 @@ fun main() = application {
         }
     }
 
+    viewModel.onGetFuelHistory = {
+        fuelSnapshotRepo.getRecent(120)
+            .mapNotNull { it.tokensPct }
+            .reversed()
+    }
+
     viewModel.onGetProjection = { currentPct, resetAt, burnRate ->
         fuelSnapshotRepo.projectExhaustion(currentPct, resetAt, burnRate)?.let { proj ->
             val now = com.angussoftware.fueldashboard.util.epochMillis()
