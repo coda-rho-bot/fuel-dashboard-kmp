@@ -12,6 +12,7 @@ import com.angussoftware.fueldashboard.acp.AcpAgentStatus
 import com.angussoftware.fueldashboard.database.AgentRegistry
 import com.angussoftware.fueldashboard.database.DatabaseDriverFactory
 import com.angussoftware.fueldashboard.database.DecisionRepository
+import com.angussoftware.fueldashboard.database.FuelSnapshotRepository
 import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
@@ -36,6 +37,7 @@ fun main() = application {
     // ── Database (decision history + agent registry) ─────────────────────
     val dbDriver = remember { DatabaseDriverFactory().createDriver() }
     val repository = remember { DecisionRepository(dbDriver) }
+    val fuelSnapshotRepo = remember { FuelSnapshotRepository(dbDriver) }
     val agentRegistry = remember { AgentRegistry(dbDriver) }
 
     // ── Embedded HTTP server for LAN access (mobile devices) ──────────────
@@ -202,6 +204,38 @@ fun main() = application {
                 headroom = record.headroom.toInt(),
                 reason = record.reason,
                 timestamp = record.timestamp,
+            )
+        }
+    }
+
+    // Wire ViewModel callbacks → FuelSnapshotRepository (log real fuel data to SQLite)
+    viewModel.onLogFuelSnapshot = { tokensPct, sessionPct, activeAgentCount, activeModels, resetAt ->
+        serverScope.launch {
+            fuelSnapshotRepo.insert(tokensPct, sessionPct, activeAgentCount, activeModels, resetAt)
+            // Cleanup old snapshots weekly (keep 7 days)
+            fuelSnapshotRepo.cleanup()
+        }
+    }
+
+    viewModel.onComputeBurnRate = {
+        fuelSnapshotRepo.computeBurnRate()
+    }
+
+    viewModel.onGetProjection = { currentPct, resetAt, burnRate ->
+        fuelSnapshotRepo.projectExhaustion(currentPct, resetAt, burnRate)?.let { proj ->
+            val now = com.angussoftware.fueldashboard.util.epochMillis()
+            val msUntilReset = resetAt?.let { it - now } ?: 3_600_000L * 5
+            val hoursUntilReset = maxOf(0.0, msUntilReset / 3_600_000.0)
+            com.angussoftware.fueldashboard.presentation.FuelProjection(
+                currentPct = currentPct,
+                burnRatePerHr = if (burnRate > 0) burnRate else null,
+                hoursUntilReset = hoursUntilReset,
+                hoursUntilExhaustion = proj.hoursUntilExhaustion,
+                projectedRemainingAtReset = proj.projectedRemainingAtReset,
+                willMakeIt = proj.willMakeIt,
+                headroomPct = proj.projectedRemainingAtReset,
+                activeAgentCount = viewModel.state.value.acpAgents.count { it.status == "connected" },
+                activeModels = viewModel.state.value.acpAgents.mapNotNull { it.currentModel }.distinct().sorted(),
             )
         }
     }
