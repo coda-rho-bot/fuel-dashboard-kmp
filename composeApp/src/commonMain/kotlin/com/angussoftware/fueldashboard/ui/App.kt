@@ -65,6 +65,7 @@ import com.angussoftware.fueldashboard.ui.components.formatLastUpdated
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
+import com.angussoftware.fueldashboard.ui.components.FuelStatusCard
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
@@ -283,22 +284,10 @@ internal fun FuelColumnContent(
                 }
 
                 // Recommendation banner
-                state.fuel?.let { fuel ->
-                    item {
-                        RecommendationBanner(
-                            recommendedModel = fuel.recommendedModel,
-                            burnRate = fuel.burnRatePctPerHr,
-                            surplusAlert = fuel.surplusAlert,
-                            showHelp = state.showHelp,
-                        )
-                    }
-                }
-
-                // Burn rate status
+                // Fuel status card — real projections from actual gauge data
                 item {
-                    BurnRateStatus(
-                        burnRate = state.burnRate,
-                        dataPoints = state.dataPointCount,
+                    FuelStatusCard(
+                        projection = state.fuelProjection,
                         showHelp = state.showHelp,
                     )
                 }

@@ -60,6 +60,7 @@ import com.angussoftware.fueldashboard.ui.components.formatLastUpdated
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
+import com.angussoftware.fueldashboard.ui.components.FuelStatusCard
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
@@ -281,19 +282,15 @@ private fun MobileFuelContent(
                     }
                 }
 
-                // Orchestrator fuel data (if connected)
-                state.fuel?.let { fuel ->
-                    item {
-                        RecommendationBanner(
-                            recommendedModel = fuel.recommendedModel,
-                            burnRate = fuel.burnRatePctPerHr,
-                            surplusAlert = fuel.surplusAlert,
-                            showHelp = state.showHelp,
-                        )
-                    }
+                // Fuel status card — real projections from actual gauge data
+                item {
+                    FuelStatusCard(
+                        projection = state.fuelProjection,
+                        showHelp = state.showHelp,
+                    )
                 }
 
-                // Burn rate status + last updated in a compact row
+                // Last updated + error count
                 item {
                     MobileStatusRow(
                         burnRate = state.burnRate,

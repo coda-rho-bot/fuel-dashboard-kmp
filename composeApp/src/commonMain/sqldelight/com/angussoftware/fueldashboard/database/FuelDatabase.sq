@@ -40,3 +40,26 @@ SELECT * FROM registered_agents;
 
 deleteAllAgents:
 DELETE FROM registered_agents;
+
+CREATE TABLE fuel_snapshots (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,
+    tokens_pct REAL,
+    session_pct REAL,
+    active_agent_count INTEGER NOT NULL DEFAULT 0,
+    active_models TEXT,
+    reset_at INTEGER
+);
+
+insertFuelSnapshot:
+INSERT INTO fuel_snapshots (timestamp, tokens_pct, session_pct, active_agent_count, active_models, reset_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+selectRecentFuelSnapshots:
+SELECT * FROM fuel_snapshots ORDER BY timestamp DESC LIMIT :limit;
+
+selectFuelSnapshotsSince:
+SELECT * FROM fuel_snapshots WHERE timestamp >= :since ORDER BY timestamp ASC;
+
+deleteOldFuelSnapshots:
+DELETE FROM fuel_snapshots WHERE timestamp < :cutoff;

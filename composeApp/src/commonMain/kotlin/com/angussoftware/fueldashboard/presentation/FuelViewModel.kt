@@ -56,6 +56,22 @@ import kotlinx.coroutines.launch
 /**
  * State for the multi-provider dashboard.
  */
+/**
+ * Real fuel projection computed from actual gauge data.
+ * No fake recommendations — just honest math.
+ */
+data class FuelProjection(
+    val currentPct: Double,
+    val burnRatePerHr: Double?,
+    val hoursUntilReset: Double,
+    val hoursUntilExhaustion: Double?,
+    val projectedRemainingAtReset: Double,
+    val willMakeIt: Boolean,
+    val headroomPct: Double,
+    val activeAgentCount: Int,
+    val activeModels: List<String>,
+)
+
 data class DashboardState(
     val settings: MultiProviderSettings = MultiProviderSettings(),
     val providerReports: Map<String, ProviderReport> = emptyMap(),
@@ -77,6 +93,7 @@ data class DashboardState(
     val junieLastChecked: Long? = null,
     val showHelp: Boolean = true,
     val checkingProviderIds: Set<String> = emptySet(),
+    val fuelProjection: FuelProjection? = null,
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -141,6 +158,9 @@ class FuelViewModel {
     private var pollJob: Job? = null
 
     private val adapters = mutableMapOf<String, ProviderAdapter>()
+
+    /** Tracks last recommendation to avoid duplicate logging. */
+    private var _lastRecommendation: String = ""
 
     private val _state = MutableStateFlow(
         DashboardState(
@@ -240,6 +260,29 @@ class FuelViewModel {
      * Called after each poll to populate the DecisionLog.
      */
     var onFetchDecisions: (() -> List<Decision>)? = null
+
+    /**
+     * Callback to log a fuel snapshot to SQLite (desktop only).
+     * Called after each poll to record real fuel state for burn-rate analysis.
+     */
+    var onLogFuelSnapshot: ((
+        tokensPct: Double?,
+        sessionPct: Double?,
+        activeAgentCount: Int,
+        activeModels: String?,
+        resetAt: Long?,
+    ) -> Unit)? = null
+
+    /**
+     * Callback to compute burn rate from stored snapshots (desktop only).
+     * Returns % per hour, or null if insufficient data.
+     */
+    var onComputeBurnRate: (() -> Double?)? = null
+
+    /**
+     * Callback to fetch recent fuel snapshots for projection computation.
+     */
+    var onGetProjection: ((currentPct: Double, resetAt: Long?, burnRate: Double) -> FuelProjection?)? = null
 
     /**
      * Push ACP agent display data into dashboard state. Called from main.kt
@@ -647,45 +690,53 @@ class FuelViewModel {
             alerts = AlertsResponse(alerts.alerts + generatedAlerts)
         }
 
-        // ── Standalone decision engine ───────────────────────────────────
-        // If no connected API is providing a recommended model, run the
-        // local decision engine to pick the best model from current fuel state.
-        val currentFuel = fuel
-        val recommendedModel = currentFuel?.recommendedModel ?: ""
-        val shouldRunDecisionEngine = recommendedModel.isBlank()
+        // ── Real fuel tracking ────────────────────────────────────────────
+        // Log a fuel snapshot for real burn-rate analysis.
+        // No fake decision engine — just honest data collection.
+        val activeAgents = _state.value.acpAgents.filter { it.status == "connected" }
+        val activeModels = activeAgents.mapNotNull { it.currentModel }.distinct().sorted()
+        val windowCreditReport = reports.values.firstOrNull { it.type == ProviderType.WINDOW_CREDIT }
+        val tokensPct = windowCreditReport?.remainingPct?.toDouble()
+        val resetAt = windowCreditReport?.resetsAt
+        val sessionPct = reports.values.firstOrNull { it.type == ProviderType.SPEND_BUDGET }?.remainingPct?.toDouble()
 
-        if (shouldRunDecisionEngine && reports.isNotEmpty()) {
-            val fuelConfig = buildFuelConfigFromReports(reports, _state.value.settings.providers)
-            val providerStates = buildProviderStates(reports)
-            val burnRateVal = BurnRateCalculator.compute(FuelHistoryStore.load())
+        onLogFuelSnapshot?.invoke(
+            tokensPct,
+            sessionPct,
+            activeAgents.size,
+            activeModels.joinToString(","),
+            resetAt,
+        )
 
-            val decision = decideModel(
-                config = fuelConfig,
-                providerStates = providerStates,
-                burnRate = burnRateVal,
-                taskFloor = Complexity.MEDIUM,
-                upgradeBenefit = 0.6,
-            )
+        // Compute real fuel projection from stored snapshots
+        val realBurnRate = onComputeBurnRate?.invoke()
+        var fuelProjection: FuelProjection? = null
 
-            if (decision != null) {
-                // Set the recommended model so the banner shows it
+        if (tokensPct != null) {
+            fuelProjection = onGetProjection?.invoke(tokensPct, resetAt, realBurnRate ?: 0.0)
+            if (fuelProjection != null) {
                 fuel = (fuel ?: FuelResponse()).copy(
-                    recommendedModel = decision.handle,
-                    burnRatePctPerHr = burnRateVal ?: 0.0,
-                )
-
-                // Log decision to SQLite via callback
-                onDecisionLogged?.invoke(
-                    "system",
-                    decision.handle,
-                    decision.provider,
-                    decision.tier.name.lowercase(),
-                    Complexity.MEDIUM.name.lowercase(),
-                    decision.utilizationRatio ?: 0.0,
-                    decision.headroom,
-                    decision.reason,
+                    burnRatePctPerHr = realBurnRate ?: 0.0,
                 )
             }
+        }
+
+        // Only log a "decision" if the recommended model from orchestrator changed
+        // (or the first time we see one). This prevents the 18k garbage rows problem.
+        val currentFuel = fuel
+        val recommendedModel = currentFuel?.recommendedModel ?: ""
+        if (recommendedModel.isNotBlank() && recommendedModel != _lastRecommendation) {
+            _lastRecommendation = recommendedModel
+            onDecisionLogged?.invoke(
+                "orchestrator",
+                recommendedModel,
+                "connected-api",
+                "standard",
+                "standard",
+                0.0,
+                tokensPct?.toInt() ?: 0,
+                "model recommended by orchestrator",
+            )
         }
 
         // Update burn rate history from provider reports
@@ -716,6 +767,7 @@ class FuelViewModel {
             lastUpdated = epochMillis(),
             burnRate = if (burnRate != null && burnRate > 0) burnRate else null,
             dataPointCount = dataPoints,
+            fuelProjection = fuelProjection,
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel
