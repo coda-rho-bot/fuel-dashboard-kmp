@@ -233,6 +233,14 @@ private fun MobileFuelContent(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // Alerts at the top (matching desktop layout)
+                if (state.alerts.alerts.isNotEmpty()) {
+                    item {
+                        AlertsPanel(alerts = state.alerts.toFuelAlerts(), showHelp = state.showHelp)
+                    }
+                    item { HorizontalDivider() }
+                }
+
                 if (state.providerReports.isNotEmpty() || state.fuel != null) {
                     item {
                         Text(
@@ -441,16 +449,6 @@ private fun AgentsTabContent(
                 hasConnectedOrchestrator = state.hasConnectedApi,
                 showHelp = state.showHelp,
             )
-        }
-
-        if (state.hasConnectedApi) {
-            AlertsPanel(alerts = state.alerts.toFuelAlerts(), showHelp = state.showHelp)
-
-            // Show decision history on agents tab too
-            val decisions = state.decisions.decisions
-            if (decisions.isNotEmpty()) {
-                DecisionLog(decisions = decisions, showHelp = state.showHelp)
-            }
         }
     }
 }
