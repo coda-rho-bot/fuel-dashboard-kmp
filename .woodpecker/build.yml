@@ -8,9 +8,10 @@ steps:
     commands:
       - mkdir -p ~/.gradle
       - echo "forgejo.token=${FORGEJO_TOKEN}" >> ~/.gradle/gradle.properties
+      - mkdir -p /tmp/android-sdk
       - echo "sdk.dir=/tmp/android-sdk" > local.properties
       - chmod +x gradlew
-      - ./gradlew --no-daemon :composeApp:compileKotlinDesktop :composeApp:desktopTest :composeApp:koverXmlReport
+      - ./gradlew --no-daemon :composeApp:compileKotlinDesktop :composeApp:desktopTest
     environment:
       GRADLE_USER_HOME: /root/.gradle
     volumes:

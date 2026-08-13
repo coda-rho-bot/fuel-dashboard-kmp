@@ -37,19 +37,19 @@ dependencyResolutionManagement {
         }
         mavenCentral()
 
-        // Forgejo Maven Registry: serves both angus-gradle-tools and Angus-Software-Theming
-        maven {
-            url = uri("https://git.angussoftware.dev/api/packages/rhomancer/maven")
-            credentials {
-                username = "rhomancer"
-                password = forgejoToken
-            }
-        }
-        // angus-bot registry: Angus-Software-Theming published here (agent has write access)
+        // angus-bot registry: Angus-Software-Theming published here (has .module + .jar)
         maven {
             url = uri("https://git.angussoftware.dev/api/packages/angus-bot/maven")
             credentials {
                 username = "angus-bot"
+                password = forgejoToken
+            }
+        }
+        // Forgejo Maven Registry: serves angus-gradle-tools plugin
+        maven {
+            url = uri("https://git.angussoftware.dev/api/packages/rhomancer/maven")
+            credentials {
+                username = "rhomancer"
                 password = forgejoToken
             }
         }

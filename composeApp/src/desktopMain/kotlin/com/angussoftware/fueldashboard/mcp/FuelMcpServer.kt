@@ -5,8 +5,11 @@ import com.angussoftware.fueldashboard.model.FuelResponse
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderKind
+import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.server.RegisteredAgent
+import com.angussoftware.fueldashboard.settings.AgentSettingsStore
 import com.angussoftware.fueldashboard.settings.FuelSettingsStore
+import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
@@ -89,6 +92,8 @@ internal class FuelMcpServer(
     private val fuelStateProvider: () -> FuelResponse?,
     private val agentRegistry: AgentRegistry? = null,
     private val onProvidersChanged: () -> Unit = {},
+    private val serverUrlProvider: () -> String? = { null },
+    private val serverApiKeyProvider: () -> String = { "" },
 ) {
     private val json = Json { encodeDefaults = true; explicitNulls = false; ignoreUnknownKeys = true }
 
@@ -115,6 +120,7 @@ internal class FuelMcpServer(
         removeProviderTool()
         listProvidersTool()
         addOrchestratorTool()
+        getSyncDataTool()
         currentFuelResource()
         recommendationResource()
     }
@@ -462,6 +468,51 @@ internal class FuelMcpServer(
                 },
                 onFailure = { errorResult("failed to add remote dashboard: ${it.message ?: "unknown error"}") },
             )
+        }
+    }
+
+    /**
+     * Tool: get_sync_data
+     *
+     * Returns the full sync payload (server URL, API key, all provider configs,
+     * agent settings) as a base64-encoded text code. This can be pasted into
+     * another Fuel Dashboard instance's "Import Sync Code" field to instantly
+     * replicate all settings including API keys.
+     *
+     * Useful for agents to programmatically sync dashboard instances across
+     * machines without manual QR scanning.
+     */
+    private fun Server.getSyncDataTool() {
+        addTool(
+            name = "get_sync_data",
+            description = "Returns a base64 sync code containing server URL, API key, " +
+                "all provider configs, and agent settings. Paste into another Fuel " +
+                "Dashboard instance to replicate settings. Returns JSON with 'sync_code' " +
+                "and 'server_url'.",
+        ) {
+            val settings = FuelSettingsStore.loadMultiProvider()
+            val agentSettings = AgentSettingsStore.load()
+            val apiKey = serverApiKeyProvider()
+            val url = serverUrlProvider()
+
+            // Build SettingsSyncData and encode as base64 text code
+            val syncData = SettingsSyncData(
+                providers = settings.providers,
+                themeMode = "SYSTEM",
+                lightColorTheme = "DEFAULT",
+                darkColorTheme = "DEFAULT",
+                serverUrl = url,
+                serverApiKey = apiKey,
+                agentSettings = agentSettings,
+            )
+            val syncCode = syncData.toCode()
+
+            val response = buildJsonObject {
+                put("sync_code", syncCode)
+                put("server_url", url ?: "")
+                put("provider_count", settings.providers.size)
+            }
+            CallToolResult(content = listOf(TextContent(text = response.toString())))
         }
     }
 

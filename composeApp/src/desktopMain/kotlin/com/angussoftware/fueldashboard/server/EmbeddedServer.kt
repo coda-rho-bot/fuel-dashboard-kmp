@@ -10,7 +10,10 @@ import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FleetAgent
 import com.angussoftware.fueldashboard.model.FuelResponse
 import com.angussoftware.fueldashboard.model.JunieBalanceData
+import com.angussoftware.fueldashboard.model.SettingsSyncData
+import com.angussoftware.fueldashboard.settings.AgentSettingsStore
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
+import com.angussoftware.fueldashboard.settings.FuelSettingsStore
 import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
 import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
@@ -70,6 +73,9 @@ class EmbeddedServer(
 
     private var server: KtorServer<*, *>? = null
     private val apiKey = ServerApiKeyStore.loadOrCreate(::generateApiKey)
+
+    /** Public server URL (tunnel or LAN) — set by main.kt, used for sync data. */
+    var serverUrl: String? = null
 
     /** Thread-safe registry of agents that self-registered via POST /agents/register or MCP register_agent. */
     internal val registeredAgents = ConcurrentHashMap<String, RegisteredAgent>()
@@ -203,6 +209,8 @@ class EmbeddedServer(
             fuelStateProvider = { fuelState },
             agentRegistry = agentRegistry,
             onProvidersChanged = onProvidersChanged,
+            serverUrlProvider = { serverUrl },
+            serverApiKeyProvider = { apiKey },
         ).createServer()
 
         routing {
@@ -290,6 +298,26 @@ class EmbeddedServer(
             }
 
             get("/alerts") { call.respond(AlertsResponse(alerts)) }
+
+            // Sync endpoint — returns base64 sync code for cross-device setup
+            get("/sync") {
+                if (!call.requireApiKey()) return@get
+                val settings = FuelSettingsStore.loadMultiProvider()
+                val agentSettings = AgentSettingsStore.load()
+                val syncData = SettingsSyncData(
+                    providers = settings.providers,
+                    themeMode = "SYSTEM",
+                    lightColorTheme = "DEFAULT",
+                    darkColorTheme = "DEFAULT",
+                    serverUrl = serverUrl,
+                    serverApiKey = apiKey,
+                    agentSettings = agentSettings,
+                )
+                call.respondText(
+                    text = """{"sync_code":"${syncData.toCode()}","server_url":"${serverUrl ?: ""}"}""",
+                    contentType = ContentType.Application.Json,
+                )
+            }
 
             // Lightweight health check — no auth required (for uptime monitors).
             get("/health") {

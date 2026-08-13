@@ -73,6 +73,7 @@ fun main() = application {
         }
     }
     viewModel.setServerUrl(serverUrl)
+    embeddedServer.serverUrl = serverUrl
 
     // ── Poll MCP/HTTP-registered agents → push to ViewModel ───────────────
     // Agents registered via MCP (POST /agents/register) or HTTP are stored
