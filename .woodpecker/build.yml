@@ -1,5 +1,11 @@
 when:
-  - event: [push, pull_request]
+  # Feature branches are validated by the pull_request pipeline — skipping
+  # the push event there halves concurrency and avoids two pipelines
+  # contending for the shared Gradle cache lock (journal-1), which
+  # serially fails one of them with "Timeout waiting to lock".
+  - event: push
+    branch: [main, master]
+  - event: pull_request
     branch: [main, master, feature/*]
 
 steps:
