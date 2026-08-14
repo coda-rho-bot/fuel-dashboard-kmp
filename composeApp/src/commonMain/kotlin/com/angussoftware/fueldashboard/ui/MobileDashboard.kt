@@ -296,6 +296,7 @@ private fun MobileFuelContent(
                         showHelp = state.showHelp,
                         fuelHistory = state.fuelHistory,
                         providerBurnRates = state.providerBurnRates,
+                        modelDrainRates = state.modelDrainRates,
                     )
                 }
 

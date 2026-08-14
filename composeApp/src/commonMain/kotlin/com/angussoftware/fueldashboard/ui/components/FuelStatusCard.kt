@@ -44,6 +44,7 @@ fun FuelStatusCard(
     showHelp: Boolean,
     fuelHistory: List<Double> = emptyList(),
     providerBurnRates: List<ProviderBurnRateDisplay> = emptyList(),
+    modelDrainRates: List<com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -121,6 +122,13 @@ fun FuelStatusCard(
             creditPools.forEach { br -> CreditPoolRow(br) }
         }
 
+        // Recommender status — honest about data collection progress
+        Spacer(Modifier.height(12.dp))
+        RecommenderStatusSection(
+            modelDrainRates = modelDrainRates,
+            showHelp = showHelp,
+        )
+
         // Active models footer
         if (projection?.activeModels?.isNotEmpty() == true) {
             Spacer(Modifier.height(8.dp))
@@ -133,9 +141,56 @@ fun FuelStatusCard(
     }
 }
 
+/**
+ * Shows honest recommender status: how much cost data has been collected
+ * and what's needed before real recommendations are possible.
+ */
 @Composable
-private fun RateWindowRow(br: ProviderBurnRateDisplay) {
-    val pct = br.currentPct?.roundToInt()
+private fun RecommenderStatusSection(
+    modelDrainRates: List<com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay>,
+    showHelp: Boolean,
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Recommender",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+            )
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("Needs cost data from at least 2 different models to compare. Switch one agent to a different model to seed comparison data.")
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+
+        val modelsWithData = modelDrainRates.filter { it.sampleCount >= 10 }
+        val statusText = when {
+            modelDrainRates.isEmpty() -> {
+                "Gathering data — no model usage recorded yet. Check back in ~1 hour."
+            }
+            modelsWithData.size < 2 -> {
+                val observed = modelDrainRates.joinToString(", ") { "${it.model} (${it.sampleCount} samples)" }
+                "Need cost data from 2+ models to compare. Observed: $observed. " +
+                    "Switch one agent to a different model to enable recommendations."
+            }
+            else -> {
+                val cheapest = modelDrainRates.minByOrNull { it.avgDrainPerHr }
+                "Ready — ${modelsWithData.size} models with cost data. " +
+                    "Cheapest: ${cheapest?.model ?: "?"} at ${cheapest?.let { formatRate(it.avgDrainPerHr) } ?: "?"}%/hr."
+            }
+        }
+        Text(
+            text = statusText,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun RateWindowRow(br: ProviderBurnRateDisplay) {    val pct = br.currentPct?.roundToInt()
     val gaugeColor = when {
         pct == null -> MaterialTheme.colorScheme.onSurfaceVariant
         pct < 15 -> MaterialTheme.colorScheme.error
