@@ -1,6 +1,7 @@
 package com.angussoftware.fueldashboard.server
 
 import com.angussoftware.fueldashboard.database.DecisionRepository
+import com.angussoftware.fueldashboard.database.UsageRepository
 import com.angussoftware.fueldashboard.mcp.FuelMcpServer
 import com.angussoftware.fueldashboard.database.AgentRegistry
 import com.angussoftware.fueldashboard.model.AgentsResponse
@@ -59,6 +60,7 @@ import java.util.concurrent.atomic.AtomicLong
 class EmbeddedServer(
     private val repository: DecisionRepository? = null,
     private val agentRegistry: AgentRegistry? = null,
+    private val usageRepository: UsageRepository? = null,
     private val port: Int = DEFAULT_PORT,
     private val host: String = DEFAULT_HOST,
     private val onProvidersChanged: () -> Unit = {},
@@ -211,6 +213,7 @@ class EmbeddedServer(
             onProvidersChanged = onProvidersChanged,
             serverUrlProvider = { serverUrl },
             serverApiKeyProvider = { apiKey },
+            usageRepository = usageRepository,
         ).createServer()
 
         routing {
@@ -364,6 +367,75 @@ class EmbeddedServer(
                 )
             }
 
+            // ── Universal usage API (agnostic contract) ─────────────────────
+            // POST /v1/usage — any runtime, provider, or tool can report usage.
+            // Schema aligns with OTel GenAI semconv: source→service.name,
+            // model→gen_ai.request.model, tokens→gen_ai.usage.*.
+            post("/v1/usage") {
+                if (!call.requireApiKey()) return@post
+                val body = call.receive<Map<String, Any?>>()
+                val source = body["source"]?.toString()
+                val model = body["model"]?.toString()
+                if (source.isNullOrBlank() || model.isNullOrBlank()) {
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("source and model are required"))
+                    return@post
+                }
+                val timestamp = (body["timestamp"] as? Number)?.toLong() ?: epochMillisNow()
+                val inputTokens = (body["input_tokens"] as? Number)?.toLong() ?: 0L
+                val outputTokens = (body["output_tokens"] as? Number)?.toLong() ?: 0L
+                val requestCount = (body["request_count"] as? Number)?.toLong() ?: 1L
+
+                usageRepository?.insert(
+                    timestamp = timestamp,
+                    source = source,
+                    model = model,
+                    inputTokens = inputTokens,
+                    outputTokens = outputTokens,
+                    requestCount = requestCount,
+                ) ?: run {
+                    call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("usage storage unavailable"))
+                    return@post
+                }
+
+                call.respondText(
+                    text = """{"status":"recorded","source":"$source","model":"$model"}""",
+                    contentType = ContentType.Application.Json,
+                )
+            }
+
+            // GET /v1/usage — query recorded usage. Optional ?since=<epoch_ms> (default 24h).
+            get("/v1/usage") {
+                if (!call.requireApiKey()) return@get
+                val since = call.request.queryParameters["since"]?.toLongOrNull()
+                    ?: (epochMillisNow() - 24L * 3_600_000)
+                val repo = usageRepository ?: run {
+                    call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("usage storage unavailable"))
+                    return@get
+                }
+                val bySource = repo.getBySourceSince(since)
+                val byModel = repo.getByModelSince(since)
+                val respondMap: Map<String, Any> = mapOf(
+                    "since" to since,
+                    "by_source" to bySource.map {
+                        mapOf(
+                            "source" to it.source,
+                            "input_tokens" to it.inputTokens,
+                            "output_tokens" to it.outputTokens,
+                            "request_count" to it.requestCount,
+                        )
+                    },
+                    "by_model" to byModel.map {
+                        mapOf(
+                            "model" to it.model,
+                            "input_tokens" to it.inputTokens,
+                            "output_tokens" to it.outputTokens,
+                            "request_count" to it.requestCount,
+                        )
+                    },
+                )
+                call.respond(respondMap)
+            }
+
             // Lightweight health check — no auth required (for uptime monitors).
             get("/health") {
                 call.respondText("""{"status":"ok"}""", ContentType.Application.Json)
@@ -390,6 +462,8 @@ class EmbeddedServer(
     private fun generateApiKey(): String = ByteArray(32)
         .also(SecureRandom()::nextBytes)
         .let { Base64.getUrlEncoder().withoutPadding().encodeToString(it) }
+
+    private fun epochMillisNow(): Long = System.currentTimeMillis()
 }
 
 internal fun bearerAuthorizationError(expectedKey: String, authorizationHeader: String?): String? {

@@ -94,6 +94,33 @@ SELECT * FROM provider_fuel_snapshots ORDER BY timestamp DESC LIMIT :limit;
 deleteOldProviderFuelSnapshots:
 DELETE FROM provider_fuel_snapshots WHERE timestamp < :cutoff;
 
+CREATE TABLE usage_records (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    request_count INTEGER NOT NULL DEFAULT 1,
+    recorded_at INTEGER NOT NULL
+);
+
+insertUsageRecord:
+INSERT INTO usage_records (timestamp, source, model, input_tokens, output_tokens, request_count, recorded_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+selectUsageSince:
+SELECT * FROM usage_records WHERE timestamp >= :since ORDER BY timestamp ASC;
+
+selectUsageBySourceSince:
+SELECT source, SUM(input_tokens) AS total_input, SUM(output_tokens) AS total_output, SUM(request_count) AS total_requests FROM usage_records WHERE timestamp >= :since GROUP BY source ORDER BY SUM(input_tokens) DESC;
+
+selectUsageByModelSince:
+SELECT model, SUM(input_tokens) AS total_input, SUM(output_tokens) AS total_output, SUM(request_count) AS total_requests FROM usage_records WHERE timestamp >= :since GROUP BY model ORDER BY SUM(input_tokens) DESC;
+
+deleteOldUsageRecords:
+DELETE FROM usage_records WHERE timestamp < :cutoff;
+
 CREATE TABLE model_drain_rates (
     model TEXT NOT NULL PRIMARY KEY,
     total_fuel_consumed REAL NOT NULL DEFAULT 0,

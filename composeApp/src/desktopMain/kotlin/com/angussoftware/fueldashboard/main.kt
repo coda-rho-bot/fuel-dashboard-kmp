@@ -53,6 +53,7 @@ fun main() = application {
     val dbDriver = remember { DatabaseDriverFactory().createDriver() }
     val repository = remember { DecisionRepository(dbDriver) }
     val fuelSnapshotRepo = remember { FuelSnapshotRepository(dbDriver) }
+    val usageRepo = remember { com.angussoftware.fueldashboard.database.UsageRepository(dbDriver) }
     val agentRegistry = remember { AgentRegistry(dbDriver) }
 
     // ── Embedded HTTP server for LAN access (mobile devices) ──────────────
@@ -61,6 +62,7 @@ fun main() = application {
         EmbeddedServer(
             repository = repository,
             agentRegistry = agentRegistry,
+            usageRepository = usageRepo,
             onProvidersChanged = { viewModel.reloadSettings() },
         )
     }

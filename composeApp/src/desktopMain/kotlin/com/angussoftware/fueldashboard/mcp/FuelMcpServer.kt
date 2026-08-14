@@ -94,6 +94,7 @@ internal class FuelMcpServer(
     private val onProvidersChanged: () -> Unit = {},
     private val serverUrlProvider: () -> String? = { null },
     private val serverApiKeyProvider: () -> String = { "" },
+    private val usageRepository: com.angussoftware.fueldashboard.database.UsageRepository? = null,
 ) {
     private val json = Json { encodeDefaults = true; explicitNulls = false; ignoreUnknownKeys = true }
 
@@ -122,6 +123,8 @@ internal class FuelMcpServer(
         addOrchestratorTool()
         getSyncDataTool()
         applySyncDataTool()
+        reportUsageTool()
+        getUsageTool()
         currentFuelResource()
         recommendationResource()
     }
@@ -579,6 +582,128 @@ internal class FuelMcpServer(
                 put("providers_imported", syncData.providers.size)
                 put("agents_imported", syncData.agentSettings.agents.size)
                 put("server_url", syncData.serverUrl ?: "")
+            }
+            CallToolResult(content = listOf(TextContent(text = response.toString())))
+        }
+    }
+
+    /**
+     * Tool: report_usage
+     *
+     * Universal usage reporting — any agent, runtime, or tool reports LLM
+     * consumption. Contract aligns with OTel GenAI semantic conventions
+     * (source→service.name, model→gen_ai.request.model, tokens→gen_ai.usage.*).
+     * Dual-registers with the HTTP POST /v1/usage endpoint (same storage).
+     */
+    private fun Server.reportUsageTool() {
+        addTool(
+            name = "report_usage",
+            description = "Report LLM usage (tokens consumed). Any agent/runtime/tool calls this " +
+                "after completing work. Requires 'source' (your name/id) and 'model'. " +
+                "input_tokens/output_tokens are the consumed counts for the period.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("source", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Identity of the consumer (agent name, runtime, tool)")
+                    })
+                    put("model", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Model handle used (e.g., 'glm-5.2')")
+                    })
+                    put("input_tokens", buildJsonObject {
+                        put("type", "number")
+                        put("description", "Prompt/input tokens consumed")
+                    })
+                    put("output_tokens", buildJsonObject {
+                        put("type", "number")
+                        put("description", "Completion/output tokens consumed")
+                    })
+                    put("request_count", buildJsonObject {
+                        put("type", "number")
+                        put("description", "Number of requests (default 1)")
+                    })
+                    put("timestamp", buildJsonObject {
+                        put("type", "number")
+                        put("description", "Epoch ms of the usage (default now)")
+                    })
+                },
+                required = listOf("source", "model"),
+            ),
+        ) { request ->
+            val args = request.arguments
+            val source = args?.get("source")?.jsonPrimitive?.content
+            val model = args?.get("model")?.jsonPrimitive?.content
+            if (source.isNullOrBlank() || model.isNullOrBlank()) {
+                return@addTool errorResult("source and model are required")
+            }
+            val inputTokens = args?.get("input_tokens")?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+            val outputTokens = args?.get("output_tokens")?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+            val requestCount = args?.get("request_count")?.jsonPrimitive?.content?.toLongOrNull() ?: 1L
+            val timestamp = args?.get("timestamp")?.jsonPrimitive?.content?.toLongOrNull()
+                ?: com.angussoftware.fueldashboard.util.epochMillis()
+
+            val repo = usageRepository
+                ?: return@addTool errorResult("usage storage unavailable")
+
+            repo.insert(
+                timestamp = timestamp,
+                source = source,
+                model = model,
+                inputTokens = inputTokens,
+                outputTokens = outputTokens,
+                requestCount = requestCount,
+            )
+
+            successResult("usage recorded: $source/$model ${inputTokens}in/${outputTokens}out")
+        }
+    }
+
+    /**
+     * Tool: get_usage
+     *
+     * Query recorded usage by source and model. Default window: last 24h.
+     */
+    private fun Server.getUsageTool() {
+        addTool(
+            name = "get_usage",
+            description = "Query recorded usage totals by source (agent/runtime) and model. " +
+                "Optional 'since_hours' (default 24). Returns per-source and per-model breakdowns.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("since_hours", buildJsonObject {
+                        put("type", "number")
+                        put("description", "Lookback window in hours (default 24)")
+                    })
+                },
+            ),
+        ) { request ->
+            val repo = usageRepository
+                ?: return@addTool errorResult("usage storage unavailable")
+            val sinceHours = request.arguments?.get("since_hours")?.jsonPrimitive?.content?.toDoubleOrNull() ?: 24.0
+            val since = com.angussoftware.fueldashboard.util.epochMillis() - (sinceHours * 3_600_000).toLong()
+
+            val response = buildJsonObject {
+                put("by_source", buildJsonArray {
+                    repo.getBySourceSince(since).forEach { u ->
+                        add(buildJsonObject {
+                            put("source", u.source)
+                            put("input_tokens", u.inputTokens)
+                            put("output_tokens", u.outputTokens)
+                            put("request_count", u.requestCount)
+                        })
+                    }
+                })
+                put("by_model", buildJsonArray {
+                    repo.getByModelSince(since).forEach { u ->
+                        add(buildJsonObject {
+                            put("model", u.model)
+                            put("input_tokens", u.inputTokens)
+                            put("output_tokens", u.outputTokens)
+                            put("request_count", u.requestCount)
+                        })
+                    }
+                })
             }
             CallToolResult(content = listOf(TextContent(text = response.toString())))
         }

@@ -19,6 +19,7 @@ actual class DatabaseDriverFactory {
         ensureFuelSnapshotsTable(driver)
         ensureModelDrainRatesTable(driver)
         ensureProviderFuelSnapshotsTable(driver)
+        ensureUsageRecordsTable(driver)
         return driver
     }
 
@@ -80,6 +81,29 @@ actual class DatabaseDriverFactory {
                     remaining_pct REAL,
                     reset_at INTEGER,
                     window_hours REAL
+                )
+                """.trimIndent(),
+                0,
+            )
+        } catch (e: Exception) {
+            // Table already exists or other non-fatal error
+        }
+    }
+
+    private fun ensureUsageRecordsTable(driver: SqlDriver) {
+        try {
+            driver.execute(
+                null,
+                """
+                CREATE TABLE IF NOT EXISTS usage_records (
+                    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    timestamp INTEGER NOT NULL,
+                    source TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL DEFAULT 0,
+                    output_tokens INTEGER NOT NULL DEFAULT 0,
+                    request_count INTEGER NOT NULL DEFAULT 1,
+                    recorded_at INTEGER NOT NULL
                 )
                 """.trimIndent(),
                 0,
