@@ -86,7 +86,23 @@ data class ProviderSnapshotInput(
     val remainingPct: Double?,
     val resetAt: Long?,
     val windowHours: Double?,
+    val quotaType: QuotaType = QuotaType.RATE_WINDOW,
 )
+
+/**
+ * Classifies how a provider's quota works — determines UI treatment.
+ * - RATE_WINDOW: Self-healing. Hitting 0 means throttling, not running out.
+ *   Examples: z.ai 5h TOKENS_PCT, Letta daily, Letta 4hr.
+ * - CREDIT_POOL: Finite budget that depletes. Refills on schedule.
+ *   Examples: Letta monthly credits, Junie balance.
+ * - SPEND_ONLY: Finite budget, no automatic refill.
+ *   Examples: OpenRouter, out-of-pocket API keys.
+ */
+enum class QuotaType {
+    RATE_WINDOW,
+    CREDIT_POOL,
+    SPEND_ONLY,
+}
 
 data class ProviderBurnRateDisplay(
     val providerId: String,
@@ -98,6 +114,8 @@ data class ProviderBurnRateDisplay(
     val projectedRemainingAtReset: Double,
     val willMakeIt: Boolean,
     val history: List<Double>,
+    val quotaType: QuotaType = QuotaType.RATE_WINDOW,
+    val windowHours: Double = 0.0,
 )
 
 data class DashboardState(
@@ -751,6 +769,7 @@ class FuelViewModel {
         val providerSnapshots = reports.mapNotNull { (providerId, report) ->
             if (report.remainingPct == null) return@mapNotNull null
             val config = _state.value.settings.providers.find { it.id == providerId }
+            val quotaType = classifyQuotaType(report)
             ProviderSnapshotInput(
                 providerId = providerId,
                 providerName = config?.resolvedDisplayName() ?: report.displayName,
@@ -758,6 +777,7 @@ class FuelViewModel {
                 remainingPct = report.remainingPct.toDouble(),
                 resetAt = report.resetsAt,
                 windowHours = report.windowHours,
+                quotaType = quotaType,
             )
         }
 
@@ -929,6 +949,30 @@ class FuelViewModel {
                     emptyMap()
                 },
             )
+        }
+    }
+
+    /**
+     * Classifies a provider's quota type from its report.
+     *
+     * - WINDOW_CREDIT: Always a rate window (self-healing on a timer).
+     *   Whether 5h (z.ai) or 27 days (z.ai session), hitting 0 just means
+     *   throttling — it refills.
+     * - SPEND_BUDGET with creditsResetAt: Credit pool (finite, refills on schedule).
+     * - SPEND_BUDGET without creditsResetAt: Spend-only (finite, no refill).
+     * - RATE_LIMIT: Always a rate window.
+     */
+    private fun classifyQuotaType(report: ProviderReport): QuotaType {
+        return when (report.type) {
+            ProviderType.WINDOW_CREDIT -> QuotaType.RATE_WINDOW
+            ProviderType.RATE_LIMIT -> QuotaType.RATE_WINDOW
+            ProviderType.SPEND_BUDGET -> {
+                if (report.creditsResetAt != null) {
+                    QuotaType.CREDIT_POOL
+                } else {
+                    QuotaType.SPEND_ONLY
+                }
+            }
         }
     }
 }

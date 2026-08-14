@@ -255,6 +255,21 @@ fun main() = application {
 
     viewModel.onGetProviderBurnRates = {
         fuelSnapshotRepo.getAllProviderBurnRates().map { br ->
+            // Look up the original report to get quota type
+            val report = viewModel.state.value.providerReports[br.providerId]
+            val quotaType = report?.let { r ->
+                when (r.type) {
+                    com.angussoftware.fueldashboard.model.ProviderType.WINDOW_CREDIT,
+                    com.angussoftware.fueldashboard.model.ProviderType.RATE_LIMIT ->
+                        com.angussoftware.fueldashboard.presentation.QuotaType.RATE_WINDOW
+                    com.angussoftware.fueldashboard.model.ProviderType.SPEND_BUDGET ->
+                        if (r.creditsResetAt != null)
+                            com.angussoftware.fueldashboard.presentation.QuotaType.CREDIT_POOL
+                        else
+                            com.angussoftware.fueldashboard.presentation.QuotaType.SPEND_ONLY
+                }
+            } ?: com.angussoftware.fueldashboard.presentation.QuotaType.RATE_WINDOW
+
             com.angussoftware.fueldashboard.presentation.ProviderBurnRateDisplay(
                 providerId = br.providerId,
                 providerName = br.providerName,
@@ -265,6 +280,8 @@ fun main() = application {
                 projectedRemainingAtReset = br.projectedRemainingAtReset,
                 willMakeIt = br.willMakeIt,
                 history = br.history,
+                quotaType = quotaType,
+                windowHours = report?.windowHours ?: 0.0,
             )
         }
     }
