@@ -268,6 +268,32 @@ fun main() = application {
         }
     }
 
+    viewModel.onGetMeteredUsage = {
+        val now = com.angussoftware.fueldashboard.util.epochMillis()
+        fun window(hours: Long) = now - hours * 3_600_000
+        fun bySource(since: Long) = usageRepo.getBySourceSince(since).map {
+            com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay(
+                label = it.source, inputTokens = it.inputTokens,
+                outputTokens = it.outputTokens, requestCount = it.requestCount,
+            )
+        }
+        fun byModel(since: Long) = usageRepo.getByModelSince(since).map {
+            com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay(
+                label = it.model, inputTokens = it.inputTokens,
+                outputTokens = it.outputTokens, requestCount = it.requestCount,
+                creditCost = com.angussoftware.fueldashboard.presentation.zaiCreditCost(
+                    it.model, it.inputTokens, it.outputTokens,
+                ),
+            )
+        }
+        com.angussoftware.fueldashboard.presentation.MeteredUsageWindows(
+            bySource24h = bySource(window(24)),
+            byModel24h = byModel(window(24)),
+            bySource7d = bySource(window(24 * 7)),
+            byModel7d = byModel(window(24 * 7)),
+        )
+    }
+
     viewModel.onGetFuelHistory = {
         fuelSnapshotRepo.getRecent(120)
             .mapNotNull { it.tokensPct }

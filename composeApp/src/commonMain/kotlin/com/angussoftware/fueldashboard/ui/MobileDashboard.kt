@@ -55,6 +55,7 @@ import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
 import com.angussoftware.fueldashboard.ui.components.DecisionLog
+import com.angussoftware.fueldashboard.ui.components.MeteredUsagePanel
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.ModelDrainRatesPanel
 import com.angussoftware.fueldashboard.ui.components.formatLastUpdated
@@ -140,6 +141,14 @@ fun MobileDashboard(
                     if (state.modelDrainRates.isNotEmpty()) {
                         ModelDrainRatesPanel(rates = state.modelDrainRates)
                     }
+
+                    // Metered usage (exact token counts from usage sources)
+                    MeteredUsagePanel(
+                        bySource24h = state.meteredBySource24h,
+                        byModel24h = state.meteredByModel24h,
+                        bySource7d = state.meteredBySource7d,
+                        byModel7d = state.meteredByModel7d,
+                    )
 
                     // Decision history
                     val decisions = state.decisions.decisions

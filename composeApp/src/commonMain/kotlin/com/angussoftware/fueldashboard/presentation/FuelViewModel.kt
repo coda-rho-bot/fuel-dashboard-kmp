@@ -90,6 +90,56 @@ data class ProviderSnapshotInput(
     val quotaType: QuotaType = QuotaType.RATE_WINDOW,
 )
 
+/** Metered token usage for one source (agent/runtime/tool) or model. */
+data class MeteredUsageDisplay(
+    val label: String,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val requestCount: Long,
+    /** Credit cost using z.ai GLM Coding Plan multipliers, if known. */
+    val creditCost: Double? = null,
+)
+
+/** Aggregated metered usage over two display windows. */
+data class MeteredUsageWindows(
+    val bySource24h: List<MeteredUsageDisplay>,
+    val byModel24h: List<MeteredUsageDisplay>,
+    val bySource7d: List<MeteredUsageDisplay>,
+    val byModel7d: List<MeteredUsageDisplay>,
+)
+
+/**
+ * z.ai GLM Coding Plan credit multipliers (per docs.z.ai/devpack/overview).
+ * Credits = input×inputMult + output×outputMult (cached input charged at the
+ * cached rate; we conservatively use the full input rate until metered data
+ * distinguishes cached tokens). Requests for GLM-5.2/5.1 auto-route to 5.3.
+ * Off-peak (Mon–Fri 14:00–18:00 UTC+8) charges 50%; blended average used.
+ */
+object ZaiCreditMultipliers {
+    private data class Mult(val input: Double, val cached: Double, val output: Double)
+
+    private val models = mapOf(
+        "glm-5.3" to Mult(6.9, 1.7, 24.0),
+        "glm-5.2" to Mult(6.9, 1.7, 24.0), // auto-routed to 5.3
+        "glm-5.1" to Mult(6.9, 1.7, 24.0), // auto-routed to 5.3
+        "glm-5-turbo" to Mult(5.7, 1.5, 21.0),
+        "glm-4.7" to Mult(4.6, 1.2, 16.0),
+    )
+
+    fun known(model: String): Boolean = normalize(model) in models
+
+    fun normalize(model: String): String = model.trim().lowercase()
+
+    fun cost(model: String, inputTokens: Long, outputTokens: Long): Double? {
+        val m = models[normalize(model)] ?: return null
+        return inputTokens * m.input + outputTokens * m.output
+    }
+}
+
+/** Credit cost for metered tokens on the z.ai plan; null when model unknown. */
+fun zaiCreditCost(model: String, inputTokens: Long, outputTokens: Long): Double? =
+    ZaiCreditMultipliers.cost(model, inputTokens, outputTokens)
+
 /**
  * Classifies how a provider's quota works — determines UI treatment.
  * - RATE_WINDOW: Self-healing. Hitting 0 means throttling, not running out.
@@ -145,6 +195,10 @@ data class DashboardState(
     val fuelHistory: List<Double> = emptyList(),
     val providerBurnRates: List<ProviderBurnRateDisplay> = emptyList(),
     val usageIngestion: IngestionStatus = IngestionStatus(),
+    val meteredBySource24h: List<MeteredUsageDisplay> = emptyList(),
+    val meteredByModel24h: List<MeteredUsageDisplay> = emptyList(),
+    val meteredBySource7d: List<MeteredUsageDisplay> = emptyList(),
+    val meteredByModel7d: List<MeteredUsageDisplay> = emptyList(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -345,6 +399,9 @@ class FuelViewModel {
      * Returns measured fuel consumption attributed to each model.
      */
     var onGetModelDrainRates: (() -> List<ModelDrainRateDisplay>)? = null
+
+    /** Metered usage aggregates (from usage_records), 24h and 7d windows. */
+    var onGetMeteredUsage: (() -> MeteredUsageWindows?)? = null
 
     /**
      * Callback to fetch recent fuel percentages for sparkline chart.
@@ -807,6 +864,7 @@ class FuelViewModel {
 
         // Compute per-provider burn rates
         val providerBurnRates = onGetProviderBurnRates?.invoke() ?: emptyList()
+        val metered = onGetMeteredUsage?.invoke()
 
         // Use primary provider for the legacy projection (backward compat)
         val realBurnRate = providerBurnRates.firstOrNull()?.burnRatePerHr
@@ -870,6 +928,10 @@ class FuelViewModel {
             modelDrainRates = onGetModelDrainRates?.invoke() ?: emptyList(),
             fuelHistory = onGetFuelHistory?.invoke() ?: emptyList(),
             providerBurnRates = providerBurnRates,
+            meteredBySource24h = metered?.bySource24h ?: emptyList(),
+            meteredByModel24h = metered?.byModel24h ?: emptyList(),
+            meteredBySource7d = metered?.bySource7d ?: emptyList(),
+            meteredByModel7d = metered?.byModel7d ?: emptyList(),
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel

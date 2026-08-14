@@ -66,6 +66,7 @@ import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
 import com.angussoftware.fueldashboard.ui.components.FuelStatusCard
+import com.angussoftware.fueldashboard.ui.components.MeteredUsagePanel
 import com.angussoftware.fueldashboard.ui.components.ModelDrainRatesPanel
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
@@ -353,6 +354,17 @@ internal fun FuelColumnContent(
                         Spacer(Modifier.height(4.dp))
                         ModelDrainRatesPanel(rates = state.modelDrainRates)
                     }
+                }
+
+                // Metered usage (exact token counts from usage sources)
+                item {
+                    Spacer(Modifier.height(4.dp))
+                    MeteredUsagePanel(
+                        bySource24h = state.meteredBySource24h,
+                        byModel24h = state.meteredByModel24h,
+                        bySource7d = state.meteredBySource7d,
+                        byModel7d = state.meteredByModel7d,
+                    )
                 }
 
                 // Decisions (from connected API only)
