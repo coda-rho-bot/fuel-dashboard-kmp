@@ -146,3 +146,39 @@ WHERE model = :model;
 
 selectAllModelDrainRates:
 SELECT * FROM model_drain_rates ORDER BY total_fuel_consumed DESC;
+
+CREATE TABLE ingested_runs (
+    run_key TEXT NOT NULL PRIMARY KEY,
+    connector_id TEXT NOT NULL,
+    ingested_at INTEGER NOT NULL
+);
+
+insertIgnoredRun:
+INSERT OR IGNORE INTO ingested_runs (run_key, connector_id, ingested_at) VALUES (?, ?, ?);
+
+isRunIngested:
+SELECT COUNT(*) >= 1 AS found FROM ingested_runs WHERE run_key = ?;
+
+deleteOldIngestedRuns:
+DELETE FROM ingested_runs WHERE ingested_at < :cutoff;
+
+CREATE TABLE agent_model_history (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    model TEXT NOT NULL,
+    valid_from INTEGER NOT NULL,
+    valid_to INTEGER
+);
+
+closeOpenAgentModelRecords:
+UPDATE agent_model_history SET valid_to = ? WHERE agent_id = ? AND valid_to IS NULL;
+
+insertAgentModelRecord:
+INSERT INTO agent_model_history (agent_id, agent_name, model, valid_from, valid_to) VALUES (?, ?, ?, ?, NULL);
+
+selectModelAtTime:
+SELECT model FROM agent_model_history WHERE agent_id = ? AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?) ORDER BY valid_from DESC LIMIT 1;
+
+selectOpenAgentModels:
+SELECT * FROM agent_model_history WHERE valid_to IS NULL;

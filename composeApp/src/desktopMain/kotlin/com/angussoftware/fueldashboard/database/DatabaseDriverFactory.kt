@@ -20,7 +20,48 @@ actual class DatabaseDriverFactory {
         ensureModelDrainRatesTable(driver)
         ensureProviderFuelSnapshotsTable(driver)
         ensureUsageRecordsTable(driver)
+        ensureIngestedRunsTable(driver)
+        ensureAgentModelHistoryTable(driver)
         return driver
+    }
+
+    private fun ensureIngestedRunsTable(driver: SqlDriver) {
+        try {
+            driver.execute(
+                null,
+                """
+                CREATE TABLE IF NOT EXISTS ingested_runs (
+                    run_key TEXT NOT NULL PRIMARY KEY,
+                    connector_id TEXT NOT NULL,
+                    ingested_at INTEGER NOT NULL
+                )
+                """.trimIndent(),
+                0,
+            )
+        } catch (e: Exception) {
+            // Table already exists or other non-fatal error
+        }
+    }
+
+    private fun ensureAgentModelHistoryTable(driver: SqlDriver) {
+        try {
+            driver.execute(
+                null,
+                """
+                CREATE TABLE IF NOT EXISTS agent_model_history (
+                    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    agent_id TEXT NOT NULL,
+                    agent_name TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    valid_from INTEGER NOT NULL,
+                    valid_to INTEGER
+                )
+                """.trimIndent(),
+                0,
+            )
+        } catch (e: Exception) {
+            // Table already exists or other non-fatal error
+        }
     }
 
     private fun ensureFuelSnapshotsTable(driver: SqlDriver) {
