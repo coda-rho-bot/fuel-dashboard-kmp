@@ -149,6 +149,11 @@ fun SettingsPanel(
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
+            // --- Usage ingestion sources (pull-side metering) ---
+            UsageSourcesSection(status = state.usageIngestion)
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
             // --- Theme mode toggle ---
             ThemeModeSection(themeController)
 

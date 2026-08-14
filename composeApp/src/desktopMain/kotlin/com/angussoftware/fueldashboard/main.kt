@@ -54,6 +54,7 @@ fun main() = application {
     val repository = remember { DecisionRepository(dbDriver) }
     val fuelSnapshotRepo = remember { FuelSnapshotRepository(dbDriver) }
     val usageRepo = remember { com.angussoftware.fueldashboard.database.UsageRepository(dbDriver) }
+    val usageIngestionRepo = remember { com.angussoftware.fueldashboard.database.UsageIngestionRepository(dbDriver) }
     val agentRegistry = remember { AgentRegistry(dbDriver) }
 
     // ── Embedded HTTP server for LAN access (mobile devices) ──────────────
@@ -77,6 +78,24 @@ fun main() = application {
     }
 
     embeddedServer.start()
+
+    // ── Usage ingestion (pluggable pull-side sources) ────────────────────
+    // Connectors poll platforms that track usage server-side (e.g. Letta
+    // runs) and normalize into usage_records. Disabled until configured in
+    // Settings → Usage Sources.
+    val usageIngestion = remember {
+        com.angussoftware.fueldashboard.usage.UsageIngestionManager(
+            usageRepository = usageRepo,
+            ingestionRepository = usageIngestionRepo,
+            httpClient = com.angussoftware.fueldashboard.network.SharedHttpClient.client,
+        )
+    }
+    usageIngestion.start(serverScope)
+    serverScope.launch {
+        usageIngestion.status.collect { status ->
+            viewModel.updateUsageIngestion(status)
+        }
+    }
 
     // ── Set server URL for QR sync ────────────────────────────────────────
     val serverUrl = remember {

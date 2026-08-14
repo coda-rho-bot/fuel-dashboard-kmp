@@ -33,6 +33,7 @@ import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
 import com.angussoftware.fueldashboard.settings.AgentSettingsStore
 import com.angussoftware.fueldashboard.settings.FuelSettingsStore
 import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
+import com.angussoftware.fueldashboard.usage.IngestionStatus
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.settings.saveStringSetting
@@ -143,6 +144,7 @@ data class DashboardState(
     val modelDrainRates: List<ModelDrainRateDisplay> = emptyList(),
     val fuelHistory: List<Double> = emptyList(),
     val providerBurnRates: List<ProviderBurnRateDisplay> = emptyList(),
+    val usageIngestion: IngestionStatus = IngestionStatus(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -210,6 +212,11 @@ class FuelViewModel {
 
     /** Tracks last recommendation to avoid duplicate logging. */
     private var _lastRecommendation: String = ""
+
+    /** Live usage-ingestion status pushed from the desktop ingestion manager. */
+    fun updateUsageIngestion(status: IngestionStatus) {
+        _state.value = _state.value.copy(usageIngestion = status)
+    }
 
     private val _state = MutableStateFlow(
         DashboardState(

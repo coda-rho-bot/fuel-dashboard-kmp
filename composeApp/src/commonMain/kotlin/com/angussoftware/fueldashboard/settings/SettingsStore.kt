@@ -27,4 +27,5 @@ internal object FuelSettingsKeys {
     const val JUNIE_LICENSE = "junie_license"
     const val JUNIE_LAST_CHECKED = "junie_last_checked"
     const val SERVER_API_KEY = "serverApiKey"
+    const val USAGE_SOURCES = "usageSourcesSettings"     // JSON: UsageSourcesSettings
 }
