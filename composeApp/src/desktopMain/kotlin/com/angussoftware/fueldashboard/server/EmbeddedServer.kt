@@ -34,6 +34,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.path
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.delete
@@ -376,7 +377,7 @@ class EmbeddedServer(
             // model→gen_ai.request.model, tokens→gen_ai.usage.*.
             post("/v1/usage") {
                 if (!call.requireApiKey()) return@post
-                val body = call.receive<io.ktor.http.content.TextContent>().text
+                val body = call.receiveText()
                 val json = kotlinx.serialization.json.Json.parseToJsonElement(body).jsonObject
                 val source = json["source"]?.jsonPrimitive?.content
                 val model = json["model"]?.jsonPrimitive?.content
