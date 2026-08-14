@@ -43,6 +43,9 @@ import io.ktor.server.routing.routing
 import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.net.NetworkInterface
 import java.security.SecureRandom
 import java.util.Base64
@@ -373,17 +376,18 @@ class EmbeddedServer(
             // model→gen_ai.request.model, tokens→gen_ai.usage.*.
             post("/v1/usage") {
                 if (!call.requireApiKey()) return@post
-                val body = call.receive<Map<String, Any?>>()
-                val source = body["source"]?.toString()
-                val model = body["model"]?.toString()
+                val body = call.receive<io.ktor.http.content.TextContent>().text
+                val json = kotlinx.serialization.json.Json.parseToJsonElement(body).jsonObject
+                val source = json["source"]?.jsonPrimitive?.content
+                val model = json["model"]?.jsonPrimitive?.content
                 if (source.isNullOrBlank() || model.isNullOrBlank()) {
                     call.respond(HttpStatusCode.BadRequest, ErrorResponse("source and model are required"))
                     return@post
                 }
-                val timestamp = (body["timestamp"] as? Number)?.toLong() ?: epochMillisNow()
-                val inputTokens = (body["input_tokens"] as? Number)?.toLong() ?: 0L
-                val outputTokens = (body["output_tokens"] as? Number)?.toLong() ?: 0L
-                val requestCount = (body["request_count"] as? Number)?.toLong() ?: 1L
+                val timestamp = json["timestamp"]?.jsonPrimitive?.content?.toLongOrNull() ?: epochMillisNow()
+                val inputTokens = json["input_tokens"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                val outputTokens = json["output_tokens"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                val requestCount = json["request_count"]?.jsonPrimitive?.content?.toLongOrNull() ?: 1L
 
                 usageRepository?.insert(
                     timestamp = timestamp,
@@ -414,26 +418,31 @@ class EmbeddedServer(
                 }
                 val bySource = repo.getBySourceSince(since)
                 val byModel = repo.getByModelSince(since)
-                val respondMap: Map<String, Any> = mapOf(
-                    "since" to since,
-                    "by_source" to bySource.map {
-                        mapOf(
-                            "source" to it.source,
-                            "input_tokens" to it.inputTokens,
-                            "output_tokens" to it.outputTokens,
-                            "request_count" to it.requestCount,
-                        )
-                    },
-                    "by_model" to byModel.map {
-                        mapOf(
-                            "model" to it.model,
-                            "input_tokens" to it.inputTokens,
-                            "output_tokens" to it.outputTokens,
-                            "request_count" to it.requestCount,
-                        )
-                    },
-                )
-                call.respond(respondMap)
+
+                val responseJson = kotlinx.serialization.json.buildJsonObject {
+                    put("since", since)
+                    put("by_source", kotlinx.serialization.json.buildJsonArray {
+                        bySource.forEach { u ->
+                            add(kotlinx.serialization.json.buildJsonObject {
+                                put("source", u.source)
+                                put("input_tokens", u.inputTokens)
+                                put("output_tokens", u.outputTokens)
+                                put("request_count", u.requestCount)
+                            })
+                        }
+                    })
+                    put("by_model", kotlinx.serialization.json.buildJsonArray {
+                        byModel.forEach { u ->
+                            add(kotlinx.serialization.json.buildJsonObject {
+                                put("model", u.model)
+                                put("input_tokens", u.inputTokens)
+                                put("output_tokens", u.outputTokens)
+                                put("request_count", u.requestCount)
+                            })
+                        }
+                    })
+                }.toString()
+                call.respondText(text = responseJson, contentType = ContentType.Application.Json)
             }
 
             // Lightweight health check — no auth required (for uptime monitors).
