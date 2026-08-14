@@ -306,6 +306,7 @@ private fun MobileFuelContent(
                         fuelHistory = state.fuelHistory,
                         providerBurnRates = state.providerBurnRates,
                         modelDrainRates = state.modelDrainRates,
+                        meteredByModel24h = state.meteredByModel24h,
                     )
                 }
 
