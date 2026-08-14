@@ -15,7 +15,9 @@ import com.agentclientprotocol.model.PermissionOptionId
 import com.agentclientprotocol.model.PermissionOptionKind
 import com.agentclientprotocol.model.RequestPermissionOutcome
 import com.agentclientprotocol.model.RequestPermissionResponse
+import com.agentclientprotocol.model.SessionConfigId
 import com.agentclientprotocol.model.SessionConfigOption
+import com.agentclientprotocol.model.SessionConfigOptionValue
 import com.agentclientprotocol.model.SessionConfigSelectOptions
 import com.agentclientprotocol.model.SessionModeId
 import com.agentclientprotocol.model.SessionUpdate
@@ -131,12 +133,26 @@ class AcpAgentManager {
 
     /**
      * Change an agent's model via ACP session API.
+     *
+     * Uses configOptions when supported (preferred by letta-acp and modern agents —
+     * the model is exposed as a config option with id "model"). Falls back to the
+     * legacy setModel API for agents that use the older models API.
+     *
      * Returns true if the model was successfully changed.
      */
     suspend fun setModel(agentId: String, modelValue: String): Boolean {
         val conn = synchronized(connections) { connections[agentId] } ?: return false
         return try {
-            conn.session.setModel(ModelId(modelValue), null)
+            if (conn.session.configOptionsSupported) {
+                // Preferred path: set the "model" config option
+                conn.session.setConfigOption(
+                    configId = SessionConfigId("model"),
+                    value = SessionConfigOptionValue.StringValue(modelValue),
+                )
+            } else {
+                // Legacy path: old session/set_model API
+                conn.session.setModel(ModelId(modelValue), null)
+            }
             updateAgentInfo(agentId) { it.copy(currentModel = modelValue) }
             true
         } catch (e: Exception) {

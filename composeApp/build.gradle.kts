@@ -98,6 +98,9 @@ kotlin {
             implementation(libs.ktor.client.cio)
             implementation(libs.kotlinx.coroutines.swing)
 
+            // SLF4J provider — routes ACP/Ktor/kotlin-logging output to log file
+            implementation(libs.slf4j.simple)
+
             // Embedded HTTP server — desktop only (serves fuel data to mobile devices on LAN)
             implementation(libs.ktor.server.core)
             implementation(libs.ktor.server.cio)

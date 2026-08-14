@@ -31,6 +31,21 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 fun main() = application {
+    // Configure SLF4J file logging BEFORE any SLF4J-using library initializes.
+    // Routes ACP SDK, Ktor, and kotlin-logging output to a rotating log file.
+    run {
+        val logDir = java.io.File(System.getProperty("user.home"), ".fuel-dashboard/logs")
+        logDir.mkdirs()
+        val logFile = java.io.File(logDir, "fuel-dashboard.log")
+        // Rotate at ~10MB: rename current to .old, start fresh
+        if (logFile.exists() && logFile.length() > 10 * 1024 * 1024) {
+            java.io.File(logDir, "fuel-dashboard.log.old").delete()
+            logFile.renameTo(java.io.File(logDir, "fuel-dashboard.log.old"))
+        }
+        System.setProperty("org.slf4j.simpleLogger.logFile", logFile.absolutePath)
+        System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info")
+    }
+
     val viewModel = remember { FuelViewModel() }
     val themeController = ThemeController
 
