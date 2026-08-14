@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class UsageRecommenderTest {
 
@@ -60,5 +61,70 @@ class UsageRecommenderTest {
             ),
         )
         assertNull(rec)
+    }
+
+    // ── Conversation-level savings tests ──
+
+    private fun convUsage(
+        convId: String,
+        agent: String,
+        model: String,
+        input: Long,
+        output: Long,
+    ) = ConversationUsageDisplay(
+        conversationId = convId,
+        agentName = agent,
+        model = model,
+        inputTokens = input,
+        outputTokens = output,
+        requestCount = 1,
+        creditCost = zaiCreditCost(model, input, output),
+    )
+
+    @Test
+    fun conversationSavingsNeedsTwoModels() {
+        val all = listOf(convUsage("c1", "Coda", "glm-5.2", 1000, 200))
+        assertEquals(emptyList(), UsageRecommender.conversationSavings(all))
+    }
+
+    @Test
+    fun conversationSavingsIdentifiesExpensiveConversations() {
+        val convs = listOf(
+            convUsage("c1", "Coda", "glm-5.2", 90_000, 10_000),   // expensive
+            convUsage("c2", "Coda", "glm-5.2", 50_000, 5_000),    // expensive
+            convUsage("c3", "Beacon", "glm-4.7", 20_000, 5_000),  // cheap
+        )
+        val savings = UsageRecommender.conversationSavings(convs)
+        assertEquals(2, savings.size)
+        // Sorted by absolute credit savings descending — c1 (90k input) saves more than c2 (50k input)
+        assertEquals("c1", savings[0].conversationId)
+        assertEquals("c2", savings[1].conversationId)
+        // All should recommend switching from glm-5.2 to glm-4.7
+        savings.forEach {
+            assertEquals("glm-5.2", it.fromModel)
+            assertEquals("glm-4.7", it.toModel)
+            assertTrue(it.savingsFraction > 0)
+        }
+    }
+
+    @Test
+    fun conversationSavingsExcludesCheapModelConversations() {
+        val convs = listOf(
+            convUsage("c1", "Coda", "glm-5.2", 90_000, 10_000),
+            convUsage("c2", "Beacon", "glm-4.7", 20_000, 5_000),
+        )
+        val savings = UsageRecommender.conversationSavings(convs)
+        // Only c1 (running the expensive model) should appear
+        assertEquals(1, savings.size)
+        assertEquals("c1", savings[0].conversationId)
+    }
+
+    @Test
+    fun conversationSavingsEmptyForUnknownModels() {
+        val convs = listOf(
+            convUsage("c1", "Coda", "gpt-4o", 1000, 200),
+            convUsage("c2", "Beacon", "claude-3", 500, 100),
+        )
+        assertEquals(emptyList<UsageRecommender.ConversationSavings>(), UsageRecommender.conversationSavings(convs))
     }
 }

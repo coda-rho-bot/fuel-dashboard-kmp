@@ -37,10 +37,11 @@ class LettaRunsConnectorTest {
     private fun runsJson(vararg runs: Triple<String, String, Long?>): String =
         runs.joinToString(prefix = "[", postfix = "]", separator = ",") { (id, agent, completedAt) ->
             val created = t0 + id.substringAfter("run-").toInt() * 3_600_000L // run-N at T0 + N hours
+            val convId = "conv-${id.substringAfter("run-")}"
             val completedField = completedAt
                 ?.let { ",\"completed_at\":\"${iso(it)}\"" }
                 ?: ",\"completed_at\":null"
-            "{\"id\":\"$id\",\"agent_id\":\"$agent\",\"created_at\":\"${iso(created)}\"$completedField}"
+            "{\"id\":\"$id\",\"agent_id\":\"$agent\",\"conversation_id\":\"$convId\",\"created_at\":\"${iso(created)}\"$completedField}"
         }
 
     private var currentRuns: String = ""
@@ -142,5 +143,42 @@ class LettaRunsConnectorTest {
         val byModel = usageRepo.getByModelSince(0).associateBy { it.model }
         assertEquals(1000L, byModel["glm-5.2"]?.inputTokens)
         assertEquals(3000L, byModel["glm-4.7"]?.inputTokens)
+    }
+
+    @Test
+    fun conversationIdIsStoredAndQueryable() = runBlocking {
+        val c = connector()
+        c.refreshMetadata()
+
+        c.poll()
+
+        // run-1 → conv-1 (agent-a/Coda, glm-5.2), run-3 → conv-3 (agent-a/Coda, glm-5.2)
+        val byConv = usageRepo.getByConversationSince(0)
+        assertEquals(2, byConv.size)
+        val conv1 = byConv.first { it.conversationId == "conv-1" }
+        assertEquals("Coda", conv1.source)
+        assertEquals("glm-5.2", conv1.model)
+        assertEquals(1000L, conv1.inputTokens)
+        assertEquals(200L, conv1.outputTokens)
+    }
+
+    @Test
+    fun conversationIdDistinguishesModelSwitch() = runBlocking {
+        val c = connector()
+        c.refreshMetadata()
+
+        // Agent switches model after run-1 but before run-3
+        nowMs = t0 + 90 * 60_000L
+        ingestionRepo.recordAgentModel("agent-a", "Coda", "glm-4.7")
+
+        c.poll()
+
+        // Both runs are from the same agent but different conversations
+        val byConv = usageRepo.getByConversationSince(0).sortedBy { it.conversationId }
+        assertEquals(2, byConv.size)
+        assertEquals("conv-1", byConv[0].conversationId)
+        assertEquals("glm-5.2", byConv[0].model)
+        assertEquals("conv-3", byConv[1].conversationId)
+        assertEquals("glm-4.7", byConv[1].model)
     }
 }

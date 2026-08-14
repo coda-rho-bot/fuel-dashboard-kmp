@@ -46,6 +46,7 @@ fun FuelStatusCard(
     providerBurnRates: List<ProviderBurnRateDisplay> = emptyList(),
     modelDrainRates: List<com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay> = emptyList(),
     meteredByModel24h: List<com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay> = emptyList(),
+    meteredByConversation24h: List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -128,6 +129,7 @@ fun FuelStatusCard(
         RecommenderStatusSection(
             modelDrainRates = modelDrainRates,
             meteredByModel = meteredByModel24h,
+            meteredByConversation = meteredByConversation24h,
             showHelp = showHelp,
         )
 
@@ -152,6 +154,7 @@ fun FuelStatusCard(
 private fun RecommenderStatusSection(
     modelDrainRates: List<com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay>,
     meteredByModel: List<com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay>,
+    meteredByConversation: List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay>,
     showHelp: Boolean,
 ) {
     Column {
@@ -186,6 +189,33 @@ private fun RecommenderStatusSection(
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium,
             )
+
+            // Show top conversations that would benefit from the switch
+            val convSavings = com.angussoftware.fueldashboard.presentation.UsageRecommender
+                .conversationSavings(meteredByConversation)
+            if (convSavings.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Top conversations to switch:",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                convSavings.take(5).forEach { cs ->
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = buildString {
+                            append("${cs.conversationId.take(12)} (${cs.agentName}) ")
+                            append("${formatCredits(cs.currentCreditCost)} → ")
+                            append("${formatCredits(cs.projectedCreditCost)} cr ")
+                            append("(${(cs.savingsFraction * 100).toInt()}% off)")
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             return@Column
         }
 

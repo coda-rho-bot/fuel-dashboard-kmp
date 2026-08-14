@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay
+import com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay
 import kotlin.math.roundToInt
 
 /**
@@ -38,13 +39,18 @@ fun MeteredUsagePanel(
     byModel24h: List<MeteredUsageDisplay>,
     bySource7d: List<MeteredUsageDisplay>,
     byModel7d: List<MeteredUsageDisplay>,
+    byConversation24h: List<ConversationUsageDisplay> = emptyList(),
+    byConversation7d: List<ConversationUsageDisplay> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    if (bySource24h.isEmpty() && bySource7d.isEmpty()) return
+    if (bySource24h.isEmpty() && bySource7d.isEmpty() &&
+        byConversation24h.isEmpty() && byConversation7d.isEmpty()
+    ) return
 
     var window7d by remember { mutableStateOf(false) }
     val bySource = if (window7d) bySource7d else bySource24h
     val byModel = if (window7d) byModel7d else byModel24h
+    val byConversation = if (window7d) byConversation7d else byConversation24h
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -88,6 +94,18 @@ fun MeteredUsagePanel(
         )
         val maxModelTokens = (byModel.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
         byModel.forEach { MeteredUsageRow(it, maxModelTokens, showCost = true) }
+
+        if (byConversation.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "By conversation",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+            val maxConvTokens = (byConversation.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
+            byConversation.forEach { ConversationUsageRow(it, maxConvTokens) }
+        }
     }
 }
 
@@ -149,3 +167,57 @@ private fun formatTokens(tokens: Long): String = when {
 
 private fun formatCredits(credits: Double): String =
     if (credits >= 1_000_000) "${(credits / 1_000_000).roundToInt()}M" else credits.roundToInt().toString()
+
+/** Shorten a conversation ID for display (first 12 chars). */
+private fun shortConvId(id: String): String =
+    if (id.length > 12) id.take(12) + "…" else id
+
+@Composable
+private fun ConversationUsageRow(
+    usage: ConversationUsageDisplay,
+    maxTokens: Long,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = shortConvId(usage.conversationId),
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = buildString {
+                    append("${usage.agentName} · ${usage.model}")
+                    append("  ·  ${formatTokens(usage.inputTokens)} in / ${formatTokens(usage.outputTokens)} out")
+                    append("  ·  ${usage.requestCount} req")
+                    usage.creditCost?.let { append("  ·  ${formatCredits(it)} cr") }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // Proportional bar
+        val inputFraction = (usage.inputTokens.toFloat() / maxTokens).coerceIn(0f, 1f)
+        val outputFraction = (usage.outputTokens.toFloat() / maxTokens).coerceIn(0f, 1f)
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(inputFraction)
+                    .height(6.dp)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+            Spacer(Modifier.width(2.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(outputFraction)
+                    .height(6.dp)
+                    .background(MaterialTheme.colorScheme.tertiary),
+            )
+        }
+    }
+    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+}

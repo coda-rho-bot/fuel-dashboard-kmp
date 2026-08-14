@@ -20,6 +20,7 @@ actual class DatabaseDriverFactory {
         ensureModelDrainRatesTable(driver)
         ensureProviderFuelSnapshotsTable(driver)
         ensureUsageRecordsTable(driver)
+        ensureUsageRecordsConversationColumn(driver)
         ensureIngestedRunsTable(driver)
         ensureAgentModelHistoryTable(driver)
         return driver
@@ -141,6 +142,7 @@ actual class DatabaseDriverFactory {
                     timestamp INTEGER NOT NULL,
                     source TEXT NOT NULL,
                     model TEXT NOT NULL,
+                    conversation_id TEXT,
                     input_tokens INTEGER NOT NULL DEFAULT 0,
                     output_tokens INTEGER NOT NULL DEFAULT 0,
                     request_count INTEGER NOT NULL DEFAULT 1,
@@ -151,6 +153,19 @@ actual class DatabaseDriverFactory {
             )
         } catch (e: Exception) {
             // Table already exists or other non-fatal error
+        }
+    }
+
+    /** Adds conversation_id column to existing usage_records tables (migration). */
+    private fun ensureUsageRecordsConversationColumn(driver: SqlDriver) {
+        try {
+            driver.execute(
+                null,
+                "ALTER TABLE usage_records ADD COLUMN conversation_id TEXT",
+                0,
+            )
+        } catch (e: Exception) {
+            // Column already exists — this is expected on subsequent runs
         }
     }
 }

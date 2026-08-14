@@ -43,6 +43,7 @@ class LettaRunsConnector(
         val agent_id: String? = null,
         val created_at: String? = null,
         val completed_at: String? = null,
+        val conversation_id: String? = null,
     )
 
     @Serializable
@@ -113,6 +114,7 @@ class LettaRunsConnector(
                 inputTokens = inputTokens,
                 outputTokens = outputTokens,
                 requestCount = 1,
+                conversationId = run.conversation_id,
             )
             ingested++
         }

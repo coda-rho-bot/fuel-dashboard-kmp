@@ -100,12 +100,26 @@ data class MeteredUsageDisplay(
     val creditCost: Double? = null,
 )
 
+/** Metered usage for one conversation — includes agent + model for context. */
+data class ConversationUsageDisplay(
+    val conversationId: String,
+    val agentName: String,
+    val model: String,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val requestCount: Long,
+    /** Credit cost using z.ai GLM Coding Plan multipliers, if known. */
+    val creditCost: Double? = null,
+)
+
 /** Aggregated metered usage over two display windows. */
 data class MeteredUsageWindows(
     val bySource24h: List<MeteredUsageDisplay>,
     val byModel24h: List<MeteredUsageDisplay>,
     val bySource7d: List<MeteredUsageDisplay>,
     val byModel7d: List<MeteredUsageDisplay>,
+    val byConversation24h: List<ConversationUsageDisplay> = emptyList(),
+    val byConversation7d: List<ConversationUsageDisplay> = emptyList(),
 )
 
 /**
@@ -199,6 +213,8 @@ data class DashboardState(
     val meteredByModel24h: List<MeteredUsageDisplay> = emptyList(),
     val meteredBySource7d: List<MeteredUsageDisplay> = emptyList(),
     val meteredByModel7d: List<MeteredUsageDisplay> = emptyList(),
+    val meteredByConversation24h: List<ConversationUsageDisplay> = emptyList(),
+    val meteredByConversation7d: List<ConversationUsageDisplay> = emptyList(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -932,6 +948,8 @@ class FuelViewModel {
             meteredByModel24h = metered?.byModel24h ?: emptyList(),
             meteredBySource7d = metered?.bySource7d ?: emptyList(),
             meteredByModel7d = metered?.byModel7d ?: emptyList(),
+            meteredByConversation24h = metered?.byConversation24h ?: emptyList(),
+            meteredByConversation7d = metered?.byConversation7d ?: emptyList(),
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel

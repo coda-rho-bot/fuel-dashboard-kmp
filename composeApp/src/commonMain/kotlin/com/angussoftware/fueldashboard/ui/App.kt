@@ -295,6 +295,7 @@ internal fun FuelColumnContent(
                         providerBurnRates = state.providerBurnRates,
                         modelDrainRates = state.modelDrainRates,
                         meteredByModel24h = state.meteredByModel24h,
+                        meteredByConversation24h = state.meteredByConversation24h,
                     )
                 }
 
@@ -365,6 +366,8 @@ internal fun FuelColumnContent(
                         byModel24h = state.meteredByModel24h,
                         bySource7d = state.meteredBySource7d,
                         byModel7d = state.meteredByModel7d,
+                        byConversation24h = state.meteredByConversation24h,
+                        byConversation7d = state.meteredByConversation7d,
                     )
                 }
 

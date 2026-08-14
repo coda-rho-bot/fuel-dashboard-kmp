@@ -99,6 +99,7 @@ CREATE TABLE usage_records (
     timestamp INTEGER NOT NULL,
     source TEXT NOT NULL,
     model TEXT NOT NULL,
+    conversation_id TEXT,
     input_tokens INTEGER NOT NULL DEFAULT 0,
     output_tokens INTEGER NOT NULL DEFAULT 0,
     request_count INTEGER NOT NULL DEFAULT 1,
@@ -106,8 +107,8 @@ CREATE TABLE usage_records (
 );
 
 insertUsageRecord:
-INSERT INTO usage_records (timestamp, source, model, input_tokens, output_tokens, request_count, recorded_at)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO usage_records (timestamp, source, model, conversation_id, input_tokens, output_tokens, request_count, recorded_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 selectUsageSince:
 SELECT * FROM usage_records WHERE timestamp >= :since ORDER BY timestamp ASC;
@@ -117,6 +118,19 @@ SELECT source, SUM(input_tokens) AS total_input, SUM(output_tokens) AS total_out
 
 selectUsageByModelSince:
 SELECT model, SUM(input_tokens) AS total_input, SUM(output_tokens) AS total_output, SUM(request_count) AS total_requests FROM usage_records WHERE timestamp >= :since GROUP BY model ORDER BY SUM(input_tokens) DESC;
+
+selectUsageByConversationSince:
+SELECT
+    conversation_id,
+    source,
+    model,
+    SUM(input_tokens) AS total_input,
+    SUM(output_tokens) AS total_output,
+    SUM(request_count) AS total_requests
+FROM usage_records
+WHERE timestamp >= :since AND conversation_id IS NOT NULL
+GROUP BY conversation_id, source, model
+ORDER BY SUM(input_tokens) DESC;
 
 deleteOldUsageRecords:
 DELETE FROM usage_records WHERE timestamp < :cutoff;

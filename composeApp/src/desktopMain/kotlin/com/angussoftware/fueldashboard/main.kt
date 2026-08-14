@@ -286,11 +286,26 @@ fun main() = application {
                 ),
             )
         }
+        fun byConversation(since: Long) = usageRepo.getByConversationSince(since).map {
+            com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay(
+                conversationId = it.conversationId,
+                agentName = it.source,
+                model = it.model,
+                inputTokens = it.inputTokens,
+                outputTokens = it.outputTokens,
+                requestCount = it.requestCount,
+                creditCost = com.angussoftware.fueldashboard.presentation.zaiCreditCost(
+                    it.model, it.inputTokens, it.outputTokens,
+                ),
+            )
+        }
         com.angussoftware.fueldashboard.presentation.MeteredUsageWindows(
             bySource24h = bySource(window(24)),
             byModel24h = byModel(window(24)),
             bySource7d = bySource(window(24 * 7)),
             byModel7d = byModel(window(24 * 7)),
+            byConversation24h = byConversation(window(24)),
+            byConversation7d = byConversation(window(24 * 7)),
         )
     }
 

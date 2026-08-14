@@ -8,6 +8,7 @@ data class UsageRecord(
     val timestamp: Long,
     val source: String,
     val model: String,
+    val conversationId: String?,
     val inputTokens: Long,
     val outputTokens: Long,
     val requestCount: Long,
@@ -21,6 +22,15 @@ data class UsageBySource(
 )
 
 data class UsageByModel(
+    val model: String,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val requestCount: Long,
+)
+
+data class UsageByConversation(
+    val conversationId: String,
+    val source: String,
     val model: String,
     val inputTokens: Long,
     val outputTokens: Long,
@@ -50,11 +60,13 @@ class UsageRepository(driver: SqlDriver) {
         inputTokens: Long,
         outputTokens: Long,
         requestCount: Long = 1,
+        conversationId: String? = null,
     ) {
         queries.insertUsageRecord(
             timestamp = timestamp,
             source = source,
             model = model,
+            conversation_id = conversationId,
             input_tokens = inputTokens,
             output_tokens = outputTokens,
             request_count = requestCount,
@@ -69,6 +81,7 @@ class UsageRepository(driver: SqlDriver) {
                 timestamp = row.timestamp,
                 source = row.source,
                 model = row.model,
+                conversationId = row.conversation_id,
                 inputTokens = row.input_tokens,
                 outputTokens = row.output_tokens,
                 requestCount = row.request_count,
@@ -90,6 +103,19 @@ class UsageRepository(driver: SqlDriver) {
     fun getByModelSince(since: Long): List<UsageByModel> =
         queries.selectUsageByModelSince(since).executeAsList().map { row ->
             UsageByModel(
+                model = row.model,
+                inputTokens = row.total_input ?: 0L,
+                outputTokens = row.total_output ?: 0L,
+                requestCount = row.total_requests ?: 0L,
+            )
+        }
+
+    /** Per-conversation totals since a cutoff (includes source + model for context). */
+    fun getByConversationSince(since: Long): List<UsageByConversation> =
+        queries.selectUsageByConversationSince(since).executeAsList().map { row ->
+            UsageByConversation(
+                conversationId = row.conversation_id ?: "",
+                source = row.source,
                 model = row.model,
                 inputTokens = row.total_input ?: 0L,
                 outputTokens = row.total_output ?: 0L,
