@@ -45,6 +45,7 @@ fun FuelStatusCard(
     fuelHistory: List<Double> = emptyList(),
     providerBurnRates: List<ProviderBurnRateDisplay> = emptyList(),
     modelDrainRates: List<com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay> = emptyList(),
+    meteredByModel24h: List<com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -126,6 +127,7 @@ fun FuelStatusCard(
         Spacer(Modifier.height(12.dp))
         RecommenderStatusSection(
             modelDrainRates = modelDrainRates,
+            meteredByModel = meteredByModel24h,
             showHelp = showHelp,
         )
 
@@ -143,11 +145,13 @@ fun FuelStatusCard(
 
 /**
  * Shows honest recommender status: how much cost data has been collected
- * and what's needed before real recommendations are possible.
+ * and what's needed before real recommendations are possible. With 2+
+ * metered models, shows the switch recommendation with projected savings.
  */
 @Composable
 private fun RecommenderStatusSection(
     modelDrainRates: List<com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay>,
+    meteredByModel: List<com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay>,
     showHelp: Boolean,
 ) {
     Column {
@@ -165,8 +169,33 @@ private fun RecommenderStatusSection(
         }
         Spacer(Modifier.height(2.dp))
 
+        // Metered-first: exact token counts + published multipliers
+        val meteredRec = com.angussoftware.fueldashboard.presentation.UsageRecommender
+            .recommendSwitch(meteredByModel)
+        if (meteredRec != null) {
+            Text(
+                text = buildString {
+                    append("${meteredRec.fromModel} → ${meteredRec.toModel}: ")
+                    append("switching that traffic projects ")
+                    append("${(meteredRec.savingsFraction * 100).toInt()}% credit savings ")
+                    append("(24h: ${formatCredits(meteredRec.currentCreditCost)} → ")
+                    append("${formatCredits(meteredRec.projectedCreditCost)} cr). ")
+                    append("Switch via the agent's model menu — manual action.")
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
+            )
+            return@Column
+        }
+
         val modelsWithData = modelDrainRates.filter { it.sampleCount >= 10 }
         val statusText = when {
+            meteredByModel.isNotEmpty() -> {
+                val observed = meteredByModel.joinToString(", ") { "${it.label} (${it.requestCount} req)" }
+                "Metering $observed. Need 2+ models with usage to compare — " +
+                    "switch one agent to a different model to enable recommendations."
+            }
             modelDrainRates.isEmpty() -> {
                 "Gathering data — no model usage recorded yet. Check back in ~1 hour."
             }
@@ -188,6 +217,9 @@ private fun RecommenderStatusSection(
         )
     }
 }
+
+private fun formatCredits(credits: Double): String =
+    if (credits >= 1_000_000) "${(credits / 1_000_000).toInt()}M" else credits.toInt().toString()
 
 @Composable
 private fun RateWindowRow(br: ProviderBurnRateDisplay) {    val pct = br.currentPct?.roundToInt()
