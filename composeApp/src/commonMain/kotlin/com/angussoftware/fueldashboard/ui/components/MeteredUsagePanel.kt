@@ -205,10 +205,10 @@ private fun ConversationUsageRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = shortConvId(usage.conversationId),
+                text = usage.title ?: shortConvId(usage.conversationId),
                 style = MaterialTheme.typography.bodyMedium,
-                fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Medium,
+                maxLines = 1,
             )
             Text(
                 text = buildString {

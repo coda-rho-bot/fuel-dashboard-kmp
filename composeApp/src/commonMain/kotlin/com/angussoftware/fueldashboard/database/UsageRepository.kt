@@ -146,4 +146,13 @@ class UsageRepository(driver: SqlDriver) {
     fun cleanup(olderThanMs: Long = 90L * 24 * 3_600_000) { // 90 days default
         queries.deleteOldUsageRecords(epochMillis() - olderThanMs)
     }
+
+    /** Upserts one conversation title (id → human-readable summary). */
+    fun upsertConversationTitle(conversationId: String, title: String) {
+        queries.insertConversationTitle(conversationId, title, epochMillis())
+    }
+
+    /** All known conversation titles for display-time resolution. */
+    fun getConversationTitles(): Map<String, String> =
+        queries.selectAllConversationTitles().executeAsList().associate { it.conversation_id to it.title }
 }

@@ -286,18 +286,22 @@ fun main() = application {
                 ),
             )
         }
-        fun byConversation(since: Long) = usageRepo.getByConversationSince(since).map {
-            com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay(
-                conversationId = it.conversationId,
-                agentName = it.source,
-                model = it.model,
-                inputTokens = it.inputTokens,
-                outputTokens = it.outputTokens,
-                requestCount = it.requestCount,
-                creditCost = com.angussoftware.fueldashboard.presentation.zaiCreditCost(
-                    it.model, it.inputTokens, it.outputTokens,
-                ),
-            )
+        fun byConversation(since: Long): List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay> {
+            val titles = usageRepo.getConversationTitles()
+            return usageRepo.getByConversationSince(since).map {
+                com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay(
+                    conversationId = it.conversationId,
+                    agentName = it.source,
+                    model = it.model,
+                    inputTokens = it.inputTokens,
+                    outputTokens = it.outputTokens,
+                    requestCount = it.requestCount,
+                    creditCost = com.angussoftware.fueldashboard.presentation.zaiCreditCost(
+                        it.model, it.inputTokens, it.outputTokens,
+                    ),
+                    title = titles[it.conversationId],
+                )
+            }
         }
         fun byAgentModel(since: Long) = usageRepo.getByAgentModelSince(since).map {
             com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay(

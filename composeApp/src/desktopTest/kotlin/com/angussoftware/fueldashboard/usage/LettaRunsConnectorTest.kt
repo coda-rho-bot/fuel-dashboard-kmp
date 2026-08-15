@@ -46,6 +46,7 @@ class LettaRunsConnectorTest {
 
     private var currentRuns: String = ""
     private val usageBodies = mutableMapOf<String, String>()
+    private var conversationsBody: String = "[]"
     private val agentsJson = """
         [
           {"id":"agent-a","name":"Coda, Agent Conductor","llm_config":{"model":"glm-5.2"}},
@@ -85,6 +86,7 @@ class LettaRunsConnectorTest {
             when {
                 path.startsWith("/v1/runs?") -> currentRuns
                 path.startsWith("/v1/agents") -> agentsJson
+                path.startsWith("/v1/conversations") -> conversationsBody
                 path.startsWith("/v1/runs/run-") -> {
                     val runId = path.trimStart('/').split("/")[2] // v1/runs/{id}/usage
                     usageBodies[runId] ?: error("unknown run $runId")
@@ -199,5 +201,25 @@ class LettaRunsConnectorTest {
         assertEquals("glm-5.2", byConv[0].model)
         assertEquals("conv-3", byConv[1].conversationId)
         assertEquals("glm-4.7", byConv[1].model)
+    }
+
+    @Test
+    fun refreshMetadataStoresConversationTitles() = runBlocking {
+        conversationsBody = """
+            [
+              {"id":"conv-1","summary":"Aug 15 Todos"},
+              {"id":"conv-3","summary":"[Telegram] RhoMan\u00a2er"},
+              {"id":"conv-2","summary":null}
+            ]
+        """.trimIndent()
+
+        val c = connector()
+        c.refreshMetadata()
+
+        val titles = usageRepo.getConversationTitles()
+        assertEquals("Aug 15 Todos", titles["conv-1"])
+        assertEquals("[Telegram] RhoMan\u00a2er", titles["conv-3"])
+        // Null summaries are skipped — no title for conv-2
+        assertEquals(null, titles["conv-2"])
     }
 }

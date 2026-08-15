@@ -110,6 +110,8 @@ data class ConversationUsageDisplay(
     val requestCount: Long,
     /** Credit cost using z.ai GLM Coding Plan multipliers, if known. */
     val creditCost: Double? = null,
+    /** Human-readable conversation title, if known (falls back to shortened ID). */
+    val title: String? = null,
 )
 
 /** Metered usage for one agent × model combination — the cross-tab cell. */

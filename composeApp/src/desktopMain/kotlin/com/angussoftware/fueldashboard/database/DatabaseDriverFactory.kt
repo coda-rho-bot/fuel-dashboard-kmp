@@ -21,6 +21,7 @@ actual class DatabaseDriverFactory {
         ensureProviderFuelSnapshotsTable(driver)
         ensureUsageRecordsTable(driver)
         ensureUsageRecordsConversationColumn(driver)
+        ensureConversationTitlesTable(driver)
         ensureIngestedRunsTable(driver)
         ensureAgentModelHistoryTable(driver)
         return driver
@@ -166,6 +167,25 @@ actual class DatabaseDriverFactory {
             )
         } catch (e: Exception) {
             // Column already exists — this is expected on subsequent runs
+        }
+    }
+
+    /** Creates conversation_titles table on existing database files (migration). */
+    private fun ensureConversationTitlesTable(driver: SqlDriver) {
+        try {
+            driver.execute(
+                null,
+                """
+                CREATE TABLE IF NOT EXISTS conversation_titles (
+                    conversation_id TEXT NOT NULL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL
+                )
+                """.trimIndent(),
+                0,
+            )
+        } catch (e: Exception) {
+            // Table already exists or other non-fatal error
         }
     }
 }

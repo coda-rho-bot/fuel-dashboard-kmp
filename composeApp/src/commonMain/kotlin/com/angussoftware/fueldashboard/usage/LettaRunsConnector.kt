@@ -61,6 +61,12 @@ class LettaRunsConnector(
     )
 
     @Serializable
+    private data class LettaConversation(
+        val id: String,
+        val summary: String? = null,
+    )
+
+    @Serializable
     private data class LettaLlmConfig(
         val model: String? = null,
     )
@@ -139,9 +145,40 @@ class LettaRunsConnector(
             agentNames[agent.id] = name
             ingestionRepository.recordAgentModel(agent.id, name, model)
         }
+        refreshConversationTitles()
+    }
+
+    /**
+     * Fetches conversation summaries into the titles lookup so the UI can
+     * show human-readable names instead of raw conversation UUIDs. Titles
+     * are resolved at display time — no re-ingestion needed when they change.
+     */
+    private suspend fun refreshConversationTitles() {
+        var after: String? = null
+        for (page in 0 until CONVERSATION_TITLE_PAGES) {
+            val path = "/v1/conversations?limit=200" + (after?.let { "&after=$it" } ?: "")
+            val body = try {
+                httpFetch(path)
+            } catch (e: Exception) {
+                return // non-fatal: keep existing titles
+            }
+            val convs = try {
+                json.decodeFromString(ListSerializer(LettaConversation.serializer()), body)
+            } catch (e: Exception) {
+                return
+            }
+            if (convs.isEmpty()) break
+            for (conv in convs) {
+                val summary = conv.summary?.trim().takeUnless { it.isNullOrEmpty() } ?: continue
+                usageRepository.upsertConversationTitle(conv.id, summary)
+            }
+            after = convs.last().id
+            if (convs.size < 200) break
+        }
     }
 
     companion object {
         private const val RUNS_BATCH = 200
+        private const val CONVERSATION_TITLE_PAGES = 5 // up to 1000 conversations
     }
 }
