@@ -78,14 +78,21 @@ data class AcpAgentDisplay(
 /**
  * Panel that displays ACP-discovered agents with their models, modes, and status.
  *
+ * Models and permissions are PER-CONVERSATION in agent runtimes. This panel
+ * shows (a) the dashboard's live ACP session model for the agent, (b) what
+ * models the agent's conversations actually ran in the last 24h (metered),
+ * and (c) per-agent usage totals.
+ *
  * @param agents       list of agents to render
- * @param onModelChange invoked when the user picks a different model for an agent
- * @param onModeChange  invoked when the user picks a different mode for an agent
+ * @param onModelChange invoked when the user picks a different session model for an agent
+ * @param onModeChange  invoked when the user picks a different session mode for an agent
  * @param onRemoveAgent invoked when the user clicks the delete button on an agent card
  * @param onAddAgent    invoked when the user submits a manual agent configuration
  * @param syncData      current settings snapshot to share with another device
  * @param onImportSyncedSettings invoked when imported settings are confirmed
  * @param hasConnectedOrchestrator whether an Orchestrator provider is configured
+ * @param usageByAgentModel24h metered agent × model usage (last 24h) for honest model display
+ * @param usageByConversation24h metered per-conversation usage (last 24h) for conversation counts
  * @param modifier      outer modifier
  */
 @Composable
@@ -99,6 +106,8 @@ fun AgentPanel(
     onImportSyncedSettings: (SettingsSyncData) -> Unit,
     hasConnectedOrchestrator: Boolean,
     showHelp: Boolean = false,
+    usageByAgentModel24h: List<com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay> = emptyList(),
+    usageByConversation24h: List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
@@ -125,7 +134,7 @@ fun AgentPanel(
                 Text(text = "Agents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (showHelp) {
                     Spacer(Modifier.width(4.dp))
-                    HelpIcon("AI agents connected to the dashboard. Agents can self-register via MCP or be added manually. The dashboard monitors their model, mode, and status via ACP.")
+                    HelpIcon("AI agents connected to the dashboard. Models and permissions are per conversation — each card shows what its conversations actually ran (metered, 24h), plus the dashboard's live session model and mode.")
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -179,7 +188,21 @@ fun AgentPanel(
                 }
             }
         } else {
+            // Usage joins: metered agent × model rows keyed by normalized agent name.
+            // Metered `source` names are first names ("Coda"); ACP display names
+            // may be full ("Coda, Agent Conductor") — normalize both sides.
+            fun norm(s: String) = s.substringBefore(",").trim().lowercase()
+            val usageByName = usageByAgentModel24h.groupBy { norm(it.agentName) }
+            val convCountByAgentModel = usageByConversation24h
+                .groupBy { norm(it.agentName) to it.model }
+                .mapValues { (_, v) -> v.map { it.conversationId }.distinct().size }
+
             agents.forEach { agent ->
+                val key = norm(agent.name)
+                val usageRows = usageByName[key].orEmpty()
+                val convCounts = convCountByAgentModel
+                    .filterKeys { it.first == key }
+                    .mapKeys { it.key.second }
                 AgentCard(
                     agent = agent,
                     isExpanded = expandedStates[agent.id] ?: false,
@@ -190,6 +213,8 @@ fun AgentPanel(
                     onModeChange = onModeChange,
                     onRemoveAgent = onRemoveAgent,
                     showHelp = showHelp,
+                    usageRows24h = usageRows,
+                    conversationCountsByModel = convCounts,
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -523,18 +548,22 @@ private fun AgentCard(
     onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
     showHelp: Boolean = false,
+    usageRows24h: List<com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay> = emptyList(),
+    conversationCountsByModel: Map<String, Int> = emptyMap(),
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val isSyncedOnly = agent.status.equals("synced", ignoreCase = true)
+    val cardAlpha = if (isSyncedOnly) 0.55f else 1f
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = cardAlpha },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // --- Header row: name + lastSeen + expand arrow + status dot + delete ---
+            // --- Header row: name + kind badge + expand arrow + status dot + delete ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -549,6 +578,10 @@ private fun AgentCard(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
+                        if (isSyncedOnly) {
+                            Spacer(Modifier.width(6.dp))
+                            KindBadge(label = "config only")
+                        }
                         Spacer(Modifier.width(4.dp))
                         Icon(
                             imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -583,15 +616,26 @@ private fun AgentCard(
 
             Spacer(Modifier.height(8.dp))
 
-            // --- Model row (always visible) ---
+            // --- Models actually in use (metered, last 24h) — shown FIRST because
+            // --- it's the truthful picture: agents run different models per conversation.
+            if (usageRows24h.isNotEmpty()) {
+                UsageModelsRow(
+                    usageRows = usageRows24h,
+                    conversationCountsByModel = conversationCountsByModel,
+                    showHelp = showHelp,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+
+            // --- Session model (the dashboard's live ACP session with this agent) ---
             ModelRow(
-                currentModel = agent.currentModel,
+                currentModel = agent.currentModel?.takeUnless { it.equals("unknown", ignoreCase = true) },
                 availableModels = agent.availableModels,
                 onModelSelected = { model -> onModelChange(agent.id, model) },
                 showHelp = showHelp,
             )
 
-            // --- Mode row (only if modes are available) ---
+            // --- Session mode (only if modes are available) ---
             if (agent.availableModes.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 ModeRow(
@@ -647,6 +691,82 @@ private fun AgentCard(
                     Text("Cancel")
                 }
             },
+        )
+    }
+}
+
+/** Small badge distinguishing synced/config-only entries from live agents. */
+@Composable
+private fun KindBadge(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
+
+/**
+ * The truthful model picture: which models this agent's conversations
+ * actually ran in the last 24h, with tokens and conversation counts.
+ */
+@Composable
+private fun UsageModelsRow(
+    usageRows: List<com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay>,
+    conversationCountsByModel: Map<String, Int>,
+    showHelp: Boolean = false,
+) {
+    val totalTokens = usageRows.sumOf { it.inputTokens + it.outputTokens }
+    val totalRequests = usageRows.sumOf { it.requestCount }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Models in use · 24h",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon(
+                    "What this agent's conversations actually ran in the last 24h, metered from usage data. " +
+                        "Models and permissions are set per conversation — this is the honest picture, not a single config value.",
+                )
+            }
+        }
+        usageRows.forEach { row ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 1.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = row.model,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = buildString {
+                        append("${formatTokensCompact(row.inputTokens + row.outputTokens)} tokens")
+                        conversationCountsByModel[row.model]?.let { append(" · $it conv") }
+                        append(" · ${row.requestCount} req")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Text(
+            text = "Total 24h: ${formatTokensCompact(totalTokens)} tokens · $totalRequests requests",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp),
         )
     }
 }
@@ -714,13 +834,17 @@ private fun ModelRow(
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = "Model:",
+            text = "Session model:",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (showHelp) {
             Spacer(Modifier.width(4.dp))
-            HelpIcon("The LLM model this agent is currently using. Click to change from available models reported by the agent.")
+            HelpIcon(
+                "The model of this dashboard's live session with the agent. " +
+                    "Conversations run their own models (see 'Models in use' above) — " +
+                    "this switch only changes this session, not other conversations.",
+            )
         }
         Spacer(Modifier.width(6.dp))
 
@@ -784,13 +908,17 @@ private fun ModeRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = "Mode:",
+            text = "Session mode:",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (showHelp) {
             Spacer(Modifier.width(4.dp))
-            HelpIcon("Agent interaction mode (e.g., YOLO, Plan, Code). Controls how the agent handles permissions and autonomy.")
+            HelpIcon(
+                "The mode of this dashboard's live session with the agent. " +
+                    "Permissions and modes are per conversation in the agent runtime — " +
+                    "this only affects this session.",
+            )
         }
         Spacer(Modifier.width(6.dp))
         availableModes.forEach { mode ->

@@ -491,6 +491,8 @@ private fun AgentsTabContent(
                 onImportSyncedSettings = onImportSyncedSettings,
                 hasConnectedOrchestrator = state.hasConnectedApi,
                 showHelp = state.showHelp,
+                usageByAgentModel24h = state.meteredByAgentModel24h,
+                usageByConversation24h = state.meteredByConversation24h,
             )
         }
     }

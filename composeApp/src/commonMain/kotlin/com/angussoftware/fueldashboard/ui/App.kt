@@ -196,6 +196,8 @@ private fun DesktopLayout(
                 onImportSyncedSettings = viewModel::importSyncedSettings,
                 hasConnectedOrchestrator = state.hasConnectedApi,
                 showHelp = state.showHelp,
+                usageByAgentModel24h = state.meteredByAgentModel24h,
+                usageByConversation24h = state.meteredByConversation24h,
             )
 
             // Divider between agents and settings

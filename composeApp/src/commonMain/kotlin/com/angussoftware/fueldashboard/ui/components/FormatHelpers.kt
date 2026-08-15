@@ -36,3 +36,16 @@ fun formatLastUpdated(epochMs: Long): String {
     val local = Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(TimeZone.currentSystemDefault())
     return "Updated ${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}:${local.second.toString().padStart(2, '0')}"
 }
+
+/** Compact token count: 1.2K / 3.4M / 900. */
+fun formatTokensCompact(tokens: Long): String = when {
+    tokens >= 1_000_000 -> {
+        val m = tokens / 1_000_000.0
+        if (m >= 100) "${m.toInt()}M" else "%.1fM".format(m)
+    }
+    tokens >= 1_000 -> {
+        val k = tokens / 1_000.0
+        if (k >= 100) "${k.toInt()}K" else "%.1fK".format(k)
+    }
+    else -> tokens.toString()
+}
