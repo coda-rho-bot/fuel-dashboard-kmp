@@ -368,6 +368,8 @@ internal fun FuelColumnContent(
                         byModel7d = state.meteredByModel7d,
                         byConversation24h = state.meteredByConversation24h,
                         byConversation7d = state.meteredByConversation7d,
+                        byAgentModel24h = state.meteredByAgentModel24h,
+                        byAgentModel7d = state.meteredByAgentModel7d,
                     )
                 }
 

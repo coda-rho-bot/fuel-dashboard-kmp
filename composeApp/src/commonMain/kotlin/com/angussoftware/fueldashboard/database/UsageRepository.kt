@@ -37,6 +37,14 @@ data class UsageByConversation(
     val requestCount: Long,
 )
 
+data class UsageByAgentModel(
+    val source: String,
+    val model: String,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val requestCount: Long,
+)
+
 /**
  * Universal usage metering store.
  *
@@ -115,6 +123,18 @@ class UsageRepository(driver: SqlDriver) {
         queries.selectUsageByConversationSince(since).executeAsList().map { row ->
             UsageByConversation(
                 conversationId = row.conversation_id ?: "",
+                source = row.source,
+                model = row.model,
+                inputTokens = row.total_input ?: 0L,
+                outputTokens = row.total_output ?: 0L,
+                requestCount = row.total_requests ?: 0L,
+            )
+        }
+
+    /** Agent × model cross-tab totals since a cutoff. */
+    fun getByAgentModelSince(since: Long): List<UsageByAgentModel> =
+        queries.selectUsageByAgentModelSince(since).executeAsList().map { row ->
+            UsageByAgentModel(
                 source = row.source,
                 model = row.model,
                 inputTokens = row.total_input ?: 0L,

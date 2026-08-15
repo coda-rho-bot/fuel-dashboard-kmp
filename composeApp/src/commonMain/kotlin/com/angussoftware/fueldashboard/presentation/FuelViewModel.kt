@@ -112,6 +112,17 @@ data class ConversationUsageDisplay(
     val creditCost: Double? = null,
 )
 
+/** Metered usage for one agent × model combination — the cross-tab cell. */
+data class AgentModelUsageDisplay(
+    val agentName: String,
+    val model: String,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val requestCount: Long,
+    /** Credit cost using z.ai GLM Coding Plan multipliers, if known. */
+    val creditCost: Double? = null,
+)
+
 /** Aggregated metered usage over two display windows. */
 data class MeteredUsageWindows(
     val bySource24h: List<MeteredUsageDisplay>,
@@ -120,6 +131,8 @@ data class MeteredUsageWindows(
     val byModel7d: List<MeteredUsageDisplay>,
     val byConversation24h: List<ConversationUsageDisplay> = emptyList(),
     val byConversation7d: List<ConversationUsageDisplay> = emptyList(),
+    val byAgentModel24h: List<AgentModelUsageDisplay> = emptyList(),
+    val byAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
 )
 
 /**
@@ -215,6 +228,8 @@ data class DashboardState(
     val meteredByModel7d: List<MeteredUsageDisplay> = emptyList(),
     val meteredByConversation24h: List<ConversationUsageDisplay> = emptyList(),
     val meteredByConversation7d: List<ConversationUsageDisplay> = emptyList(),
+    val meteredByAgentModel24h: List<AgentModelUsageDisplay> = emptyList(),
+    val meteredByAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -950,6 +965,8 @@ class FuelViewModel {
             meteredByModel7d = metered?.byModel7d ?: emptyList(),
             meteredByConversation24h = metered?.byConversation24h ?: emptyList(),
             meteredByConversation7d = metered?.byConversation7d ?: emptyList(),
+            meteredByAgentModel24h = metered?.byAgentModel24h ?: emptyList(),
+            meteredByAgentModel7d = metered?.byAgentModel7d ?: emptyList(),
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel

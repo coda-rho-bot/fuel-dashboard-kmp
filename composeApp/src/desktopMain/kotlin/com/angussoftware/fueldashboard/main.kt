@@ -299,6 +299,18 @@ fun main() = application {
                 ),
             )
         }
+        fun byAgentModel(since: Long) = usageRepo.getByAgentModelSince(since).map {
+            com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay(
+                agentName = it.source,
+                model = it.model,
+                inputTokens = it.inputTokens,
+                outputTokens = it.outputTokens,
+                requestCount = it.requestCount,
+                creditCost = com.angussoftware.fueldashboard.presentation.zaiCreditCost(
+                    it.model, it.inputTokens, it.outputTokens,
+                ),
+            )
+        }
         com.angussoftware.fueldashboard.presentation.MeteredUsageWindows(
             bySource24h = bySource(window(24)),
             byModel24h = byModel(window(24)),
@@ -306,6 +318,8 @@ fun main() = application {
             byModel7d = byModel(window(24 * 7)),
             byConversation24h = byConversation(window(24)),
             byConversation7d = byConversation(window(24 * 7)),
+            byAgentModel24h = byAgentModel(window(24)),
+            byAgentModel7d = byAgentModel(window(24 * 7)),
         )
     }
 

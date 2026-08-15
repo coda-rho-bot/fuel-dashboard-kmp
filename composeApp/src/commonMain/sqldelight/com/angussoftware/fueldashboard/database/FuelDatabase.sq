@@ -132,6 +132,18 @@ WHERE timestamp >= :since AND conversation_id IS NOT NULL
 GROUP BY conversation_id, source, model
 ORDER BY SUM(input_tokens) DESC;
 
+selectUsageByAgentModelSince:
+SELECT
+    source,
+    model,
+    SUM(input_tokens) AS total_input,
+    SUM(output_tokens) AS total_output,
+    SUM(request_count) AS total_requests
+FROM usage_records
+WHERE timestamp >= :since
+GROUP BY source, model
+ORDER BY SUM(input_tokens) DESC;
+
 deleteOldUsageRecords:
 DELETE FROM usage_records WHERE timestamp < :cutoff;
 

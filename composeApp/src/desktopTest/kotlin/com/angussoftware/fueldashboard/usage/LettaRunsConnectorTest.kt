@@ -146,6 +146,25 @@ class LettaRunsConnectorTest {
     }
 
     @Test
+    fun agentModelCrossTabSplitsUsageByAgentAndModel() = runBlocking {
+        val c = connector()
+        c.refreshMetadata()
+
+        // agent-a switches models mid-window: run-1 on glm-5.2, run-3 on glm-4.7
+        nowMs = t0 + 90 * 60_000L
+        ingestionRepo.recordAgentModel("agent-a", "Coda", "glm-4.7")
+        c.poll()
+
+        val crossTab = usageRepo.getByAgentModelSince(0)
+            .associateBy { it.source to it.model }
+
+        // Coda × glm-5.2 → run-1's 1000 input tokens
+        assertEquals(1000L, crossTab["Coda" to "glm-5.2"]?.inputTokens)
+        // Coda × glm-4.7 → run-3's 3000 input tokens
+        assertEquals(3000L, crossTab["Coda" to "glm-4.7"]?.inputTokens)
+    }
+
+    @Test
     fun conversationIdIsStoredAndQueryable() = runBlocking {
         val c = connector()
         c.refreshMetadata()

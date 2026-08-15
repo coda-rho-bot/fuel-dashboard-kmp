@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay
 import com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay
+import com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay
 import kotlin.math.roundToInt
 
 /**
@@ -41,16 +42,20 @@ fun MeteredUsagePanel(
     byModel7d: List<MeteredUsageDisplay>,
     byConversation24h: List<ConversationUsageDisplay> = emptyList(),
     byConversation7d: List<ConversationUsageDisplay> = emptyList(),
+    byAgentModel24h: List<AgentModelUsageDisplay> = emptyList(),
+    byAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     if (bySource24h.isEmpty() && bySource7d.isEmpty() &&
-        byConversation24h.isEmpty() && byConversation7d.isEmpty()
+        byConversation24h.isEmpty() && byConversation7d.isEmpty() &&
+        byAgentModel24h.isEmpty() && byAgentModel7d.isEmpty()
     ) return
 
     var window7d by remember { mutableStateOf(false) }
     val bySource = if (window7d) bySource7d else bySource24h
     val byModel = if (window7d) byModel7d else byModel24h
     val byConversation = if (window7d) byConversation7d else byConversation24h
+    val byAgentModel = if (window7d) byAgentModel7d else byAgentModel24h
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -84,6 +89,22 @@ fun MeteredUsagePanel(
         )
         val maxSourceTokens = (bySource.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
         bySource.forEach { MeteredUsageRow(it, maxSourceTokens, showCost = false) }
+
+        if (byAgentModel.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "By agent × model",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.width(4.dp))
+                HelpIcon("Cost-accurate breakdown: each agent's tokens split by the model that ran them (models have different credit multipliers)")
+            }
+            val maxAgentModelTokens = (byAgentModel.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
+            byAgentModel.forEach { AgentModelUsageRow(it, maxAgentModelTokens) }
+        }
 
         Spacer(Modifier.height(10.dp))
         Text(
@@ -193,6 +214,54 @@ private fun ConversationUsageRow(
                 text = buildString {
                     append("${usage.agentName} · ${usage.model}")
                     append("  ·  ${formatTokens(usage.inputTokens)} in / ${formatTokens(usage.outputTokens)} out")
+                    append("  ·  ${usage.requestCount} req")
+                    usage.creditCost?.let { append("  ·  ${formatCredits(it)} cr") }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // Proportional bar
+        val inputFraction = (usage.inputTokens.toFloat() / maxTokens).coerceIn(0f, 1f)
+        val outputFraction = (usage.outputTokens.toFloat() / maxTokens).coerceIn(0f, 1f)
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(inputFraction)
+                    .height(6.dp)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+            Spacer(Modifier.width(2.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(outputFraction)
+                    .height(6.dp)
+                    .background(MaterialTheme.colorScheme.tertiary),
+            )
+        }
+    }
+    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+}
+
+@Composable
+private fun AgentModelUsageRow(
+    usage: AgentModelUsageDisplay,
+    maxTokens: Long,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${usage.agentName} · ${usage.model}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = buildString {
+                    append("${formatTokens(usage.inputTokens)} in / ${formatTokens(usage.outputTokens)} out")
                     append("  ·  ${usage.requestCount} req")
                     usage.creditCost?.let { append("  ·  ${formatCredits(it)} cr") }
                 },
