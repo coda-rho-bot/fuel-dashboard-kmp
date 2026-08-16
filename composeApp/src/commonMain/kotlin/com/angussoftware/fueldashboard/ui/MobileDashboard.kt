@@ -54,8 +54,9 @@ import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
-import com.angussoftware.fueldashboard.ui.components.DecisionLog
 import com.angussoftware.fueldashboard.ui.components.MeteredUsagePanel
+import com.angussoftware.fueldashboard.ui.components.FuelEventHistoryPanel
+import com.angussoftware.fueldashboard.ui.components.WasteDetectionPanel
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.ModelDrainRatesPanel
 import com.angussoftware.fueldashboard.ui.components.formatLastUpdated
@@ -73,7 +74,7 @@ import kotlinx.datetime.toLocalDateTime
 private enum class MobileTab(val label: String) {
     FUEL("Fuel"),
     AGENTS("Agents"),
-    DECISIONS("Decisions"),
+    INTEL("Intel"),
     SETTINGS("Settings"),
 }
 
@@ -128,7 +129,7 @@ fun MobileDashboard(
                 )
             }
 
-            MobileTab.DECISIONS -> {
+            MobileTab.INTEL -> {
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -137,6 +138,12 @@ fun MobileDashboard(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    // Fuel event timeline (drops, switches, recommendations)
+                    FuelEventHistoryPanel(events = state.fuelEvents)
+
+                    // Waste detection (unattributed drain)
+                    WasteDetectionPanel(windows = state.wasteWindows24h)
+
                     // Model consumption breakdown
                     if (state.modelDrainRates.isNotEmpty()) {
                         ModelDrainRatesPanel(rates = state.modelDrainRates)
@@ -154,11 +161,7 @@ fun MobileDashboard(
                         byAgentModel7d = state.meteredByAgentModel7d,
                     )
 
-                    // Decision history
-                    val decisions = state.decisions.decisions
-                    if (decisions.isNotEmpty()) {
-                        DecisionLog(decisions = decisions, showHelp = state.showHelp)
-                    } else if (state.modelDrainRates.isEmpty()) {
+                    if (state.fuelEvents.isEmpty() && state.modelDrainRates.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center,
@@ -202,7 +205,7 @@ fun MobileDashboard(
                             imageVector = when (tab) {
                                 MobileTab.FUEL -> Icons.Default.LocalGasStation
                                 MobileTab.AGENTS -> Icons.Default.Person
-                                MobileTab.DECISIONS -> Icons.Default.History
+                                MobileTab.INTEL -> Icons.Default.History
                                 MobileTab.SETTINGS -> Icons.Default.Settings
                             },
                             contentDescription = tab.label,

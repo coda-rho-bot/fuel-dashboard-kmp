@@ -67,4 +67,24 @@ class UsageIngestionRepository(
     /** Current open model mappings (agent_id → model). */
     fun openAgentModels(): Map<String, String> =
         queries.selectOpenAgentModels().executeAsList().associate { it.agent_id to it.model }
+
+    /** Full per-agent model timeline (ordered by agent, then start) — for switch detection. */
+    fun agentModelTimeline(): List<AgentModelPeriodRecord> =
+        queries.selectAgentModelTimeline().executeAsList().map { row ->
+            AgentModelPeriodRecord(
+                agentId = row.agent_id,
+                agentName = row.agent_name,
+                model = row.model,
+                validFrom = row.valid_from,
+                validTo = row.valid_to,
+            )
+        }
 }
+
+data class AgentModelPeriodRecord(
+    val agentId: String,
+    val agentName: String,
+    val model: String,
+    val validFrom: Long,
+    val validTo: Long?,
+)

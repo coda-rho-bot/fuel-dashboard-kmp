@@ -333,6 +333,39 @@ fun main() = application {
             .reversed()
     }
 
+    // Fuel Intelligence: waste windows + merged event timeline (roadmap Phase 4)
+    viewModel.onGetIntelligence = {
+        val now = com.angussoftware.fueldashboard.util.epochMillis()
+        val day = now - 24 * 3_600_000L
+        val week = now - 7 * 24 * 3_600_000L
+        val windows = com.angussoftware.fueldashboard.presentation.FuelIntelligence.wasteWindows(
+            snapshots = fuelSnapshotRepo.getSince(day),
+            usage = usageRepo.getSince(day),
+        )
+        val events = com.angussoftware.fueldashboard.presentation.FuelIntelligence.fuelEvents(
+            snapshots = fuelSnapshotRepo.getSince(week),
+            modelPeriods = usageIngestionRepo.agentModelTimeline().map {
+                com.angussoftware.fueldashboard.presentation.FuelIntelligence.AgentModelPeriod(
+                    agentName = it.agentName,
+                    model = it.model,
+                    validFrom = it.validFrom,
+                    validTo = it.validTo,
+                )
+            },
+            decisions = repository.getRecent(20).map {
+                com.angussoftware.fueldashboard.presentation.FuelIntelligence.DecisionRecord(
+                    timestamp = it.timestamp,
+                    modelHandle = it.modelHandle,
+                    reason = it.reason,
+                )
+            },
+        )
+        com.angussoftware.fueldashboard.presentation.IntelligenceData(
+            wasteWindows = windows,
+            fuelEvents = events,
+        )
+    }
+
     viewModel.onLogProviderSnapshots = { snapshots ->
         serverScope.launch {
             for (s in snapshots) {

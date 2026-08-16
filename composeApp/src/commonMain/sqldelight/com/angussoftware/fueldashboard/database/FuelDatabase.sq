@@ -220,3 +220,6 @@ SELECT model FROM agent_model_history WHERE agent_id = ? AND valid_from <= ? AND
 
 selectOpenAgentModels:
 SELECT * FROM agent_model_history WHERE valid_to IS NULL;
+
+selectAgentModelTimeline:
+SELECT * FROM agent_model_history ORDER BY agent_id, valid_from;

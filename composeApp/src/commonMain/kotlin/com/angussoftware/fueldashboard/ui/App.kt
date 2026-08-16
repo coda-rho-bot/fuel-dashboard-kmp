@@ -59,7 +59,8 @@ import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
-import com.angussoftware.fueldashboard.ui.components.DecisionLog
+import com.angussoftware.fueldashboard.ui.components.FuelEventHistoryPanel
+import com.angussoftware.fueldashboard.ui.components.WasteDetectionPanel
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.formatLastUpdated
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
@@ -360,6 +361,16 @@ internal fun FuelColumnContent(
                     }
                 }
 
+                // Fuel Intelligence: event timeline + waste detection (roadmap Phase 4)
+                item {
+                    Spacer(Modifier.height(4.dp))
+                    FuelEventHistoryPanel(events = state.fuelEvents)
+                }
+                item {
+                    Spacer(Modifier.height(4.dp))
+                    WasteDetectionPanel(windows = state.wasteWindows24h)
+                }
+
                 // Metered usage (exact token counts from usage sources)
                 item {
                     Spacer(Modifier.height(4.dp))
@@ -373,15 +384,6 @@ internal fun FuelColumnContent(
                         byAgentModel24h = state.meteredByAgentModel24h,
                         byAgentModel7d = state.meteredByAgentModel7d,
                     )
-                }
-
-                // Decisions (from connected API only)
-                val decisions = state.decisions.decisions
-                if (decisions.isNotEmpty()) {
-                    item {
-                        Spacer(Modifier.height(4.dp))
-                        DecisionLog(decisions = decisions, showHelp = state.showHelp)
-                    }
                 }
             }
         }

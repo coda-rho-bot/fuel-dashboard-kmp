@@ -137,6 +137,12 @@ data class MeteredUsageWindows(
     val byAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
 )
 
+/** Fuel Intelligence tab data — waste windows + merged event timeline. */
+data class IntelligenceData(
+    val wasteWindows: List<FuelIntelligence.WasteWindow> = emptyList(),
+    val fuelEvents: List<FuelIntelligence.FuelEvent> = emptyList(),
+)
+
 /**
  * z.ai GLM Coding Plan credit multipliers (per docs.z.ai/devpack/overview).
  * Credits = input×inputMult + output×outputMult (cached input charged at the
@@ -232,6 +238,8 @@ data class DashboardState(
     val meteredByConversation7d: List<ConversationUsageDisplay> = emptyList(),
     val meteredByAgentModel24h: List<AgentModelUsageDisplay> = emptyList(),
     val meteredByAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
+    val wasteWindows24h: List<FuelIntelligence.WasteWindow> = emptyList(),
+    val fuelEvents: List<FuelIntelligence.FuelEvent> = emptyList(),
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -432,6 +440,9 @@ class FuelViewModel {
      * Returns measured fuel consumption attributed to each model.
      */
     var onGetModelDrainRates: (() -> List<ModelDrainRateDisplay>)? = null
+
+    /** Fuel Intelligence data (waste windows + event timeline), or null when unavailable. */
+    var onGetIntelligence: (() -> IntelligenceData?)? = null
 
     /** Metered usage aggregates (from usage_records), 24h and 7d windows. */
     var onGetMeteredUsage: (() -> MeteredUsageWindows?)? = null
@@ -898,6 +909,7 @@ class FuelViewModel {
         // Compute per-provider burn rates
         val providerBurnRates = onGetProviderBurnRates?.invoke() ?: emptyList()
         val metered = onGetMeteredUsage?.invoke()
+        val intelligence = onGetIntelligence?.invoke()
 
         // Use primary provider for the legacy projection (backward compat)
         val realBurnRate = providerBurnRates.firstOrNull()?.burnRatePerHr
@@ -969,6 +981,8 @@ class FuelViewModel {
             meteredByConversation7d = metered?.byConversation7d ?: emptyList(),
             meteredByAgentModel24h = metered?.byAgentModel24h ?: emptyList(),
             meteredByAgentModel7d = metered?.byAgentModel7d ?: emptyList(),
+            wasteWindows24h = intelligence?.wasteWindows ?: emptyList(),
+            fuelEvents = intelligence?.fuelEvents ?: emptyList(),
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel
