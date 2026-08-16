@@ -9,7 +9,10 @@ import androidx.compose.runtime.setValue
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.theming.compose.ui.theme.AngusTheme
 import com.angussoftware.theming.compose.ui.theme.ThemeMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
@@ -20,13 +23,36 @@ actual fun DashboardTheme(
         ThemeMode.DARK -> true
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> {
-            // Poll the system theme so switches propagate while running
+            // Track the system theme so switches propagate while running
             // (Compose's isSystemInDarkTheme() always returns false on JVM).
+            // Primary path is event-driven: `gsettings monitor` emits a line the
+            // instant the setting changes (no polling delay). Fallback for
+            // non-GNOME environments without gsettings: poll every 30s.
             var systemDark by remember { mutableStateOf(isSystemDarkMode()) }
             LaunchedEffect(Unit) {
-                while (true) {
-                    delay(30_000)
-                    systemDark = isSystemDarkMode()
+                val monitor = try {
+                    ProcessBuilder("gsettings", "monitor", "org.gnome.desktop.interface", "color-scheme")
+                        .redirectErrorStream(true)
+                        .start()
+                } catch (_: Exception) {
+                    null
+                }
+                if (monitor == null) {
+                    // No gsettings — poll fallback
+                    while (true) {
+                        delay(30_000)
+                        systemDark = isSystemDarkMode()
+                    }
+                } else {
+                    // Kill the monitor process the moment this effect cancels
+                    // (unblocks the read and prevents a leaked process).
+                    coroutineContext[Job]?.invokeOnCompletion { monitor.destroyForcibly() }
+                    withContext(Dispatchers.IO) {
+                        monitor.inputStream.bufferedReader().forEachLine { line ->
+                            systemDark = line.contains("dark", ignoreCase = true) &&
+                                !line.contains("prefer-light", ignoreCase = true)
+                        }
+                    }
                 }
             }
             systemDark
