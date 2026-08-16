@@ -1,10 +1,15 @@
 package com.angussoftware.fueldashboard.ui.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.theming.compose.ui.theme.AngusTheme
 import com.angussoftware.theming.compose.ui.theme.ThemeMode
+import kotlinx.coroutines.delay
 import java.io.File
 
 @Composable
@@ -14,12 +19,29 @@ actual fun DashboardTheme(
     val darkTheme = when (ThemeController.themeMode) {
         ThemeMode.DARK -> true
         ThemeMode.LIGHT -> false
-        ThemeMode.SYSTEM -> remember { isSystemDarkMode() }
+        ThemeMode.SYSTEM -> {
+            // Poll the system theme so switches propagate while running
+            // (Compose's isSystemInDarkTheme() always returns false on JVM).
+            var systemDark by remember { mutableStateOf(isSystemDarkMode()) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(30_000)
+                    systemDark = isSystemDarkMode()
+                }
+            }
+            systemDark
+        }
     }
+    // Resolve the palette FROM the resolved dark/light state — community
+    // palettes (Gruvbox, Catppuccin, …) carry their own light/dark identity
+    // and ignore the darkTheme flag, so SYSTEM mode must pick the palette,
+    // not just the flag.
+    val colorTheme = ThemeController.colorThemeFor(darkTheme)
+    println("[DashboardTheme] mode=${ThemeController.themeMode} dark=$darkTheme palette=$colorTheme")
     AngusTheme(
         darkTheme = darkTheme,
         dynamicColor = false,
-        colorTheme = ThemeController.activeColorTheme,
+        colorTheme = colorTheme,
         content = content,
     )
 }

@@ -12,8 +12,8 @@ import com.angussoftware.theming.compose.ui.theme.initializeThemeMode
  *
  * Stores separate [lightColorTheme] and [darkColorTheme] selections so the user can
  * pick different color schemes for light and dark modes (matching the AngusSoftwareApp
- * pattern). The [activeColorTheme] property resolves which one to use based on the
- * current [themeMode].
+ * pattern). The [colorThemeFor] function resolves which one to use based on the
+ * current dark/light state.
  */
 object ThemeController {
 
@@ -51,19 +51,14 @@ object ThemeController {
     }
 
     /**
-     * The color theme that should actually be applied, resolved from [lightColorTheme]
-     * or [darkColorTheme] based on the current [themeMode].
-     *
-     * - LIGHT → [lightColorTheme]
-     * - DARK → [darkColorTheme]
-     * - SYSTEM → [darkColorTheme] (the actual light/dark resolution happens at render time)
+     * The color theme that should actually be applied, resolved from the
+     * current dark/light state. Platform DashboardTheme actuals resolve the
+     * dark/light state (from themeMode + system theme) and call this —
+     * community palettes carry their own light/dark identity, so the palette
+     * must be picked from the resolved state, not from themeMode alone.
      */
-    val activeColorTheme: ColorTheme
-        get() = when (themeMode) {
-            ThemeMode.LIGHT -> lightColorTheme
-            ThemeMode.DARK -> darkColorTheme
-            ThemeMode.SYSTEM -> darkColorTheme
-        }
+    fun colorThemeFor(darkTheme: Boolean): ColorTheme =
+        if (darkTheme) darkColorTheme else lightColorTheme
 
     fun updateLightColorTheme(theme: ColorTheme) {
         lightColorTheme = theme
