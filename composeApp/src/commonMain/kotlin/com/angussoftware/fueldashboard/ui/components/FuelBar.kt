@@ -70,7 +70,7 @@ fun FuelBar(
                     color = animatedColor,
                 )
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(3.dp))
         }
 
         // Background track
@@ -94,10 +94,34 @@ fun FuelBar(
 }
 
 fun fuelColor(pct: Int): Color {
-    return when {
-        pct > 50 -> Color(0xFF4CAF50)  // green
-        pct > 25 -> Color(0xFFFFC107)  // yellow
-        pct > 10 -> Color(0xFFFF9800)  // orange
-        else -> Color(0xFFEF5350)      // red
+    val clamped = pct.coerceIn(0, 100)
+
+    // Material Design palette endpoints
+    // 100% → Green 500  (0.29, 0.69, 0.31)
+    //  50% → Amber 500  (1.00, 0.76, 0.03)
+    //   0% → Red 400    (0.94, 0.33, 0.31)
+
+    val green = floatArrayOf(0.29f, 0.69f, 0.31f)
+    val amber = floatArrayOf(1.00f, 0.76f, 0.03f)
+    val red = floatArrayOf(0.94f, 0.33f, 0.31f)
+
+    val target = if (clamped >= 50) {
+        // Interpolate green → amber (100% → 50%)
+        val t = (100 - clamped) / 50f
+        floatArrayOf(
+            green[0] + (amber[0] - green[0]) * t,
+            green[1] + (amber[1] - green[1]) * t,
+            green[2] + (amber[2] - green[2]) * t,
+        )
+    } else {
+        // Interpolate amber → red (50% → 0%)
+        val t = (50 - clamped) / 50f
+        floatArrayOf(
+            amber[0] + (red[0] - amber[0]) * t,
+            amber[1] + (red[1] - amber[1]) * t,
+            amber[2] + (red[2] - amber[2]) * t,
+        )
     }
+
+    return Color(target[0], target[1], target[2])
 }
