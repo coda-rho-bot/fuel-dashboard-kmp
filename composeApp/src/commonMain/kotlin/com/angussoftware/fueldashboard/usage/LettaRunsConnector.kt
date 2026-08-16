@@ -2,6 +2,9 @@ package com.angussoftware.fueldashboard.usage
 
 import com.angussoftware.fueldashboard.database.UsageIngestionRepository
 import com.angussoftware.fueldashboard.database.UsageRepository
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -64,6 +67,8 @@ class LettaRunsConnector(
     private data class LettaConversation(
         val id: String,
         val summary: String? = null,
+        val agent_id: String? = null,
+        val created_at: String? = null,
     )
 
     @Serializable
@@ -152,6 +157,10 @@ class LettaRunsConnector(
      * Fetches conversation summaries into the titles lookup so the UI can
      * show human-readable names instead of raw conversation UUIDs. Titles
      * are resolved at display time — no re-ingestion needed when they change.
+     *
+     * Most conversations have no server-side summary, so a fallback label
+     * is derived from the owning agent's name and the creation date
+     * ("Beacon · Aug 15") — still far more readable than a UUID.
      */
     private suspend fun refreshConversationTitles() {
         var after: String? = null
@@ -169,12 +178,30 @@ class LettaRunsConnector(
             }
             if (convs.isEmpty()) break
             for (conv in convs) {
-                val summary = conv.summary?.trim().takeUnless { it.isNullOrEmpty() } ?: continue
-                usageRepository.upsertConversationTitle(conv.id, summary)
+                val summary = conv.summary?.trim().takeUnless { it.isNullOrEmpty() }
+                val title = summary ?: fallbackTitle(conv.agent_id, conv.created_at)
+                usageRepository.upsertConversationTitle(conv.id, title)
             }
             after = convs.last().id
             if (convs.size < 200) break
         }
+    }
+
+    /** "Beacon · Aug 15" for summary-less conversations; null when nothing is known. */
+    private fun fallbackTitle(agentId: String?, createdAt: String?): String {
+        val agent = agentId?.let { agentNames[it] } ?: "conversation"
+        val date = createdAt?.let { ts ->
+            runCatching {
+                Instant.parse(ts).toLocalDateTime(TimeZone.currentSystemDefault())
+                    .let { "${monthShort(it.monthNumber)} ${it.dayOfMonth}" }
+            }.getOrNull()
+        }
+        return if (date != null) "$agent · $date" else agent
+    }
+
+    private fun monthShort(month: Int): String = when (month) {
+        1 -> "Jan"; 2 -> "Feb"; 3 -> "Mar"; 4 -> "Apr"; 5 -> "May"; 6 -> "Jun"
+        7 -> "Jul"; 8 -> "Aug"; 9 -> "Sep"; 10 -> "Oct"; 11 -> "Nov"; else -> "Dec"
     }
 
     companion object {

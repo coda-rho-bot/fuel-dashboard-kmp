@@ -134,7 +134,7 @@ fun AgentPanel(
                 Text(text = "Agents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (showHelp) {
                     Spacer(Modifier.width(4.dp))
-                    HelpIcon("AI agents connected to the dashboard. Models and permissions are per conversation — each card shows what its conversations actually ran (metered, 24h), plus the dashboard's live session model and mode.")
+                    HelpIcon("AI agents connected to the dashboard. There is no single agent model or permission set — models and permissions are per conversation. Each card shows what its conversations actually ran (metered, 24h); expand a card for dashboard session controls and details.")
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -616,33 +616,20 @@ private fun AgentCard(
 
             Spacer(Modifier.height(8.dp))
 
-            // --- Models actually in use (metered, last 24h) — shown FIRST because
-            // --- it's the truthful picture: agents run different models per conversation.
+            // --- Models actually in use (metered, last 24h) — the truthful
+            // --- picture: agents run different models per conversation.
             if (usageRows24h.isNotEmpty()) {
                 UsageModelsRow(
                     usageRows = usageRows24h,
                     conversationCountsByModel = conversationCountsByModel,
                     showHelp = showHelp,
                 )
-                Spacer(Modifier.height(8.dp))
-            }
-
-            // --- Session model (the dashboard's live ACP session with this agent) ---
-            ModelRow(
-                currentModel = agent.currentModel?.takeUnless { it.equals("unknown", ignoreCase = true) },
-                availableModels = agent.availableModels,
-                onModelSelected = { model -> onModelChange(agent.id, model) },
-                showHelp = showHelp,
-            )
-
-            // --- Session mode (only if modes are available) ---
-            if (agent.availableModes.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                ModeRow(
-                    currentMode = agent.currentMode,
-                    availableModes = agent.availableModes,
-                    onModeSelected = { mode -> onModeChange(agent.id, mode) },
-                    showHelp = showHelp,
+            } else if (!isSyncedOnly) {
+                Text(
+                    text = "No metered usage in the last 24h — models are set per conversation; " +
+                        "there's no single \"agent model\".",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -653,6 +640,26 @@ private fun AgentCard(
                 exit = shrinkVertically(),
             ) {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
+                    // Dashboard ACP session controls — these change only the
+                    // dashboard's live session, NOT any agent-wide config
+                    // (agents don't have one: models and permissions are
+                    // per conversation). Kept here for session launching.
+                    ModelRow(
+                        currentModel = agent.currentModel?.takeUnless { it.equals("unknown", ignoreCase = true) },
+                        availableModels = agent.availableModels,
+                        onModelSelected = { model -> onModelChange(agent.id, model) },
+                        showHelp = showHelp,
+                    )
+                    if (agent.availableModes.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        ModeRow(
+                            currentMode = agent.currentMode,
+                            availableModes = agent.availableModes,
+                            onModeSelected = { mode -> onModeChange(agent.id, mode) },
+                            showHelp = showHelp,
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
                     agent.framework?.let { fw ->
                         DetailRow(label = "Framework", value = fw)
                     }
@@ -834,16 +841,16 @@ private fun ModelRow(
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = "Session model:",
+            text = "Start dashboard session with model:",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (showHelp) {
             Spacer(Modifier.width(4.dp))
             HelpIcon(
-                "The model of this dashboard's live session with the agent. " +
-                    "Conversations run their own models (see 'Models in use' above) — " +
-                    "this switch only changes this session, not other conversations.",
+                "Sets the model for a NEW dashboard session with this agent. " +
+                    "There is no agent-wide model — existing conversations keep their own. " +
+                    "See 'Models in use' on the card for what conversations actually run.",
             )
         }
         Spacer(Modifier.width(6.dp))
@@ -908,16 +915,16 @@ private fun ModeRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = "Session mode:",
+            text = "Start dashboard session with mode:",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (showHelp) {
             Spacer(Modifier.width(4.dp))
             HelpIcon(
-                "The mode of this dashboard's live session with the agent. " +
-                    "Permissions and modes are per conversation in the agent runtime — " +
-                    "this only affects this session.",
+                "Sets the permission mode for a NEW dashboard session with this agent. " +
+                    "Permissions are per conversation in the agent runtime — " +
+                    "existing conversations keep their own.",
             )
         }
         Spacer(Modifier.width(6.dp))

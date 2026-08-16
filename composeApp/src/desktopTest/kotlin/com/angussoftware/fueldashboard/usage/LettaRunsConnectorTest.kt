@@ -209,7 +209,8 @@ class LettaRunsConnectorTest {
             [
               {"id":"conv-1","summary":"Aug 15 Todos"},
               {"id":"conv-3","summary":"[Telegram] RhoMan\u00a2er"},
-              {"id":"conv-2","summary":null}
+              {"id":"conv-2","summary":null,"agent_id":"agent-a","created_at":"2026-08-15T12:00:00Z"},
+              {"id":"conv-4","summary":null,"agent_id":null,"created_at":null}
             ]
         """.trimIndent()
 
@@ -219,7 +220,9 @@ class LettaRunsConnectorTest {
         val titles = usageRepo.getConversationTitles()
         assertEquals("Aug 15 Todos", titles["conv-1"])
         assertEquals("[Telegram] RhoMan\u00a2er", titles["conv-3"])
-        // Null summaries are skipped — no title for conv-2
-        assertEquals(null, titles["conv-2"])
+        // Null summaries get an agent · date fallback (needs agent metadata loaded first)
+        assertEquals("Coda · Aug 15", titles["conv-2"])
+        // Unknown agent + no date → generic label
+        assertEquals("conversation", titles["conv-4"])
     }
 }
