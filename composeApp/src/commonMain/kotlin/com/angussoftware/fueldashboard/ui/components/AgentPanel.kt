@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.QrCode2
@@ -48,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.ui.rememberQrScanner
@@ -839,62 +843,82 @@ private fun ModelRow(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = "Start dashboard session with model:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (showHelp) {
-            Spacer(Modifier.width(4.dp))
-            HelpIcon(
-                "Sets the model for a NEW dashboard session with this agent. " +
-                    "There is no agent-wide model — existing conversations keep their own. " +
-                    "See 'Models in use' on the card for what conversations actually run.",
+    Column {
+        // Label on its own line — never competes with the selector for width
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Start dashboard session with model:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        Spacer(Modifier.width(6.dp))
-
-        if (availableModels.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable { expanded = true }
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = currentModel ?: "\u2014",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.width(2.dp))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "Change model",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(16.dp)
-                        .graphicsLayer { rotationZ = if (expanded) 90f else 0f },
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon(
+                    "Sets the model for a NEW dashboard session with this agent. " +
+                        "There is no agent-wide model — existing conversations keep their own. " +
+                        "See 'Models in use' on the card for what conversations actually run.",
                 )
             }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-            ) {
-                availableModels.forEach { model ->
-                    DropdownMenuItem(
-                        text = { Text(model, style = MaterialTheme.typography.bodyMedium) },
-                        onClick = {
-                            onModelSelected(model)
-                            expanded = false
-                        },
+        }
+        Spacer(Modifier.height(4.dp))
+
+        if (availableModels.isNotEmpty()) {
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { expanded = true }
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (currentModel != null) {
+                            Text(
+                                text = "current",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            text = currentModel ?: "not set (agent default)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Choose model",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
                     )
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                ) {
+                    availableModels.forEach { model ->
+                        DropdownMenuItem(
+                            text = { Text(model, style = MaterialTheme.typography.bodyMedium) },
+                            trailingIcon = if (model == currentModel) {
+                                { Icon(Icons.Default.Check, contentDescription = "Current", modifier = Modifier.size(16.dp)) }
+                            } else {
+                                null
+                            },
+                            onClick = {
+                                onModelSelected(model)
+                                expanded = false
+                            },
+                        )
+                    }
                 }
             }
         } else {
             Text(
-                text = currentModel ?: "\u2014",
+                text = currentModel ?: "—",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
@@ -906,6 +930,7 @@ private fun ModelRow(
 // Mode Row (selector chips)
 // ---------------------------------------------------------------------------
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ModeRow(
     currentMode: String?,
@@ -913,28 +938,45 @@ private fun ModeRow(
     onModeSelected: (String) -> Unit,
     showHelp: Boolean = false,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = "Start dashboard session with mode:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (showHelp) {
-            Spacer(Modifier.width(4.dp))
-            HelpIcon(
-                "Sets the permission mode for a NEW dashboard session with this agent. " +
-                    "Permissions are per conversation in the agent runtime — " +
-                    "existing conversations keep their own.",
+    Column {
+        // Label on its own line
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Start dashboard session with mode:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (showHelp) {
+                Spacer(Modifier.width(4.dp))
+                HelpIcon(
+                    "Sets the permission mode for a NEW dashboard session with this agent. " +
+                        "Permissions are per conversation in the agent runtime — " +
+                        "existing conversations keep their own.",
+                )
+            }
+        }
+        if (currentMode != null) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "current: $currentMode",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
             )
         }
-        Spacer(Modifier.width(6.dp))
-        availableModes.forEach { mode ->
-            ModeChip(
-                label = mode,
-                isSelected = mode == currentMode,
-                onClick = { onModeSelected(mode) },
-            )
-            Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.height(6.dp))
+        // Chips wrap instead of squishing
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            availableModes.forEach { mode ->
+                ModeChip(
+                    label = mode,
+                    isSelected = mode == currentMode,
+                    onClick = { onModeSelected(mode) },
+                )
+            }
         }
     }
 }
@@ -956,17 +998,30 @@ private fun ModeChip(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        color = contentColor,
-        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .background(containerColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),
-    )
+    ) {
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(3.dp))
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = contentColor,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------
