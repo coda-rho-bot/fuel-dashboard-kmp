@@ -30,7 +30,7 @@ steps:
       event: pull_request
     commands:
       - apk add --no-cache git bash
-      - git clone https://x-access-token:${GPR_TOKEN}@github.com/RhoMancer/ci-scripts.git /tmp/ci-scripts
+      - git clone https://git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
       - bash /tmp/ci-scripts/scripts/validate-commits.sh "origin/main...HEAD"
 
   auto-tag:
@@ -40,6 +40,6 @@ steps:
       branch: [main, master]
     commands:
       - apk add --no-cache git bash curl
-      - git clone https://x-access-token:${GPR_TOKEN}@github.com/RhoMancer/ci-scripts.git /tmp/ci-scripts
+      - git clone https://git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
       - git fetch --tags "https://x-access-token:${GPR_TOKEN}@github.com/RhoMancer/fuel-dashboard-kmp.git" 2>&1 || true
       - REPO=RhoMancer/fuel-dashboard-kmp sh /tmp/ci-scripts/scripts/auto-tag.sh
