@@ -189,6 +189,30 @@ class LettaRunsConnector(
     }
 
     /**
+     * Fetches titles for the given conversation IDs directly (bounded) and
+     * upserts them. Called at display-build time when a panel result contains
+     * conversations the bulk/backfill passes haven't titled yet — closes the
+     * "raw ID until next metadata cycle" lag for newly-active conversations.
+     */
+    override suspend fun ensureConversationTitles(conversationIds: List<String>) {
+        val known = usageRepository.getConversationTitles().keys
+        for (id in conversationIds.distinct().filter { it !in known }.take(TITLE_BACKFILL_BATCH)) {
+            val body = try {
+                httpFetch("/v1/conversations/$id")
+            } catch (e: Exception) {
+                continue
+            }
+            val conv = try {
+                json.decodeFromString(LettaConversation.serializer(), body)
+            } catch (e: Exception) {
+                continue
+            }
+            val summary = conv.summary?.trim().takeUnless { it.isNullOrEmpty() }
+            usageRepository.upsertConversationTitle(conv.id, summary ?: fallbackTitle(conv.agent_id, conv.created_at))
+        }
+    }
+
+    /**
      * The /v1/conversations list is unreliable for full coverage (thousands of
      * migration-era conversations bury recent ones beyond the page window —
      * observed: a top-usage conversation absent from 8 pages but fetchable

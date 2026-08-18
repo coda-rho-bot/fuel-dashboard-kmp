@@ -93,6 +93,12 @@ class UsageIngestionManager(
         }
     }
 
+    /** Delegates display-time title gap-fill to connectors (fire-and-forget safe). */
+    suspend fun ensureConversationTitles(conversationIds: List<String>) {
+        if (conversationIds.isEmpty()) return
+        connectors.forEach { it.ensureConversationTitles(conversationIds) }
+    }
+
     fun stop() {
         managerScope?.launch { } // no-op; loop exits with scope cancellation
         managerScope = null

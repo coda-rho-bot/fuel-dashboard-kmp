@@ -280,7 +280,14 @@ fun main() = application {
         }
         fun byConversation(since: Long): List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay> {
             val titles = usageRepo.getConversationTitles()
-            return usageRepo.getByConversationSince(since).map {
+            val rows = usageRepo.getByConversationSince(since)
+            // Display-time gap fill: conversations the bulk/backfill passes haven't
+            // titled yet get fetched by ID in the background — next poll shows them.
+            val missing = rows.map { it.conversationId }.filter { it !in titles }.distinct()
+            if (missing.isNotEmpty()) {
+                serverScope.launch { usageIngestion.ensureConversationTitles(missing) }
+            }
+            return rows.map {
                 com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay(
                     conversationId = it.conversationId,
                     agentName = it.source,

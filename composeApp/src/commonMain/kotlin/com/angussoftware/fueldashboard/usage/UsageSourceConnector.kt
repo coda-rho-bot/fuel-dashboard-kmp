@@ -29,6 +29,9 @@ interface UsageSourceConnector {
     /** Refreshes platform-side metadata (e.g. agent→model mappings). */
     suspend fun refreshMetadata() {}
 
+    /** Ensures titles exist for the given conversations (display-time gap fill). */
+    suspend fun ensureConversationTitles(conversationIds: List<String>) {}
+
     data class PollResult(
         val recordsIngested: Int,
         val errors: List<String> = emptyList(),
