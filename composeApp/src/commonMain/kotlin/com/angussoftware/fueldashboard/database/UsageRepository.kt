@@ -155,4 +155,8 @@ class UsageRepository(driver: SqlDriver) {
     /** All known conversation titles for display-time resolution. */
     fun getConversationTitles(): Map<String, String> =
         queries.selectAllConversationTitles().executeAsList().associate { it.conversation_id to it.title }
+
+    /** Usage-recorded conversations that have no title yet (for targeted gap-fill). */
+    fun getUntitledUsageConversations(limit: Int = 50): List<String> =
+        queries.selectUntitledUsageConversations(limit.toLong()).executeAsList()
 }

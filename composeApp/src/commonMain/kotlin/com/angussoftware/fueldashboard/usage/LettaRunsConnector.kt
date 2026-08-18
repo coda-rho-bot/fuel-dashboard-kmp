@@ -185,6 +185,33 @@ class LettaRunsConnector(
             after = convs.last().id
             if (convs.size < 200) break
         }
+        backfillMissingTitles()
+    }
+
+    /**
+     * The /v1/conversations list is unreliable for full coverage (thousands of
+     * migration-era conversations bury recent ones beyond the page window —
+     * observed: a top-usage conversation absent from 8 pages but fetchable
+     * directly). Conversations with usage records but no title get fetched
+     * by ID — bounded per cycle so consecutive cycles converge.
+     */
+    private suspend fun backfillMissingTitles() {
+        val missing = usageRepository.getUntitledUsageConversations(limit = TITLE_BACKFILL_BATCH)
+        for (convId in missing) {
+            val body = try {
+                httpFetch("/v1/conversations/$convId")
+            } catch (e: Exception) {
+                continue // non-fatal: try again next cycle
+            }
+            val conv = try {
+                json.decodeFromString(LettaConversation.serializer(), body)
+            } catch (e: Exception) {
+                continue
+            }
+            val summary = conv.summary?.trim().takeUnless { it.isNullOrEmpty() }
+            val title = summary ?: fallbackTitle(conv.agent_id, conv.created_at)
+            usageRepository.upsertConversationTitle(conv.id, title)
+        }
     }
 
     /** "Beacon · Aug 15" for summary-less conversations; null when nothing is known. */
@@ -207,5 +234,6 @@ class LettaRunsConnector(
     companion object {
         private const val RUNS_BATCH = 200
         private const val CONVERSATION_TITLE_PAGES = 5 // up to 1000 conversations
+        private const val TITLE_BACKFILL_BATCH = 50 // direct-ID fetches per cycle
     }
 }

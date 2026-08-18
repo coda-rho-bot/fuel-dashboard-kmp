@@ -159,6 +159,13 @@ INSERT OR REPLACE INTO conversation_titles (conversation_id, title, updated_at) 
 selectAllConversationTitles:
 SELECT conversation_id, title FROM conversation_titles;
 
+selectUntitledUsageConversations:
+SELECT DISTINCT conversation_id
+FROM usage_records
+WHERE conversation_id IS NOT NULL
+  AND conversation_id NOT IN (SELECT conversation_id FROM conversation_titles)
+LIMIT :limit;
+
 CREATE TABLE model_drain_rates (
     model TEXT NOT NULL PRIMARY KEY,
     total_fuel_consumed REAL NOT NULL DEFAULT 0,

@@ -47,6 +47,7 @@ class LettaRunsConnectorTest {
     private var currentRuns: String = ""
     private val usageBodies = mutableMapOf<String, String>()
     private var conversationsBody: String = "[]"
+    private var conversationById: Map<String, String> = emptyMap()
     private val agentsJson = """
         [
           {"id":"agent-a","name":"Coda, Agent Conductor","llm_config":{"model":"glm-5.2"}},
@@ -86,6 +87,8 @@ class LettaRunsConnectorTest {
             when {
                 path.startsWith("/v1/runs?") -> currentRuns
                 path.startsWith("/v1/agents") -> agentsJson
+                path.startsWith("/v1/conversations/") ->
+                    conversationById[path.substringAfterLast('/')] ?: error("unknown conversation ${path.substringAfterLast('/')}")
                 path.startsWith("/v1/conversations") -> conversationsBody
                 path.startsWith("/v1/runs/run-") -> {
                     val runId = path.trimStart('/').split("/")[2] // v1/runs/{id}/usage
@@ -224,5 +227,31 @@ class LettaRunsConnectorTest {
         assertEquals("Coda · Aug 15", titles["conv-2"])
         // Unknown agent + no date → generic label
         assertEquals("conversation", titles["conv-4"])
+    }
+
+    @Test
+    fun backfillsTitlesForUsageConversationsMissingFromList() = runBlocking {
+        // The list returns nothing (observed: top-usage conversations absent
+        // from list pagination entirely); the usage records carry the ID.
+        usageRepo.insert(
+            timestamp = 1_000L,
+            source = "Coda",
+            model = "glm-5.2",
+            inputTokens = 100,
+            outputTokens = 10,
+            conversationId = "conv-missing",
+        )
+        conversationsBody = "[]"
+        conversationById = mapOf(
+            "conv-missing" to """
+                {"id":"conv-missing","summary":"Fuel Dashboard","agent_id":"agent-a","created_at":"2026-08-12T22:47:23Z"}
+            """.trimIndent(),
+        )
+
+        val c = connector()
+        c.refreshMetadata()
+
+        val titles = usageRepo.getConversationTitles()
+        assertEquals("Fuel Dashboard", titles["conv-missing"])
     }
 }
