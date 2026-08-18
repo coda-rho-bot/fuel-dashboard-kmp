@@ -141,6 +141,7 @@ data class MeteredUsageWindows(
 data class IntelligenceData(
     val wasteWindows: List<FuelIntelligence.WasteWindow> = emptyList(),
     val fuelEvents: List<FuelIntelligence.FuelEvent> = emptyList(),
+    val advice: FuelAdvisor.Advice? = null,
 )
 
 /**
@@ -162,6 +163,10 @@ object ZaiCreditMultipliers {
     )
 
     fun known(model: String): Boolean = normalize(model) in models
+
+    /** Cheapest known model (for routine-work downgrade projections). */
+    fun cheapestKnown(): String? =
+        models.entries.minByOrNull { it.value.input }?.key
 
     fun normalize(model: String): String = model.trim().lowercase()
 
@@ -240,6 +245,7 @@ data class DashboardState(
     val meteredByAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
     val wasteWindows24h: List<FuelIntelligence.WasteWindow> = emptyList(),
     val fuelEvents: List<FuelIntelligence.FuelEvent> = emptyList(),
+    val fuelAdvice: FuelAdvisor.Advice? = null,
 ) {
     /** All configured providers (have enough info to poll). */
     val activeProviders: List<ProviderConfig>
@@ -981,6 +987,7 @@ class FuelViewModel {
             meteredByAgentModel7d = metered?.byAgentModel7d ?: emptyList(),
             wasteWindows24h = intelligence?.wasteWindows ?: emptyList(),
             fuelEvents = intelligence?.fuelEvents ?: emptyList(),
+            fuelAdvice = intelligence?.advice,
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel

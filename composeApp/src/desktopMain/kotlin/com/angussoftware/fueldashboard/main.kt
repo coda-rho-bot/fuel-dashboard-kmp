@@ -341,6 +341,24 @@ fun main() = application {
             snapshots = fuelSnapshotRepo.getSince(day),
             usage = usageRepo.getSince(day),
         )
+        // Fuel Advisor v3: regime from 7d snapshots, routine classification from 7d usage
+        val snapshots7d = fuelSnapshotRepo.getSince(week)
+        val usage7d = usageRepo.getSince(week)
+        val resetAt = snapshots7d.mapNotNull { it.resetAt }.maxOrNull()
+        val titles = usageRepo.getConversationTitles()
+        val rawAdvice = com.angussoftware.fueldashboard.presentation.FuelAdvisor.advise(
+            snapshots = snapshots7d,
+            usage = usage7d,
+            now = now,
+            resetAt = resetAt,
+        )
+        val advice = when (rawAdvice) {
+            is com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice.AtRisk ->
+                rawAdvice.copy(routineConsumers = rawAdvice.routineConsumers.map { it.copy(title = titles[it.conversationKey]) })
+            is com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice.PersistentPressure ->
+                rawAdvice.copy(routineConsumers = rawAdvice.routineConsumers.map { it.copy(title = titles[it.conversationKey]) })
+            else -> rawAdvice
+        }
         val events = com.angussoftware.fueldashboard.presentation.FuelIntelligence.fuelEvents(
             snapshots = fuelSnapshotRepo.getSince(week),
             modelPeriods = usageIngestionRepo.agentModelTimeline().map {
@@ -362,6 +380,7 @@ fun main() = application {
         com.angussoftware.fueldashboard.presentation.IntelligenceData(
             wasteWindows = windows,
             fuelEvents = events,
+            advice = advice,
         )
     }
 

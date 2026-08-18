@@ -47,6 +47,7 @@ fun FuelStatusCard(
     modelDrainRates: List<com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay> = emptyList(),
     meteredByModel24h: List<com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay> = emptyList(),
     meteredByConversation24h: List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay> = emptyList(),
+    advice: com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -124,12 +125,10 @@ fun FuelStatusCard(
             creditPools.forEach { br -> CreditPoolRow(br) }
         }
 
-        // Recommender status — honest about data collection progress
+        // Fuel advisor — regime-aware advice (v3)
         Spacer(Modifier.height(12.dp))
-        RecommenderStatusSection(
-            modelDrainRates = modelDrainRates,
-            meteredByModel = meteredByModel24h,
-            meteredByConversation = meteredByConversation24h,
+        AdvisorSection(
+            advice = advice,
             showHelp = showHelp,
         )
 
@@ -146,107 +145,120 @@ fun FuelStatusCard(
 }
 
 /**
- * Shows honest recommender status: how much cost data has been collected
- * and what's needed before real recommendations are possible. With 2+
- * metered models, shows the switch recommendation with projected savings.
+ * Fuel Advisor v3 — advice that considers quota history, reset timing, and
+ * routine-vs-interactive work. Only recommends action when the quota regime
+ * justifies it (persistent exhaustion or an at-risk window), and only ever
+ * for routine work — interactive sessions keep the smart model.
  */
 @Composable
-private fun RecommenderStatusSection(
-    modelDrainRates: List<com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay>,
-    meteredByModel: List<com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay>,
-    meteredByConversation: List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay>,
+private fun AdvisorSection(
+    advice: com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice?,
     showHelp: Boolean,
 ) {
+    if (advice == null) return
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Recommender",
+                text = "Advisor",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Bold,
             )
             if (showHelp) {
                 Spacer(Modifier.width(4.dp))
-                HelpIcon("Needs cost data from at least 2 different models to compare. Switch one agent to a different model to seed comparison data.")
+                HelpIcon(
+                    "Regime-aware fuel advice: considers quota exhaustion history, reset timing, " +
+                        "and whether work is routine (repeated across days) before recommending anything. " +
+                        "Interactive work is never downgraded.",
+                )
             }
         }
         Spacer(Modifier.height(2.dp))
 
-        // Metered-first: exact token counts + published multipliers
-        val meteredRec = com.angussoftware.fueldashboard.presentation.UsageRecommender
-            .recommendSwitch(meteredByModel)
-        if (meteredRec != null) {
-            Text(
-                text = buildString {
-                    append("${meteredRec.fromModel} → ${meteredRec.toModel}: ")
-                    append("switching that traffic projects ")
-                    append("${(meteredRec.savingsFraction * 100).toInt()}% credit savings ")
-                    append("(24h: ${formatCredits(meteredRec.currentCreditCost)} → ")
-                    append("${formatCredits(meteredRec.projectedCreditCost)} cr). ")
-                    append("Switch via the agent's model menu — manual action.")
-                },
+        when (advice) {
+            com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice.InsufficientData -> Text(
+                "Collecting quota history — need ~2 window cycles before advice is honest.",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // Show top conversations that would benefit from the switch
-            val convSavings = com.angussoftware.fueldashboard.presentation.UsageRecommender
-                .conversationSavings(meteredByConversation)
-            if (convSavings.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
+            is com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice.Surplus -> {
+                val r = advice.regime
                 Text(
-                    text = "Top conversations to switch:",
+                    buildString {
+                        append("No action needed. ")
+                        if (r.projectedPctAtReset != null) {
+                            append("Projected ${(100 - r.projectedPctAtReset).toInt()}% headroom at reset. ")
+                        }
+                        append("Quota exhausted ${r.exhaustions}/${r.windowsAnalyzed} windows — ")
+                        append("surplus regime, the smart model is effectively free right now.")
+                    },
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
                 )
-                convSavings.take(5).forEach { cs ->
+            }
+
+            is com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice.Healthy -> Text(
+                buildString {
+                    append("Window healthy — ~${advice.projectedHeadroomPct.toInt()}% projected headroom at reset. ")
+                    append("Exhaustions ${advice.regime.exhaustions}/${advice.regime.windowsAnalyzed} windows.")
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            is com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice.AtRisk -> {
+                Text(
+                    buildString {
+                        append("⚠ At risk: projected to exhaust before reset")
+                        advice.projectedExhaustInMs?.let { append(" (~${formatHours(it / 3_600_000.0)})") }
+                        append(". ")
+                        if (advice.routineConsumers.isEmpty()) {
+                            append("No routine work to offload — consider pausing heavy non-urgent runs.")
+                        } else {
+                            append("Move routine work to ${advice.routineConsumers.first().let { cheapTarget(it.model) }}:")
+                        }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium,
+                )
+                advice.routineConsumers.take(3).forEach { rc ->
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = buildString {
-                            append("${cs.title ?: cs.conversationId.take(12)} (${cs.agentName}) ")
-                            append("${formatCredits(cs.currentCreditCost)} → ")
-                            append("${formatCredits(cs.projectedCreditCost)} cr ")
-                            append("(${(cs.savingsFraction * 100).toInt()}% off)")
-                        },
+                        "  • ${rc.title ?: rc.conversationKey.take(12)} — ${formatCredits(rc.currentCreditPerDay)}→${formatCredits(rc.projectedCreditPerDay)} cr/day (${(rc.savingsFraction * 100).toInt()}% off, ${rc.activeDays}d routine)",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            return@Column
-        }
-
-        val modelsWithData = modelDrainRates.filter { it.sampleCount >= 10 }
-        val statusText = when {
-            meteredByModel.isNotEmpty() -> {
-                val observed = meteredByModel.joinToString(", ") { "${it.label} (${it.requestCount} req)" }
-                "Metering $observed. Need 2+ models with usage to compare — " +
-                    "switch one agent to a different model to enable recommendations."
-            }
-            modelDrainRates.isEmpty() -> {
-                "Gathering data — no model usage recorded yet. Check back in ~1 hour."
-            }
-            modelsWithData.size < 2 -> {
-                val observed = modelDrainRates.joinToString(", ") { "${it.model} (${it.sampleCount} samples)" }
-                "Need cost data from 2+ models to compare. Observed: $observed. " +
-                    "Switch one agent to a different model to enable recommendations."
-            }
-            else -> {
-                val cheapest = modelDrainRates.minByOrNull { it.avgDrainPerHr }
-                "Ready — ${modelsWithData.size} models with cost data. " +
-                    "Cheapest: ${cheapest?.model ?: "?"} at ${cheapest?.let { formatRate(it.avgDrainPerHr) } ?: "?"}%/hr."
+            is com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice.PersistentPressure -> {
+                Text(
+                    buildString {
+                        append("Quota exhausted ${advice.regime.exhaustions}/${advice.regime.windowsAnalyzed} windows — ")
+                        append("standing advice: route routine work to a cheaper model.")
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Medium,
+                )
+                advice.routineConsumers.take(3).forEach { rc ->
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "  • ${rc.title ?: rc.conversationKey.take(12)} — ${formatCredits(rc.currentCreditPerDay)}→${formatCredits(rc.projectedCreditPerDay)} cr/day (${(rc.savingsFraction * 100).toInt()}% off, ${rc.activeDays}d routine)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
-        Text(
-            text = statusText,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
+
+private fun cheapTarget(fromModel: String): String =
+    com.angussoftware.fueldashboard.presentation.ZaiCreditMultipliers.cheapestKnown() ?: fromModel
 
 private fun formatCredits(credits: Double): String =
     if (credits >= 1_000_000) "${(credits / 1_000_000).toInt()}M" else credits.toInt().toString()

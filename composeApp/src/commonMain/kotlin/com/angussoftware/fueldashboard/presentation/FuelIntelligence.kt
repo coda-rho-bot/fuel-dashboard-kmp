@@ -17,6 +17,9 @@ import com.angussoftware.fueldashboard.database.UsageRecord
  */
 object FuelIntelligence {
 
+    /** Ingestion lag tolerance for waste attribution (records arrive after drops). */
+    const val METERED_LAG_MS = 10 * 60_000L
+
     /** One hour bucket of fuel consumption vs. metered activity. */
     data class WasteWindow(
         val hourStart: Long,
@@ -89,16 +92,23 @@ object FuelIntelligence {
             agentSamples.getOrPut(bucket) { mutableListOf() }.add(cur.activeAgentCount)
         }
 
-        // Metered tokens per hour bucket.
+        // Metered tokens per hour bucket. Attribution tolerance: usage records
+        // arrive on the ingestion cadence (30s-5min) AFTER the fuel drop they
+        // caused and can cross into the NEXT hour bucket (drop at :55, record
+        // at :03). A window therefore counts tokens from its own bucket AND
+        // the following one — over-attribution is harmless, phantom
+        // "unattributed waste" from lag is not.
         val metered = HashMap<Long, Long>()
-        for (u in usage.filter { it.timestamp >= windowStart }) {
+        for (u in usage.filter { it.timestamp >= windowStart - hourMs }) {
             val bucket = u.timestamp / hourMs * hourMs
             metered[bucket] = (metered[bucket] ?: 0L) + u.inputTokens + u.outputTokens
         }
+        fun meteredNear(bucket: Long): Long =
+            (metered[bucket] ?: 0L) + (metered[bucket + hourMs] ?: 0L)
 
         return consumption.keys.sorted().map { bucket ->
             val consumed = consumption[bucket] ?: 0.0
-            val tokens = metered[bucket] ?: 0L
+            val tokens = meteredNear(bucket)
             val agents = agentSamples[bucket]?.average() ?: 0.0
             WasteWindow(
                 hourStart = bucket,
