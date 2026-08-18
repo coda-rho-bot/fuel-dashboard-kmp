@@ -110,7 +110,6 @@ fun AgentPanel(
     usageByConversation24h: List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
     var showAddDialog by remember { mutableStateOf(false) }
     var showQrSyncDialog by remember { mutableStateOf(false) }
     var showImportEntryDialog by remember { mutableStateOf(false) }
@@ -205,10 +204,6 @@ fun AgentPanel(
                     .mapKeys { it.key.second }
                 AgentCard(
                     agent = agent,
-                    isExpanded = expandedStates[agent.id] ?: false,
-                    onToggleExpand = {
-                        expandedStates[agent.id] = !(expandedStates[agent.id] ?: false)
-                    },
                     onRemoveAgent = onRemoveAgent,
                     showHelp = showHelp,
                     usageRows24h = usageRows,
@@ -540,8 +535,6 @@ internal fun AddAgentDialog(
 @Composable
 private fun AgentCard(
     agent: AcpAgentDisplay,
-    isExpanded: Boolean,
-    onToggleExpand: () -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
     showHelp: Boolean = false,
     usageRows24h: List<com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay> = emptyList(),
@@ -559,11 +552,9 @@ private fun AgentCard(
         ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // --- Header row: name + kind badge + expand arrow + status dot + delete ---
+            // --- Header row: name + kind badge + status dot + delete ---
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggleExpand() },
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -578,13 +569,6 @@ private fun AgentCard(
                             Spacer(Modifier.width(6.dp))
                             KindBadge(label = "config only")
                         }
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = if (isExpanded) "Collapse" else "Expand",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp),
-                        )
                     }
                     // Last seen timestamp
                     agent.lastSeen?.let { seen ->
@@ -627,36 +611,6 @@ private fun AgentCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-
-            // --- Expandable details section ---
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically(),
-                exit = shrinkVertically(),
-            ) {
-                Column(modifier = Modifier.padding(top = 8.dp)) {
-                    // Session model/mode controls removed — they configured the
-                    // dashboard's ACP monitoring session, which has no chat/prompt
-                    // surface, and the mode setter was a no-op stub. Models and
-                    // permissions are per conversation in Letta; the dashboard is
-                    // a monitor, not a session launcher.
-                    agent.framework?.let { fw ->
-                        DetailRow(label = "Framework", value = fw)
-                    }
-                    agent.command?.let { cmd ->
-                        DetailRow(label = "Command", value = cmd, monospace = true)
-                    }
-                    agent.registeredAt?.let { ts ->
-                        if (ts > 0) {
-                            DetailRow(label = "Registered", value = formatRegisteredDate(ts))
-                        }
-                    }
-                    if (agent.capabilities.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        CapabilitiesRow(capabilities = agent.capabilities)
-                    }
-                }
             }
         }
     }
@@ -760,34 +714,6 @@ private fun UsageModelsRow(
 }
 
 // ---------------------------------------------------------------------------
-// Detail Row (for expanded section)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun DetailRow(label: String, value: String, monospace: Boolean = false) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "$label:",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Medium,
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontFamily = if (monospace) FontFamily.Monospace else null,
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Status Dot
 // ---------------------------------------------------------------------------
 
@@ -805,53 +731,6 @@ private fun StatusDot(status: String) {
             .clip(CircleShape)
             .background(color),
     )
-}
-
-// ---------------------------------------------------------------------------
-// Capabilities Row (badges)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun CapabilitiesRow(capabilities: List<String>) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = "Capabilities:",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.width(6.dp))
-        capabilities.forEach { cap ->
-            CapabilityBadge(label = cap)
-            Spacer(Modifier.width(4.dp))
-        }
-    }
-}
-
-@Composable
-private fun CapabilityBadge(label: String) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.tertiary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    )
-}
-
-private fun formatRegisteredDate(epochMs: Long): String {
-    val now = epochMillisNow()
-    val diffMs = now - epochMs
-    val days = diffMs / 86_400_000
-    return when {
-        days < 1 -> "today"
-        days == 1L -> "yesterday"
-        days < 30 -> "$days days ago"
-        days < 365 -> "${days / 30} months ago"
-        else -> "${days / 365} years ago"
-    }
 }
 
 /** Platform-agnostic current time — uses the commonMain util epochMillis. */
