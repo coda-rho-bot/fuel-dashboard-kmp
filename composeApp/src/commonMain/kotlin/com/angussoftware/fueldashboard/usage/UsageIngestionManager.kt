@@ -39,6 +39,9 @@ class UsageIngestionManager(
     private var managerScope: CoroutineScope? = null
 
     /** Connector instances keyed by settings type. Rebuilt when config changes. */
+    // Volatile: written by the poll coroutine, read by ensureConversationTitles
+    // from display-build coroutines — safe publication across threads.
+    @kotlin.concurrent.Volatile
     private var connectors: List<UsageSourceConnector> = emptyList()
     private var lastConfigFingerprint: String? = null
 

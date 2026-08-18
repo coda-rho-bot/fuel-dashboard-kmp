@@ -340,11 +340,17 @@ fun main() = application {
         val week = now - 7 * 24 * 3_600_000L
         val snapshots7d = fuelSnapshotRepo.getSince(week)
         val usage7d = usageRepo.getSince(week)
+        // Gap reconstruction is only valid for the provider whose quota the
+        // metered usage burns (z.ai via BYOK) — other providers must not be
+        // reconstructed with foreign tokens.
+        val zaiProviderId = viewModel.state.value.settings.providers
+            .firstOrNull { it.kind == com.angussoftware.fueldashboard.model.ProviderKind.ZAI }?.id
         val providerWaste = com.angussoftware.fueldashboard.presentation.FuelIntelligence.providerWaste(
             snapshots = fuelSnapshotRepo.getProviderSnapshotsSince(week),
             usage = usage7d,
             since = week,
             now = now,
+            usageOwnerProviderId = zaiProviderId,
         )
         // Fuel Advisor v3: regime from 7d snapshots, routine classification from 7d usage
         val resetAt = snapshots7d.mapNotNull { it.resetAt }.maxOrNull()

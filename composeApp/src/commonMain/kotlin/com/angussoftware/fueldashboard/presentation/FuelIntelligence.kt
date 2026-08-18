@@ -79,6 +79,10 @@ object FuelIntelligence {
         usage: List<UsageRecord> = emptyList(),
         since: Long,
         now: Long,
+        /** The provider whose quota the metered usage actually burns (z.ai via
+         *  BYOK). Gap reconstruction is only valid for that provider — other
+         *  providers' windows must not be reconstructed with foreign tokens. */
+        usageOwnerProviderId: String? = null,
     ): List<ProviderWaste> {
         return snapshots
             .groupBy { it.providerId }
@@ -96,7 +100,11 @@ object FuelIntelligence {
                 } else {
                     gridTiles(sorted, windowMs, now)
                 }
-                val tiles = reconstructGaps(measured, usage, windowMs, sorted.first().timestamp, now)
+                val tiles = if (usageOwnerProviderId == null || providerId == usageOwnerProviderId) {
+                    reconstructGaps(measured, usage, windowMs, sorted.first().timestamp, now)
+                } else {
+                    measured
+                }
                 if (tiles.isEmpty()) return@mapNotNull null
                 val daily = dailyWaste(tiles)
                 if (daily.isEmpty()) return@mapNotNull null

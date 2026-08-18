@@ -5,6 +5,7 @@ import com.angussoftware.fueldashboard.database.UsageRepository
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -77,7 +78,11 @@ class LettaRunsConnector(
     )
 
     /** Agent name cache (agent_id → display name), refreshed with metadata. */
-    private val agentNames = mutableMapOf<String, String>()
+    // Copy-on-write snapshot: written by the poll coroutine, read from
+    // display-build coroutines on other threads — a volatile Map swap is the
+    // common-safe publication (no concurrent mutation of a shared HashMap).
+    @kotlin.concurrent.Volatile
+    private var agentNames: Map<String, String> = emptyMap()
 
     override suspend fun poll(): UsageSourceConnector.PollResult {
         val errors = mutableListOf<String>()
@@ -147,7 +152,7 @@ class LettaRunsConnector(
         for (agent in agents) {
             val model = agent.llm_config?.model ?: continue
             val name = agent.name?.substringBefore(",")?.trim().takeUnless { it.isNullOrEmpty() } ?: agent.id
-            agentNames[agent.id] = name
+            agentNames = agentNames + (agent.id to name)
             ingestionRepository.recordAgentModel(agent.id, name, model)
         }
         refreshConversationTitles()
@@ -194,21 +199,38 @@ class LettaRunsConnector(
      * conversations the bulk/backfill passes haven't titled yet — closes the
      * "raw ID until next metadata cycle" lag for newly-active conversations.
      */
+    // In-flight title fetches: byConversation fires ensureConversationTitles
+    // every poll while titles are missing; without a guard, overlapping
+    // coroutines fetch the same conversations concurrently. Mutex-guarded
+    // set — KMP-safe (no JVM synchronized in commonMain).
+    private val titleFetchMutex = kotlinx.coroutines.sync.Mutex()
+    private val inFlightTitleFetches = mutableSetOf<String>()
+
     override suspend fun ensureConversationTitles(conversationIds: List<String>) {
         val known = usageRepository.getConversationTitles().keys
-        for (id in conversationIds.distinct().filter { it !in known }.take(TITLE_BACKFILL_BATCH)) {
-            val body = try {
-                httpFetch("/v1/conversations/$id")
-            } catch (e: Exception) {
-                continue
-            }
+        val toFetch = titleFetchMutex.withLock {
+            conversationIds.distinct()
+                .filter { it !in known && it !in inFlightTitleFetches }
+                .take(TITLE_BACKFILL_BATCH)
+                .also { inFlightTitleFetches.addAll(it) }
+        }
+        try {
+            for (id in toFetch) {
+                val body = try {
+                    httpFetch("/v1/conversations/$id")
+                } catch (e: Exception) {
+                    continue
+                }
             val conv = try {
                 json.decodeFromString(LettaConversation.serializer(), body)
             } catch (e: Exception) {
                 continue
             }
             val summary = conv.summary?.trim().takeUnless { it.isNullOrEmpty() }
-            usageRepository.upsertConversationTitle(conv.id, summary ?: fallbackTitle(conv.agent_id, conv.created_at))
+                usageRepository.upsertConversationTitle(conv.id, summary ?: fallbackTitle(conv.agent_id, conv.created_at))
+            }
+        } finally {
+            titleFetchMutex.withLock { inFlightTitleFetches.removeAll(toFetch) }
         }
     }
 
