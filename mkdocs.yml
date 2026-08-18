@@ -1,0 +1,69 @@
+site_name: Fuel Dashboard
+site_description: Cross-platform fuel monitoring for AI agent fleets — track quotas, burn rates, and per-conversation usage across providers.
+site_url: https://docs.angussoftware.dev/fuel-dashboard
+repo_url: https://git.angussoftware.dev/coda/fuel-dashboard-kmp
+repo_name: coda/fuel-dashboard-kmp
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2026 Angus Software
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Tabs:
+      - Overview: tabs/overview.md
+      - Usage: tabs/usage.md
+      - Intel: tabs/intel.md
+      - Agents: tabs/agents.md
+  - The Advisor: advisor.md
+  - Where Data Comes From: data-flow.md
+  - Self-Hosting & API: self-hosting.md
+  - Troubleshooting: troubleshooting.md
+  - Research Notes (archive):
+      - Agent Framework: research/agent-framework-research.md
+      - MCP Server: research/mcp-server-research.md
+      - Orchestrator-Embedded: research/orchestrator-embedded-research.md
+      - Provider: research/provider-research.md
