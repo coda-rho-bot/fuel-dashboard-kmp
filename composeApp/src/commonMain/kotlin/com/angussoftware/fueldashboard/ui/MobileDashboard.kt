@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.LocalGasStation
@@ -73,6 +74,7 @@ import kotlinx.datetime.toLocalDateTime
 
 private enum class MobileTab(val label: String) {
     FUEL("Fuel"),
+    USAGE("Usage"),
     AGENTS("Agents"),
     INTEL("Intel"),
     SETTINGS("Settings"),
@@ -123,7 +125,7 @@ fun MobileDashboard(
                 )
             }
 
-            MobileTab.INTEL -> {
+            MobileTab.USAGE -> {
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -132,17 +134,6 @@ fun MobileDashboard(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    // Fuel event timeline (drops, switches, recommendations)
-                    FuelEventHistoryPanel(events = state.fuelEvents)
-
-                    // Waste detection (unattributed drain)
-                    WasteDetectionPanel(windows = state.wasteWindows24h)
-
-                    // Model consumption breakdown
-                    if (state.modelDrainRates.isNotEmpty()) {
-                        ModelDrainRatesPanel(rates = state.modelDrainRates)
-                    }
-
                     // Metered usage (exact token counts from usage sources)
                     MeteredUsagePanel(
                         bySource24h = state.meteredBySource24h,
@@ -155,7 +146,29 @@ fun MobileDashboard(
                         byAgentModel7d = state.meteredByAgentModel7d,
                     )
 
-                    if (state.fuelEvents.isEmpty() && state.modelDrainRates.isEmpty()) {
+                    // Model consumption breakdown
+                    if (state.modelDrainRates.isNotEmpty()) {
+                        ModelDrainRatesPanel(rates = state.modelDrainRates)
+                    }
+
+                    // Waste detection (unattributed drain)
+                    WasteDetectionPanel(windows = state.wasteWindows24h)
+                }
+            }
+
+            MobileTab.INTEL -> {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    // Fuel event timeline (drops, switches, recommendations)
+                    FuelEventHistoryPanel(events = state.fuelEvents)
+
+                    if (state.fuelEvents.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center,
@@ -198,6 +211,7 @@ fun MobileDashboard(
                         Icon(
                             imageVector = when (tab) {
                                 MobileTab.FUEL -> Icons.Default.LocalGasStation
+                                MobileTab.USAGE -> Icons.Default.DataUsage
                                 MobileTab.AGENTS -> Icons.Default.Person
                                 MobileTab.INTEL -> Icons.Default.History
                                 MobileTab.SETTINGS -> Icons.Default.Settings

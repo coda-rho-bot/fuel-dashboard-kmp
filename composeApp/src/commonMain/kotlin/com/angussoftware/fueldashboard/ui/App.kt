@@ -20,11 +20,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -139,8 +146,16 @@ fun FuelDashboardApp(
 }
 
 // ---------------------------------------------------------------------------
-// Desktop Layout — two-column (fuel left, settings/agents/alerts right)
+// Desktop Layout — NavigationRail with unified tabs (mirrors mobile)
 // ---------------------------------------------------------------------------
+
+private enum class DesktopTab(val label: String) {
+    OVERVIEW("Overview"),
+    USAGE("Usage"),
+    INTEL("Intel"),
+    AGENTS("Agents"),
+    SETTINGS("Settings"),
+}
 
 @Composable
 private fun DesktopLayout(
@@ -149,61 +164,140 @@ private fun DesktopLayout(
     viewModel: FuelViewModel,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        FuelColumnContent(
-            state = state,
-            viewModel = viewModel,
-            modifier = Modifier.weight(1.5f).fillMaxHeight(),
-        )
+    var selectedTab by remember { mutableStateOf(DesktopTab.OVERVIEW) }
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+    Row(modifier = modifier.fillMaxSize()) {
+        NavigationRail(
+            header = {
+                IconButton(onClick = { viewModel.refreshNow() }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            },
         ) {
-            // Agents first
-            AgentPanel(
-                agents = state.acpAgents,
-                onRemoveAgent = { agentId ->
-                    viewModel.removeAgent(agentId)
-                },
-                onAddAgent = viewModel::addAgent,
-                syncData = run {
-                    val key = viewModel.getServerApiKey()
-                    val junie = viewModel.getJunieBalance()
-                    SettingsSyncData.from(
-                        settings = state.settings,
-                        agentSettings = state.agentSettings,
-                        themeController = themeController,
-                        serverUrl = state.serverUrl,
-                        serverApiKey = key.ifBlank { null },
-                        junieBalance = junie,
-                        junieLicense = viewModel.getJunieLicense(),
-                        junieLastChecked = viewModel.getJunieLastChecked(),
+            DesktopTab.entries.forEach { tab ->
+                NavigationRailItem(
+                    selected = selectedTab == tab,
+                    onClick = { selectedTab = tab },
+                    icon = {
+                        Icon(
+                            imageVector = when (tab) {
+                                DesktopTab.OVERVIEW -> Icons.Default.Dashboard
+                                DesktopTab.USAGE -> Icons.Default.DataUsage
+                                DesktopTab.INTEL -> Icons.Default.History
+                                DesktopTab.AGENTS -> Icons.Default.Person
+                                DesktopTab.SETTINGS -> Icons.Default.Settings
+                            },
+                            contentDescription = tab.label,
+                        )
+                    },
+                    label = { Text(tab.label) },
+                )
+            }
+        }
+
+        // Content area — one tab at a time, consistent padding/spacing rhythm
+        when (selectedTab) {
+            DesktopTab.OVERVIEW -> {
+                FuelColumnContent(
+                    state = state,
+                    viewModel = viewModel,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
+
+            DesktopTab.USAGE -> {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    MeteredUsagePanel(
+                        bySource24h = state.meteredBySource24h,
+                        byModel24h = state.meteredByModel24h,
+                        bySource7d = state.meteredBySource7d,
+                        byModel7d = state.meteredByModel7d,
+                        byConversation24h = state.meteredByConversation24h,
+                        byConversation7d = state.meteredByConversation7d,
+                        byAgentModel24h = state.meteredByAgentModel24h,
+                        byAgentModel7d = state.meteredByAgentModel7d,
                     )
-                },
-                onImportSyncedSettings = viewModel::importSyncedSettings,
-                hasConnectedOrchestrator = state.hasConnectedApi,
-                showHelp = state.showHelp,
-                usageByAgentModel24h = state.meteredByAgentModel24h,
-                usageByConversation24h = state.meteredByConversation24h,
-            )
+                    if (state.modelDrainRates.isNotEmpty()) {
+                        ModelDrainRatesPanel(rates = state.modelDrainRates)
+                    }
+                    WasteDetectionPanel(windows = state.wasteWindows24h)
+                }
+            }
 
-            // Divider between agents and settings
-            HorizontalDivider()
+            DesktopTab.INTEL -> {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    FuelEventHistoryPanel(events = state.fuelEvents)
+                }
+            }
 
-            // Settings below agents
-            SettingsPanel(
-                themeController = themeController,
-                settings = state.settings,
-                viewModel = viewModel,
-            )
+            DesktopTab.AGENTS -> {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    AgentPanel(
+                        agents = state.acpAgents,
+                        onRemoveAgent = { agentId ->
+                            viewModel.removeAgent(agentId)
+                        },
+                        onAddAgent = viewModel::addAgent,
+                        syncData = run {
+                            val key = viewModel.getServerApiKey()
+                            val junie = viewModel.getJunieBalance()
+                            SettingsSyncData.from(
+                                settings = state.settings,
+                                agentSettings = state.agentSettings,
+                                themeController = themeController,
+                                serverUrl = state.serverUrl,
+                                serverApiKey = key.ifBlank { null },
+                                junieBalance = junie,
+                                junieLicense = viewModel.getJunieLicense(),
+                                junieLastChecked = viewModel.getJunieLastChecked(),
+                            )
+                        },
+                        onImportSyncedSettings = viewModel::importSyncedSettings,
+                        hasConnectedOrchestrator = state.hasConnectedApi,
+                        showHelp = state.showHelp,
+                        usageByAgentModel24h = state.meteredByAgentModel24h,
+                        usageByConversation24h = state.meteredByConversation24h,
+                    )
+                }
+            }
+
+            DesktopTab.SETTINGS -> {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    SettingsPanel(
+                        themeController = themeController,
+                        settings = state.settings,
+                        viewModel = viewModel,
+                    )
+                }
+            }
         }
     }
 }
@@ -347,38 +441,7 @@ internal fun FuelColumnContent(
                     )
                 }
 
-                // Model consumption breakdown
-                if (state.modelDrainRates.isNotEmpty()) {
-                    item {
-                        Spacer(Modifier.height(4.dp))
-                        ModelDrainRatesPanel(rates = state.modelDrainRates)
-                    }
-                }
-
-                // Fuel Intelligence: event timeline + waste detection (roadmap Phase 4)
-                item {
-                    Spacer(Modifier.height(4.dp))
-                    FuelEventHistoryPanel(events = state.fuelEvents)
-                }
-                item {
-                    Spacer(Modifier.height(4.dp))
-                    WasteDetectionPanel(windows = state.wasteWindows24h)
-                }
-
-                // Metered usage (exact token counts from usage sources)
-                item {
-                    Spacer(Modifier.height(4.dp))
-                    MeteredUsagePanel(
-                        bySource24h = state.meteredBySource24h,
-                        byModel24h = state.meteredByModel24h,
-                        bySource7d = state.meteredBySource7d,
-                        byModel7d = state.meteredByModel7d,
-                        byConversation24h = state.meteredByConversation24h,
-                        byConversation7d = state.meteredByConversation7d,
-                        byAgentModel24h = state.meteredByAgentModel24h,
-                        byAgentModel7d = state.meteredByAgentModel7d,
-                    )
-                }
+                // Usage / Intelligence / Agents / Settings live in their own tabs.
             }
         }
     }
