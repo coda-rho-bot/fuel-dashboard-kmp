@@ -30,6 +30,7 @@ object UsageRecommender {
     /** A single conversation that would benefit from a model switch. */
     data class ConversationSavings(
         val conversationId: String,
+        val title: String? = null,
         val agentName: String,
         val fromModel: String,
         val toModel: String,
@@ -109,6 +110,7 @@ object UsageRecommender {
                 if (projected >= current) return@mapNotNull null
                 ConversationSavings(
                     conversationId = conv.conversationId,
+                    title = conv.title,
                     agentName = conv.agentName,
                     fromModel = fromModel,
                     toModel = toModel,

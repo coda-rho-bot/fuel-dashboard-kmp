@@ -205,7 +205,7 @@ private fun RecommenderStatusSection(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = buildString {
-                            append("${cs.conversationId.take(12)} (${cs.agentName}) ")
+                            append("${cs.title ?: cs.conversationId.take(12)} (${cs.agentName}) ")
                             append("${formatCredits(cs.currentCreditCost)} → ")
                             append("${formatCredits(cs.projectedCreditCost)} cr ")
                             append("(${(cs.savingsFraction * 100).toInt()}% off)")
