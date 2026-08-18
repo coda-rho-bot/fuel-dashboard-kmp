@@ -133,7 +133,7 @@ object FuelIntelligence {
         snapshots: List<FuelSnapshotRecord>,
         modelPeriods: List<AgentModelPeriod>,
         decisions: List<DecisionRecord>,
-        dropThresholdPct: Double = 3.0,
+        dropThresholdPct: Double = 1.0,
         aggregateMs: Long = 10 * 60_000,
         limit: Int = 50,
     ): List<FuelEvent> {

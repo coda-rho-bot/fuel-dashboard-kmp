@@ -155,8 +155,12 @@ fun SettingsPanel(
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
-            // --- Theme settings (shared library panel) ---
+            // --- Theme settings (shared library panel) — supersedes the old
+            // ThemeModeSection + ColorThemePicker UI from the overhaul branch ---
             ThemeSettingsPanel(themeController.settings)
+
+            Spacer(Modifier.height(16.dp))
+            IntelligenceSection()
 
             Spacer(Modifier.height(8.dp))
 
@@ -1197,6 +1201,77 @@ private fun AgentConfigRow(
 // ---------------------------------------------------------------------------
 // Theme sections (unchanged)
 // ---------------------------------------------------------------------------
+
+@Composable
+private fun IntelligenceSection() {
+    var threshold by remember {
+        mutableStateOf(
+            com.angussoftware.fueldashboard.settings.loadStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.EVENT_DROP_THRESHOLD, "1.0",
+            ),
+        )
+    }
+    Text(
+        text = "Intelligence",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(6.dp))
+    OutlinedTextField(
+        value = threshold,
+        onValueChange = { raw ->
+            threshold = raw
+            raw.toDoubleOrNull()?.let { v ->
+                if (v in 0.1..20.0) {
+                    com.angussoftware.fueldashboard.settings.saveStringSetting(
+                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.EVENT_DROP_THRESHOLD,
+                        v.toString(),
+                    )
+                }
+            }
+        },
+        label = { Text("Fuel event drop threshold (%)") },
+        supportingText = { Text("Gauge drops ≥ this become history events. Default 1. Applies on next poll.") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun ThemeModeSection(themeController: ThemeController) {
+    Text(
+        text = "Appearance",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ThemeModeChip(
+            label = "System",
+            icon = Icons.Default.SettingsApplications,
+            isSelected = themeController.themeMode == ThemeMode.SYSTEM,
+            onClick = { themeController.updateThemeMode(ThemeMode.SYSTEM) },
+            modifier = Modifier.weight(1f),
+        )
+        ThemeModeChip(
+            label = "Light",
+            icon = Icons.Default.LightMode,
+            isSelected = themeController.themeMode == ThemeMode.LIGHT,
+            onClick = { themeController.updateThemeMode(ThemeMode.LIGHT) },
+            modifier = Modifier.weight(1f),
+        )
+        ThemeModeChip(
+            label = "Dark",
+            icon = Icons.Default.DarkMode,
+            isSelected = themeController.themeMode == ThemeMode.DARK,
+            onClick = { themeController.updateThemeMode(ThemeMode.DARK) },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
 
 @Composable
 private fun ThemeModeChip(

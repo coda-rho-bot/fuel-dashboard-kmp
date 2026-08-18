@@ -28,4 +28,5 @@ internal object FuelSettingsKeys {
     const val JUNIE_LAST_CHECKED = "junie_last_checked"
     const val SERVER_API_KEY = "serverApiKey"
     const val USAGE_SOURCES = "usageSourcesSettings"     // JSON: UsageSourcesSettings
+    const val EVENT_DROP_THRESHOLD = "fuelEventDropThresholdPct" // double, pct
 }

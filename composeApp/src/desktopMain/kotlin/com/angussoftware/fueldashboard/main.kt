@@ -359,7 +359,11 @@ fun main() = application {
                 rawAdvice.copy(routineConsumers = rawAdvice.routineConsumers.map { it.copy(title = titles[it.conversationKey]) })
             else -> rawAdvice
         }
+        val dropThreshold = com.angussoftware.fueldashboard.settings.loadStringSetting(
+            com.angussoftware.fueldashboard.settings.FuelSettingsKeys.EVENT_DROP_THRESHOLD, "1.0",
+        ).toDoubleOrNull() ?: 1.0
         val events = com.angussoftware.fueldashboard.presentation.FuelIntelligence.fuelEvents(
+            dropThresholdPct = dropThreshold,
             snapshots = fuelSnapshotRepo.getSince(week),
             modelPeriods = usageIngestionRepo.agentModelTimeline().map {
                 com.angussoftware.fueldashboard.presentation.FuelIntelligence.AgentModelPeriod(
