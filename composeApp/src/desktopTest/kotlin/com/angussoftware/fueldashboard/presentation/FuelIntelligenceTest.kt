@@ -77,6 +77,42 @@ class FuelIntelligenceTest {
     }
 
     @Test
+    fun fixedResetProviderWasteMeasuredAtActualResets() {
+        // Letta-style daily: resets at fixed midnight times (resetAt jumps daily).
+        // Usage pattern: burns to 30% remaining by end of day 1, 60% by day 2.
+        val t0 = 1_000_000_000_000L
+        val r1 = t0 + 12 * hour           // day-1 reset
+        val r2 = r1 + 24 * hour           // day-2 reset
+        val snaps = listOf(
+            psnap(t0, 100.0, windowHours = 24.0, provider = "letta").let { it.copy(resetAt = r1) },
+            psnap(t0 + 6 * hour, 70.0, windowHours = 24.0, provider = "letta").let { it.copy(resetAt = r1) },
+            psnap(t0 + 11 * hour, 30.0, windowHours = 24.0, provider = "letta").let { it.copy(resetAt = r1) },
+            // after reset 1: fresh window, resets at r2
+            psnap(t0 + 12 * hour + minute(5), 100.0, windowHours = 24.0, provider = "letta").let { it.copy(resetAt = r2) },
+            psnap(t0 + 20 * hour, 60.0, windowHours = 24.0, provider = "letta").let { it.copy(resetAt = r2) },
+            psnap(t0 + 23 * hour, 60.0, windowHours = 24.0, provider = "letta").let { it.copy(resetAt = r2) },
+        )
+        val waste = FuelIntelligence.providerWaste(snaps, since = t0, now = t0 + 24 * hour)
+        assertEquals(1, waste.size)
+        val tiles = waste.first().daily.sumOf { it.windows }
+        assertEquals(1, tiles) // only reset 1 completed within the timeline
+        // Waste at reset 1 = 30% remaining just before expiry
+        assertEquals(30.0, waste.first().wastedPctAvg, 0.01)
+    }
+
+    @Test
+    fun slidingProviderDetectedWhenResetAtMovesEveryPoll() {
+        // z.ai-style: resetAt always ~now+5h (moves each poll) → grid tiling
+        val t0 = 1_000_000_000_000L
+        val snaps = (0..10).map { k ->
+            psnap(t0 + k * 30 * 60_000L, 80.0 - k * 5.0, windowHours = 5.0, provider = "zai")
+                .let { it.copy(resetAt = t0 + k * 30 * 60_000L + 5 * hour) }
+        }
+        val waste = FuelIntelligence.providerWaste(snaps, since = t0, now = t0 + 5 * hour)
+        assertEquals(1, waste.size) // grid path, not reset-driven
+    }
+
+    @Test
     fun providerWindowLengthComesFromItsOwnMetadata() {
         val t0 = 1_000_000_000_000L
         // zai: 5h windows; letta-daily: 24h windows — same timeline

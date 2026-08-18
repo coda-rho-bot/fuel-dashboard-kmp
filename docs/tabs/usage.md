@@ -30,7 +30,7 @@ How much quota **expired unused** when each window closed. A window that ends wi
 - A window slides with 10% remaining → **10% wasted**
 - A window exhausted to 0% → **0% wasted** (you used everything you had)
 
-The window length follows each provider's own quota mechanics — z.ai's 5-hour sliding window, Letta's daily 24h, credit pools' refill period — read from each provider's snapshot metadata, not hardcoded. Daily rows show the average remaining-at-expiry across that day's windows, with an "hit 0% at least once" marker when any window ran dry.
+Measurement follows each provider's quota mechanics: **sliding windows** (z.ai) are sampled every window-length — the API value at each boundary is exactly that window's trailing usage, so the tiling is exact; **fixed-reset windows** (Letta daily/4h, monthly pools) are measured at their *actual reset times* — the level just before each observed reset is the waste, avoiding the mid-window sampling error that would overcount. Daily rows show the average remaining-at-expiry across that day's windows, with an "hit 0% at least once" marker when any window ran dry.
 
 High waste means capacity went unused (the advisor's surplus regime pairs with this: it's when downgrades are pointless — but also when extra smart-model work is effectively free).
 A clean day shows the all-clear line explicitly. Persistent unattributed windows are worth investigating — that's fuel with no receipt.

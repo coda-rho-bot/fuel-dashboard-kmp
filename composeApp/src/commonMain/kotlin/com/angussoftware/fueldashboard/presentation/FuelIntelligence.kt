@@ -1,6 +1,7 @@
 package com.angussoftware.fueldashboard.presentation
 
 import com.angussoftware.fueldashboard.database.FuelSnapshotRecord
+import kotlinx.datetime.toLocalDateTime
 import com.angussoftware.fueldashboard.database.UsageRecord
 
 /**
@@ -50,17 +51,21 @@ object FuelIntelligence {
 
     /**
      * Expired-quota waste per provider: how much quota evaporated unused when
-     * each window expired. The window length comes from each provider's own
-     * quota mechanics (snapshot metadata: z.ai ~5h sliding, Letta daily 24h,
-     * credit pools = refill period) — not a hardcoded value.
+     * each window expired. Window length comes from each provider's own quota
+     * mechanics. Two tiling strategies:
      *
-     * Sampling the gauge at each window boundary yields adjacent
-     * non-overlapping windows, and the level at the boundary is exactly the
-     * quota that expired unused:
+     *  - FIXED-RESET providers (Letta daily/4h, monthly pools): windows reset at
+     *    known times. Boundaries are the ACTUAL reset times observed in the
+     *    snapshots' resetAt transitions — the last remaining-value before each
+     *    reset is the waste. (Grid tiling would sample mid-window and overcount.)
+     *  - SLIDING providers (z.ai 5h): the window slides continuously; the API
+     *    value at any instant is the trailing-window usage, so sampling every
+     *    windowMs yields adjacent, exact tiles. Detected via resetAt changing
+     *    on nearly every poll.
      *
-     *   - window unused entirely          → 100% wasted
-     *   - expired with 10% still left     → 10% wasted
-     *   - exhausted to 0% before the end  → 0% wasted
+     *   - window unused entirely          -> 100% wasted
+     *   - expired with 10% still left     -> 10% wasted
+     *   - exhausted to 0% before the end  -> 0% wasted
      */
     fun providerWaste(
         snapshots: List<com.angussoftware.fueldashboard.database.ProviderFuelSnapshot>,
@@ -71,14 +76,18 @@ object FuelIntelligence {
             .groupBy { it.providerId }
             .mapNotNull { (providerId, rows) ->
                 val name = rows.firstOrNull()?.providerName ?: providerId
-                // Median window length from the provider's own metadata
                 val windowMs = rows.mapNotNull { it.windowHours }
                     .filter { it > 0 }
                     .sorted()
                     .let { if (it.isEmpty()) null else it[it.size / 2] * 3_600_000.0 }
                     ?.toLong() ?: return@mapNotNull null
 
-                val tiles = wasteTiles(rows, windowMs, since, now)
+                val sorted = rows.sortedBy { it.timestamp }
+                val tiles = if (isFixedReset(sorted, windowMs)) {
+                    resetDrivenTiles(sorted)
+                } else {
+                    gridTiles(sorted, windowMs, now)
+                }
                 if (tiles.isEmpty()) return@mapNotNull null
                 val daily = dailyWaste(tiles)
                 if (daily.isEmpty()) return@mapNotNull null
@@ -93,22 +102,52 @@ object FuelIntelligence {
             .sortedByDescending { it.wastedPctAvg }
     }
 
-    /** Boundary-sampled tiles for one provider (remaining % at each window expiry). */
-    private fun wasteTiles(
-        rows: List<com.angussoftware.fueldashboard.database.ProviderFuelSnapshot>,
+    /**
+     * Fixed-reset detection: a sliding window's resetAt moves on ~every poll
+     * (distinct count ~ snapshot count); a fixed window's resetAt changes only
+     * at actual resets (~ window count). If distinct resets are sparse relative
+     * to the expected window count, resets are discrete events.
+     */
+    private fun isFixedReset(
+        sorted: List<com.angussoftware.fueldashboard.database.ProviderFuelSnapshot>,
         windowMs: Long,
-        since: Long,
+    ): Boolean {
+        val resets = sorted.mapNotNull { it.resetAt }.distinct()
+        if (resets.size < 2) return false
+        val span = (sorted.last().timestamp - sorted.first().timestamp).toDouble()
+        val expectedWindows = (span / windowMs).coerceAtLeast(1.0)
+        return resets.size <= expectedWindows * 4 + 2
+    }
+
+    /** Tiles at observed reset transitions: the last remaining value before each reset. */
+    private fun resetDrivenTiles(
+        sorted: List<com.angussoftware.fueldashboard.database.ProviderFuelSnapshot>,
+    ): List<WasteTile> {
+        val tiles = mutableListOf<WasteTile>()
+        var prev: com.angussoftware.fueldashboard.database.ProviderFuelSnapshot? = null
+        for (snap in sorted) {
+            val pre = prev
+            prev = snap
+            val cur = snap.resetAt ?: continue
+            val before = pre?.resetAt
+            if (before != null && cur > before && pre.remainingPct != null) {
+                tiles.add(WasteTile(windowEnd = before, wastedPct = pre.remainingPct!!))
+            }
+        }
+        return tiles
+    }
+
+    /** Boundary-sampled tiles for sliding windows (adjacent, exact tiling). */
+    private fun gridTiles(
+        sorted: List<com.angussoftware.fueldashboard.database.ProviderFuelSnapshot>,
+        windowMs: Long,
         now: Long,
     ): List<WasteTile> {
-        val withPct = rows.mapNotNull { s -> s.remainingPct?.let { s.timestamp to it } }
-            .sortedBy { it.first }
+        val withPct = sorted.mapNotNull { s -> s.remainingPct?.let { s.timestamp to it } }
         if (withPct.isEmpty()) return emptyList()
 
         val tolerance = (windowMs / 10).coerceIn(15 * 60_000L, 60 * 60_000L)
         val tiles = mutableListOf<WasteTile>()
-        // Anchor the grid to the data, not the epoch: provider windows are not
-        // wall-clock aligned (z.ai slides per-user). The first window expires
-        // one window-length after observation begins.
         var boundary = withPct.first().first + windowMs
         var cursor = 0
         while (boundary <= now) {
@@ -131,8 +170,9 @@ object FuelIntelligence {
 
     /** Rolls observed tiles into local-day averages. */
     fun dailyWaste(tiles: List<WasteTile>): List<DailyWaste> {
+        val tz = kotlinx.datetime.TimeZone.currentSystemDefault()
         return tiles
-            .groupBy { it.windowEnd / 86_400_000 }
+            .groupBy { kotlinx.datetime.Instant.fromEpochMilliseconds(it.windowEnd).toLocalDateTime(tz).date.toEpochDays().toLong() }
             .map { (dayKey, dayTiles) ->
                 DailyWaste(
                     dayStart = dayKey * 86_400_000,
