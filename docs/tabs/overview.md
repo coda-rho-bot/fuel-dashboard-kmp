@@ -30,7 +30,7 @@ One tile per configured provider. Each shows its quota in the shape that matches
 - **Credit pools** (Letta monthly, Junie): budget bar + refill schedule
 - **Rate limits**: compact reset bars
 
-The z.ai tile also shows per-model usage details (search-prime, web-reader, zread) when the API reports them.
+Per-model consumption attributed from gauge drops lives in the [Usage tab](usage.md).
 
 ## Status row
 

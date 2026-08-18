@@ -67,12 +67,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
@@ -129,6 +131,11 @@ fun SettingsPanel(
             }
 
             Spacer(Modifier.height(12.dp))
+
+            // --- Documentation link ---
+            DocumentationSection()
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             // --- Providers section ---
             ProvidersSection(
@@ -188,6 +195,27 @@ fun SettingsPanel(
             }
         }
     }
+}
+
+@Composable
+private fun DocumentationSection() {
+    val uriHandler = LocalUriHandler.current
+
+    Text(
+        text = "Documentation",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = "https://docs.angussoftware.dev/fuel-dashboard",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.primary,
+        textDecoration = TextDecoration.Underline,
+        modifier = Modifier.clickable {
+            uriHandler.openUri("https://docs.angussoftware.dev/fuel-dashboard")
+        },
+    )
 }
 
 @Composable

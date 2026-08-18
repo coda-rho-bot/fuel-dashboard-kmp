@@ -30,7 +30,7 @@ All data endpoints require `Authorization: Bearer <api key>`. `/health` is open 
 | `/sync` | GET/POST | settings sync payload |
 | `/alerts` | GET | alert list |
 | `/decisions` | GET | decision history |
-| `/mcp` | POST | MCP (Streamable HTTP) — tools: `register_agent`, `report_usage`, `get_usage` |
+| `/mcp` | POST | MCP (Streamable HTTP) — 11 tools incl. `register_agent`, `report_usage`, `get_usage`, `update_model`, `update_status`, provider management, settings sync |
 
 ### Reporting usage from anything
 
@@ -70,6 +70,12 @@ Add to any MCP client (e.g. Letta Code's global `mcpServers`):
   }
 }
 ```
+
+## Data & privacy
+
+- **Stays local:** all usage records, snapshots, titles, and settings (SQLite + Java prefs on the host)
+- **Leaves the machine:** API keys are sent to their own providers when polling (z.ai key → z.ai, Letta key → Letta). No telemetry is sent anywhere else
+- **Public surface:** if the Cloudflare tunnel is enabled, the API (including `/v1/usage` ingestion) is reachable at `fuel.angussoftware.dev` — protected by the Bearer key; treat that key like a password
 
 ## Cloudflare tunnel
 
