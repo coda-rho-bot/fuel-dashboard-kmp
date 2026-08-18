@@ -206,14 +206,6 @@ fun main() = application {
         }
     }
 
-    // Wire ViewModel callbacks → agent manager (model/mode changes)
-    viewModel.onAgentModelChange = { agentId, model ->
-        acpScope.launch { agentManager.setModel(agentId, model) }
-    }
-    viewModel.onAgentModeChange = { _, _ ->
-        // Mode change not yet implemented in AcpAgentManager
-    }
-
     // Wire ViewModel callback → EmbeddedServer (agent removal)
     viewModel.onRemoveAgent = { agentId ->
         serverScope.launch { embeddedServer.deleteRegisteredAgent(agentId) }

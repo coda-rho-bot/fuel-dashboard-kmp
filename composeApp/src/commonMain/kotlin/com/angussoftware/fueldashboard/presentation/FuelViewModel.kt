@@ -373,8 +373,6 @@ class FuelViewModel {
      * Callbacks for ACP agent model/mode changes. Set from main.kt where the
      * AcpAgentManager lives. Null on platforms without ACP support (Android).
      */
-    var onAgentModelChange: ((agentId: String, model: String) -> Unit)? = null
-    var onAgentModeChange: ((agentId: String, mode: String) -> Unit)? = null
     /**
      * Callback invoked when the user clicks delete on an agent card.
      * Set from main.kt (desktop) to remove from EmbeddedServer registry.

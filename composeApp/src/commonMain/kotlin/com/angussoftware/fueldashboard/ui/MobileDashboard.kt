@@ -104,12 +104,6 @@ fun MobileDashboard(
                 AgentsTabContent(
                     state = state,
                     onGoToSettings = { selectedTab = MobileTab.SETTINGS.ordinal },
-                    onModelChange = { agentId, model ->
-                        viewModel.onAgentModelChange?.invoke(agentId, model)
-                    },
-                    onModeChange = { agentId, mode ->
-                        viewModel.onAgentModeChange?.invoke(agentId, mode)
-                    },
                     onRemoveAgent = { agentId ->
                         viewModel.onRemoveAgent?.invoke(agentId)
                     },
@@ -469,8 +463,6 @@ private fun MobileProviderCard(
 private fun AgentsTabContent(
     state: DashboardState,
     onGoToSettings: () -> Unit,
-    onModelChange: (agentId: String, model: String) -> Unit,
-    onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
     onAddAgent: (name: String, command: String, args: String) -> Unit,
     syncData: SettingsSyncData,
@@ -486,8 +478,6 @@ private fun AgentsTabContent(
         } else {
             AgentPanel(
                 agents = state.acpAgents,
-                onModelChange = onModelChange,
-                onModeChange = onModeChange,
                 onRemoveAgent = onRemoveAgent,
                 onAddAgent = onAddAgent,
                 syncData = syncData,

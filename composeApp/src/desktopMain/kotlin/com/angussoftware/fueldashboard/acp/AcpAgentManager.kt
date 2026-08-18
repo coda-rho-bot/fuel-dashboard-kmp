@@ -15,9 +15,7 @@ import com.agentclientprotocol.model.PermissionOptionId
 import com.agentclientprotocol.model.PermissionOptionKind
 import com.agentclientprotocol.model.RequestPermissionOutcome
 import com.agentclientprotocol.model.RequestPermissionResponse
-import com.agentclientprotocol.model.SessionConfigId
 import com.agentclientprotocol.model.SessionConfigOption
-import com.agentclientprotocol.model.SessionConfigOptionValue
 import com.agentclientprotocol.model.SessionConfigSelectOptions
 import com.agentclientprotocol.model.SessionModeId
 import com.agentclientprotocol.model.SessionUpdate
@@ -49,7 +47,6 @@ import java.io.File
  * Key operations:
  * - [startMonitoring]: Spawn agent processes and read their capabilities/model info
  * - [stopMonitoring]: Kill all processes and clean up
- * - [setModel]: Change an agent's model via ACP session API
  *
  * Agent info is reported via [agents] StateFlow, which updates as agents
  * connect, report their config, or disconnect.
@@ -129,35 +126,6 @@ class AcpAgentManager {
         synchronized(agentConfigs) { agentConfigs.clear() }
         retryingAgents.clear()
         _agents.value = _agents.value.map { it.copy(status = AcpAgentStatus.DISCONNECTED) }
-    }
-
-    /**
-     * Change an agent's model via ACP session API.
-     *
-     * Uses configOptions when supported (preferred by letta-acp and modern agents —
-     * the model is exposed as a config option with id "model"). Falls back to the
-     * legacy setModel API for agents that use the older models API.
-     *
-     * Returns true if the model was successfully changed.
-     */
-    suspend fun setModel(agentId: String, modelValue: String): Boolean {
-        val conn = synchronized(connections) { connections[agentId] } ?: return false
-        return try {
-            if (conn.session.configOptionsSupported) {
-                // Preferred path: set the "model" config option
-                conn.session.setConfigOption(
-                    configId = SessionConfigId("model"),
-                    value = SessionConfigOptionValue.StringValue(modelValue),
-                )
-            } else {
-                // Legacy path: old session/set_model API
-                conn.session.setModel(ModelId(modelValue), null)
-            }
-            updateAgentInfo(agentId) { it.copy(currentModel = modelValue) }
-            true
-        } catch (e: Exception) {
-            false
-        }
     }
 
     // ─── Internal: agent connection lifecycle ──────────────────────────

@@ -88,8 +88,6 @@ data class AcpAgentDisplay(
  * and (c) per-agent usage totals.
  *
  * @param agents       list of agents to render
- * @param onModelChange invoked when the user picks a different session model for an agent
- * @param onModeChange  invoked when the user picks a different session mode for an agent
  * @param onRemoveAgent invoked when the user clicks the delete button on an agent card
  * @param onAddAgent    invoked when the user submits a manual agent configuration
  * @param syncData      current settings snapshot to share with another device
@@ -102,8 +100,6 @@ data class AcpAgentDisplay(
 @Composable
 fun AgentPanel(
     agents: List<AcpAgentDisplay>,
-    onModelChange: (agentId: String, model: String) -> Unit,
-    onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
     onAddAgent: (name: String, command: String, args: String) -> Unit,
     syncData: SettingsSyncData,
@@ -213,8 +209,6 @@ fun AgentPanel(
                     onToggleExpand = {
                         expandedStates[agent.id] = !(expandedStates[agent.id] ?: false)
                     },
-                    onModelChange = onModelChange,
-                    onModeChange = onModeChange,
                     onRemoveAgent = onRemoveAgent,
                     showHelp = showHelp,
                     usageRows24h = usageRows,
@@ -548,8 +542,6 @@ private fun AgentCard(
     agent: AcpAgentDisplay,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
-    onModelChange: (agentId: String, model: String) -> Unit,
-    onModeChange: (agentId: String, mode: String) -> Unit,
     onRemoveAgent: (agentId: String) -> Unit,
     showHelp: Boolean = false,
     usageRows24h: List<com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay> = emptyList(),
@@ -644,26 +636,11 @@ private fun AgentCard(
                 exit = shrinkVertically(),
             ) {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
-                    // Dashboard ACP session controls — these change only the
-                    // dashboard's live session, NOT any agent-wide config
-                    // (agents don't have one: models and permissions are
-                    // per conversation). Kept here for session launching.
-                    ModelRow(
-                        currentModel = agent.currentModel?.takeUnless { it.equals("unknown", ignoreCase = true) },
-                        availableModels = agent.availableModels,
-                        onModelSelected = { model -> onModelChange(agent.id, model) },
-                        showHelp = showHelp,
-                    )
-                    if (agent.availableModes.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        ModeRow(
-                            currentMode = agent.currentMode,
-                            availableModes = agent.availableModes,
-                            onModeSelected = { mode -> onModeChange(agent.id, mode) },
-                            showHelp = showHelp,
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
+                    // Session model/mode controls removed — they configured the
+                    // dashboard's ACP monitoring session, which has no chat/prompt
+                    // surface, and the mode setter was a no-op stub. Models and
+                    // permissions are per conversation in Letta; the dashboard is
+                    // a monitor, not a session launcher.
                     agent.framework?.let { fw ->
                         DetailRow(label = "Framework", value = fw)
                     }
@@ -828,200 +805,6 @@ private fun StatusDot(status: String) {
             .clip(CircleShape)
             .background(color),
     )
-}
-
-// ---------------------------------------------------------------------------
-// Model Row (with dropdown)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun ModelRow(
-    currentModel: String?,
-    availableModels: List<String>,
-    onModelSelected: (String) -> Unit,
-    showHelp: Boolean = false,
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Column {
-        // Label on its own line — never competes with the selector for width
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "Start dashboard session with model:",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (showHelp) {
-                Spacer(Modifier.width(4.dp))
-                HelpIcon(
-                    "Sets the model for a NEW dashboard session with this agent. " +
-                        "There is no agent-wide model — existing conversations keep their own. " +
-                        "See 'Models in use' on the card for what conversations actually run.",
-                )
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-
-        if (availableModels.isNotEmpty()) {
-            Box {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { expanded = true }
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        if (currentModel != null) {
-                            Text(
-                                text = "current",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            text = currentModel ?: "not set (agent default)",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Choose model",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                ) {
-                    availableModels.forEach { model ->
-                        DropdownMenuItem(
-                            text = { Text(model, style = MaterialTheme.typography.bodyMedium) },
-                            trailingIcon = if (model == currentModel) {
-                                { Icon(Icons.Default.Check, contentDescription = "Current", modifier = Modifier.size(16.dp)) }
-                            } else {
-                                null
-                            },
-                            onClick = {
-                                onModelSelected(model)
-                                expanded = false
-                            },
-                        )
-                    }
-                }
-            }
-        } else {
-            Text(
-                text = currentModel ?: "—",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Mode Row (selector chips)
-// ---------------------------------------------------------------------------
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ModeRow(
-    currentMode: String?,
-    availableModes: List<String>,
-    onModeSelected: (String) -> Unit,
-    showHelp: Boolean = false,
-) {
-    Column {
-        // Label on its own line
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "Start dashboard session with mode:",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (showHelp) {
-                Spacer(Modifier.width(4.dp))
-                HelpIcon(
-                    "Sets the permission mode for a NEW dashboard session with this agent. " +
-                        "Permissions are per conversation in the agent runtime — " +
-                        "existing conversations keep their own.",
-                )
-            }
-        }
-        if (currentMode != null) {
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = "current: $currentMode",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        // Chips wrap instead of squishing
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            availableModes.forEach { mode ->
-                ModeChip(
-                    label = mode,
-                    isSelected = mode == currentMode,
-                    onClick = { onModeSelected(mode) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModeChip(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-) {
-    val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val contentColor = if (isSelected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(containerColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        if (isSelected) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(14.dp),
-            )
-            Spacer(Modifier.width(3.dp))
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = contentColor,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-        )
-    }
 }
 
 // ---------------------------------------------------------------------------

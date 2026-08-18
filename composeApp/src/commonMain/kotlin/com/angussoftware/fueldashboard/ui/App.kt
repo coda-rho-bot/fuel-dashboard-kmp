@@ -170,12 +170,6 @@ private fun DesktopLayout(
             // Agents first
             AgentPanel(
                 agents = state.acpAgents,
-                onModelChange = { agentId, model ->
-                    viewModel.onAgentModelChange?.invoke(agentId, model)
-                },
-                onModeChange = { agentId, mode ->
-                    viewModel.onAgentModeChange?.invoke(agentId, mode)
-                },
                 onRemoveAgent = { agentId ->
                     viewModel.removeAgent(agentId)
                 },
