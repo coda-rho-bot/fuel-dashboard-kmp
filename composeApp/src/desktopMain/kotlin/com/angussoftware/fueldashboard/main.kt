@@ -337,14 +337,15 @@ fun main() = application {
         val now = com.angussoftware.fueldashboard.util.epochMillis()
         val day = now - 24 * 3_600_000L
         val week = now - 7 * 24 * 3_600_000L
+        val snapshots7d = fuelSnapshotRepo.getSince(week)
+        val usage7d = usageRepo.getSince(week)
         val providerWaste = com.angussoftware.fueldashboard.presentation.FuelIntelligence.providerWaste(
             snapshots = fuelSnapshotRepo.getProviderSnapshotsSince(week),
+            usage = usage7d,
             since = week,
             now = now,
         )
         // Fuel Advisor v3: regime from 7d snapshots, routine classification from 7d usage
-        val snapshots7d = fuelSnapshotRepo.getSince(week)
-        val usage7d = usageRepo.getSince(week)
         val resetAt = snapshots7d.mapNotNull { it.resetAt }.maxOrNull()
         val titles = usageRepo.getConversationTitles()
         val rawAdvice = com.angussoftware.fueldashboard.presentation.FuelAdvisor.advise(

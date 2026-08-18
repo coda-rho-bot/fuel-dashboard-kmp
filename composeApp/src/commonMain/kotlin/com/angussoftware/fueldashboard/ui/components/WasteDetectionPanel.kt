@@ -103,7 +103,8 @@ private fun DailyWasteRow(day: FuelIntelligence.DailyWaste, windowMs: Long) {
             }
             Text(
                 text = "${day.windows} × ${formatWindow(windowMs)}" +
-                    if (day.anyExhausted) " · hit 0% at least once" else "",
+                    (if (day.estimated > 0) " · ${day.estimated} est." else "") +
+                    (if (day.anyExhausted) " · hit 0% at least once" else ""),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

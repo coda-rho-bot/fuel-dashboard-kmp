@@ -77,6 +77,55 @@ class FuelIntelligenceTest {
     }
 
     @Test
+    fun unobservedWindowsReconstructedFromMeteredUsage() {
+        // Two observed 5h windows calibrate capacity; a third window passes
+        // with the dashboard DOWN (no snapshots) but metered usage exists.
+        val t0 = 1_000_000_000_000L
+        val snaps = listOf(
+            psnap(t0, 100.0),
+            psnap(t0 + 5 * hour, 50.0),           // window 1: 50% used
+            psnap(t0 + 6 * hour, 100.0),
+            psnap(t0 + 10 * hour, 50.0),          // window 2: 50% used
+            // dashboard down 10h..15h — window 3 unobserved
+            psnap(t0 + 15 * hour + minute(10), 100.0),
+        )
+        // Calibration: 50% used <-> 1000 tokens = 20 tokens per 1%
+        val usage = listOf(
+            usage(t0 + 4 * hour, 1000),
+            usage(t0 + 9 * hour, 1000),
+            usage(t0 + 14 * hour, 1000), // unobserved window's usage
+        )
+        val waste = FuelIntelligence.providerWaste(
+            snapshots = snaps, usage = usage,
+            since = t0, now = t0 + 15 * hour + minute(10),
+        )
+        assertEquals(1, waste.size)
+        val obs = waste.first().daily.sumOf { it.observed }
+        val est = waste.first().daily.sumOf { it.estimated }
+        assertTrue(obs >= 2, "expected >=2 observed, got $obs")
+        assertEquals(1, est, "expected 1 reconstructed, got $est (daily=${waste.first().daily})")
+        // Reconstructed: 1000 tokens / 20 per-% = 50% used -> 50% wasted.
+        // Verify via the tiles: average across 3 windows (50+50+50)/3 = 50
+        assertEquals(50.0, waste.first().wastedPctAvg, 15.0)
+    }
+
+    @Test
+    fun noCalibrationMeansNoReconstruction() {
+        val t0 = 1_000_000_000_000L
+        val snaps = listOf(
+            psnap(t0, 100.0),
+            psnap(t0 + 5 * hour, 50.0),
+            psnap(t0 + 15 * hour, 100.0), // long gap, unobserved windows
+        )
+        val usage = listOf(usage(t0 + 4 * hour, 1000))
+        val waste = FuelIntelligence.providerWaste(
+            snapshots = snaps, usage = usage,
+            since = t0, now = t0 + 15 * hour,
+        )
+        assertEquals(0, waste.first().daily.sumOf { it.estimated })
+    }
+
+    @Test
     fun fixedResetProviderWasteMeasuredAtActualResets() {
         // Letta-style daily: resets at fixed midnight times (resetAt jumps daily).
         // Usage pattern: burns to 30% remaining by end of day 1, 60% by day 2.

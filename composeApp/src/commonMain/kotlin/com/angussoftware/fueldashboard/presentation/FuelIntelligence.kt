@@ -24,15 +24,22 @@ object FuelIntelligence {
         val windowEnd: Long,
         /** Fuel level (remaining %) at expiry — this quota evaporated unused. */
         val wastedPct: Double,
+        /** False = measured from the gauge at expiry; true = reconstructed
+         *  from metered usage (dashboard was down at expiry). */
+        val estimated: Boolean = false,
     )
 
     /** Daily rollup of expired-quota waste for one provider. */
     data class DailyWaste(
         /** Local-day start (epoch ms). */
         val dayStart: Long,
-        /** Observed windows this day. */
+        /** Total windows this day (observed + estimated). */
         val windows: Int,
-        /** Average remaining-at-expiry across observed windows (0-100). */
+        /** Windows measured directly from the gauge. */
+        val observed: Int,
+        /** Windows reconstructed from metered usage (dashboard down at expiry). */
+        val estimated: Int,
+        /** Average remaining-at-expiry across windows (0-100). */
         val wastedPctAvg: Double,
         /** True if any window exhausted (nothing wasted). */
         val anyExhausted: Boolean,
@@ -69,6 +76,7 @@ object FuelIntelligence {
      */
     fun providerWaste(
         snapshots: List<com.angussoftware.fueldashboard.database.ProviderFuelSnapshot>,
+        usage: List<UsageRecord> = emptyList(),
         since: Long,
         now: Long,
     ): List<ProviderWaste> {
@@ -83,11 +91,12 @@ object FuelIntelligence {
                     ?.toLong() ?: return@mapNotNull null
 
                 val sorted = rows.sortedBy { it.timestamp }
-                val tiles = if (isFixedReset(sorted, windowMs)) {
+                val measured = if (isFixedReset(sorted, windowMs)) {
                     resetDrivenTiles(sorted)
                 } else {
                     gridTiles(sorted, windowMs, now)
                 }
+                val tiles = reconstructGaps(measured, usage, windowMs, sorted.first().timestamp, now)
                 if (tiles.isEmpty()) return@mapNotNull null
                 val daily = dailyWaste(tiles)
                 if (daily.isEmpty()) return@mapNotNull null
@@ -151,21 +160,61 @@ object FuelIntelligence {
         var boundary = withPct.first().first + windowMs
         var cursor = 0
         while (boundary <= now) {
+            // Remaining AT expiry: prefer the LATEST snapshot at-or-before the
+            // boundary (post-boundary snapshots reflect the next window).
             var best: Pair<Long, Double>? = null
-            while (cursor < withPct.size && withPct[cursor].first <= boundary + tolerance) {
+            while (cursor < withPct.size && withPct[cursor].first <= boundary) {
                 val cand = withPct[cursor]
-                if (cand.first >= boundary - tolerance) {
-                    if (best == null || kotlin.math.abs(cand.first - boundary) < kotlin.math.abs(best.first - boundary)) {
-                        best = cand
-                    }
-                }
-                if (cand.first > boundary) break
+                if (cand.first >= boundary - tolerance) best = cand
                 cursor++
             }
             if (best != null) tiles.add(WasteTile(windowEnd = boundary, wastedPct = best.second))
             boundary += windowMs
         }
         return tiles
+    }
+
+    /**
+     * Reconstructs waste for windows the dashboard was down to observe, from
+     * metered usage: used% = tokens-in-window / capacity, capacity calibrated
+     * from windows we DID observe (tokens <-> gauge-% correspondence).
+     * Requires >=2 calibration points; otherwise missing windows stay missing
+     * — never fabricate without basis. Reconstructed tiles are marked estimated.
+     */
+    private fun reconstructGaps(
+        measured: List<WasteTile>,
+        usage: List<UsageRecord>,
+        windowMs: Long,
+        dataStart: Long,
+        now: Long,
+    ): List<WasteTile> {
+        if (usage.isEmpty() || measured.size < 2) return measured
+
+        // Calibrate: tokens per used-% from observed tiles
+        val calibrations = measured.mapNotNull { tile ->
+            val tokens = usage.filter { it.timestamp in (tile.windowEnd - windowMs)..tile.windowEnd }
+                .sumOf { it.inputTokens + it.outputTokens }
+            val usedPct = 100.0 - tile.wastedPct
+            if (usedPct >= 5.0 && tokens > 0) tokens / usedPct else null
+        }
+        if (calibrations.size < 2) return measured
+        val perPct = calibrations.sorted()[calibrations.size / 2] // median tokens per 1%
+
+        val boundaries = mutableListOf<Long>()
+        var b = dataStart + windowMs
+        while (b <= now) {
+            boundaries.add(b)
+            b += windowMs
+        }
+        val have = measured.map { it.windowEnd }.toHashSet()
+
+        val reconstructed = boundaries.filter { it !in have }.map { boundary ->
+            val tokens = usage.filter { it.timestamp in (boundary - windowMs)..boundary }
+                .sumOf { it.inputTokens + it.outputTokens }
+            val usedPct = (tokens / perPct).coerceIn(0.0, 100.0)
+            WasteTile(windowEnd = boundary, wastedPct = 100.0 - usedPct, estimated = true)
+        }
+        return (measured + reconstructed).sortedBy { it.windowEnd }
     }
 
     /** Rolls observed tiles into local-day averages. */
@@ -177,6 +226,8 @@ object FuelIntelligence {
                 DailyWaste(
                     dayStart = dayKey * 86_400_000,
                     windows = dayTiles.size,
+                    observed = dayTiles.count { !it.estimated },
+                    estimated = dayTiles.count { it.estimated },
                     wastedPctAvg = dayTiles.map { it.wastedPct }.average(),
                     anyExhausted = dayTiles.any { it.wastedPct <= 1.0 },
                 )
