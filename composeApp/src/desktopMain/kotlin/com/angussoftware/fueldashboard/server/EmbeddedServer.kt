@@ -68,6 +68,7 @@ class EmbeddedServer(
     private val port: Int = DEFAULT_PORT,
     private val host: String = DEFAULT_HOST,
     private val onProvidersChanged: () -> Unit = {},
+    private val dashboardStateProvider: () -> com.angussoftware.fueldashboard.presentation.DashboardState? = { null },
 ) {
     companion object {
         const val DEFAULT_PORT = 8322
@@ -218,11 +219,12 @@ class EmbeddedServer(
             serverUrlProvider = { serverUrl },
             serverApiKeyProvider = { apiKey },
             usageRepository = usageRepository,
+            dashboardStateProvider = dashboardStateProvider,
         ).createServer()
 
         routing {
             get("/") {
-                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /sync", "POST /sync", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
+                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /sync", "POST /sync", "GET /dashboard", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
             }
 
             get("/fuel") {
@@ -444,6 +446,17 @@ class EmbeddedServer(
                     })
                 }.toString()
                 call.respondText(text = responseJson, contentType = ContentType.Application.Json)
+            }
+
+            // Complete dashboard display state (everything the UI shows, no secrets)
+            get("/dashboard") {
+                val state = dashboardStateProvider()
+                if (state == null) {
+                    call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("dashboard state unavailable"))
+                } else {
+                    val snapshot = com.angussoftware.fueldashboard.presentation.DashboardSnapshot.build(state)
+                    call.respondText(snapshot.toString(), ContentType.Application.Json)
+                }
             }
 
             // Lightweight health check — no auth required (for uptime monitors).

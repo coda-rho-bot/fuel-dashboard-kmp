@@ -21,6 +21,7 @@ All data endpoints require `Authorization: Bearer <api key>`. `/health` is open 
 |----------|--------|---------|
 | `/health` | GET | liveness (no auth) |
 | `/fuel` | GET | provider levels, burn rates, windows, alerts, recommendation |
+| `/dashboard` | GET | **complete display state** — everything the UI shows (providers, projection, advisor, all metered breakdowns, waste, events, agents), no secrets |
 | `/v1/usage?since=<ms>` | GET | usage aggregates since an epoch-ms cutoff |
 | `/v1/usage` | POST | **self-report usage**: `{"source", "model", "input_tokens", "output_tokens", "request_count", "conversation_id", "timestamp"}` |
 | `/agents` | GET | registered agents (ACP + MCP + synced) |
@@ -30,7 +31,7 @@ All data endpoints require `Authorization: Bearer <api key>`. `/health` is open 
 | `/sync` | GET/POST | settings sync payload |
 | `/alerts` | GET | alert list |
 | `/decisions` | GET | decision history |
-| `/mcp` | POST | MCP (Streamable HTTP) — 11 tools incl. `register_agent`, `report_usage`, `get_usage`, `update_model`, `update_status`, provider management, settings sync |
+| `/mcp` | POST | MCP (Streamable HTTP) — 15 tools: `get_dashboard` (full state), `get_waste`, `get_fuel_events`, `get_advice`, `get_usage`, `report_usage`, `register_agent`, `update_model`, `update_status`, `add_provider`, `remove_provider`, `list_providers`, `add_orchestrator`, `get_sync_data`, `apply_sync_data` |
 
 ### Reporting usage from anything
 
@@ -57,6 +58,20 @@ The schema aligns with OpenTelemetry GenAI semantic conventions (`source` ≈ se
 | `registered_agents` | MCP/self-registered agents |
 
 Retention: usage records 90d, snapshots 7d (auto-cleanup).
+
+## Programmatic access for agents
+
+Every piece of information the UI displays is queryable by agents — designed for CI, cron jobs, and other agents (e.g. PR reviewers checking quota before running heavy work):
+
+```bash
+# Full state in one call (HTTP)
+curl -s http://127.0.0.1:8322/dashboard -H "Authorization: Bearer $FUEL_KEY" | jq .advisor
+
+# Or via MCP from any Letta agent: the fuel-dashboard MCP server's tools
+# get_dashboard / get_waste / get_fuel_events / get_advice / get_usage
+```
+
+The snapshot covers: provider levels/resets/errors, fuel projection (burn rate, exhaustion, headroom), the advisor's full advice state (regime + routine consumers with savings), all metered usage breakdowns (source / model / conversation / agent×model, 24h + 7d), wasted quota per provider (daily rows, observed vs estimated), the fuel event timeline, model drain rates, agents with models-in-use, and ingestion status. Secrets (API keys) are excluded by construction.
 
 ## MCP integration
 

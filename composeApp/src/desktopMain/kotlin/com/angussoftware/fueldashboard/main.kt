@@ -64,6 +64,7 @@ fun main() = application {
             repository = repository,
             agentRegistry = agentRegistry,
             usageRepository = usageRepo,
+            dashboardStateProvider = { viewModel.state.value },
             onProvidersChanged = { viewModel.reloadSettings() },
         )
     }

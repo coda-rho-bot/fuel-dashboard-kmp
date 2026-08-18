@@ -95,6 +95,7 @@ internal class FuelMcpServer(
     private val serverUrlProvider: () -> String? = { null },
     private val serverApiKeyProvider: () -> String = { "" },
     private val usageRepository: com.angussoftware.fueldashboard.database.UsageRepository? = null,
+    private val dashboardStateProvider: () -> com.angussoftware.fueldashboard.presentation.DashboardState? = { null },
 ) {
     private val json = Json { encodeDefaults = true; explicitNulls = false; ignoreUnknownKeys = true }
 
@@ -114,6 +115,10 @@ internal class FuelMcpServer(
             ),
         ),
     ) {
+        getDashboardTool()
+        getWasteTool()
+        getFuelEventsTool()
+        getAdviceTool()
         registerAgentTool()
         updateModelTool()
         updateStatusTool()
@@ -724,6 +729,91 @@ internal class FuelMcpServer(
             ),
         ),
     )
+
+    /**
+     * Tool: get_dashboard
+     *
+     * The complete dashboard display state — every piece of information the UI
+     * shows: providers (levels, resets, errors), fuel projection, advisor
+     * advice, all metered usage breakdowns (source/model/conversation/agent×model,
+     * 24h+7d), wasted quota per provider, fuel events timeline, model drain
+     * rates, agents, ingestion status. No secrets (API keys excluded).
+     */
+    private fun Server.getDashboardTool() {
+        addTool(
+            name = "get_dashboard",
+            description = "Get the COMPLETE dashboard state: providers, fuel projection, advisor advice, " +
+                "metered usage (all breakdowns, 24h+7d), wasted quota, fuel events, model drain rates, " +
+                "agents, ingestion status. Everything the UI displays, no secrets.",
+            inputSchema = ToolSchema(properties = buildJsonObject { }),
+        ) { _ ->
+            val state = dashboardStateProvider()
+                ?: return@addTool errorResult("dashboard state unavailable")
+            val snapshot = com.angussoftware.fueldashboard.presentation.DashboardSnapshot.build(state)
+            CallToolResult(content = listOf(TextContent(text = snapshot.toString())))
+        }
+    }
+
+    /**
+     * Tool: get_waste — expired-quota waste per provider (unused capacity at
+     * each window expiry), with daily rollups and observed/estimated counts.
+     */
+    private fun Server.getWasteTool() {
+        addTool(
+            name = "get_waste",
+            description = "Wasted quota per provider: how much quota expired unused at each window " +
+                "expiry (provider-specific window mechanics), daily averages, observed vs estimated windows.",
+            inputSchema = ToolSchema(properties = buildJsonObject { }),
+        ) { _ ->
+            val state = dashboardStateProvider()
+                ?: return@addTool errorResult("dashboard state unavailable")
+            if (state.wasteByProvider.isEmpty()) {
+                return@addTool CallToolResult(content = listOf(TextContent(text = "{\"waste\": {}}")))
+            }
+            val waste = com.angussoftware.fueldashboard.presentation.DashboardSnapshot.build(state)["waste"] ?: kotlinx.serialization.json.JsonObject(emptyMap())
+            CallToolResult(content = listOf(TextContent(text = waste.toString())))
+        }
+    }
+
+    /**
+     * Tool: get_fuel_events — the deduplicated fuel event timeline (drops,
+     * model switches, recommendation changes), newest first.
+     */
+    private fun Server.getFuelEventsTool() {
+        addTool(
+            name = "get_fuel_events",
+            description = "Fuel event timeline: significant gauge drops (burst-aggregated), agent model " +
+                "switches, and recommendation changes — newest first, deduplicated.",
+            inputSchema = ToolSchema(properties = buildJsonObject { }),
+        ) { _ ->
+            val state = dashboardStateProvider()
+                ?: return@addTool errorResult("dashboard state unavailable")
+            val events = com.angussoftware.fueldashboard.presentation.DashboardSnapshot.build(state)["fuel_events"] ?: kotlinx.serialization.json.JsonObject(emptyMap())
+            CallToolResult(content = listOf(TextContent(text = events.toString())))
+        }
+    }
+
+    /**
+     * Tool: get_advice — the Fuel Advisor's current regime-aware advice state
+     * (surplus/healthy/at-risk/persistent-pressure) with routine-consumer details.
+     */
+    private fun Server.getAdviceTool() {
+        addTool(
+            name = "get_advice",
+            description = "Current fuel advisor advice: quota regime (exhaustion history), window " +
+                "projection, and — when actionable — which routine work to move to a cheaper model " +
+                "with projected savings.",
+            inputSchema = ToolSchema(properties = buildJsonObject { }),
+        ) { _ ->
+            val state = dashboardStateProvider()
+                ?: return@addTool errorResult("dashboard state unavailable")
+            if (state.fuelAdvice == null) {
+                return@addTool CallToolResult(content = listOf(TextContent(text = "{\"advisor\": null, \"message\": \"advisor data not yet computed\"}")))
+            }
+            val advice = com.angussoftware.fueldashboard.presentation.DashboardSnapshot.build(state)["advisor"] ?: kotlinx.serialization.json.JsonNull
+            CallToolResult(content = listOf(TextContent(text = advice.toString())))
+        }
+    }
 
     private fun errorResult(message: String): CallToolResult =
         CallToolResult(
