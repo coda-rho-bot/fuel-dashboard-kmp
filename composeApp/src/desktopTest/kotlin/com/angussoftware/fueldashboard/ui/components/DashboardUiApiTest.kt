@@ -95,7 +95,7 @@ class DashboardUiApiTest {
         val mobile = sourceFile("ui/MobileDashboard.kt").readText()
 
         assertTrue(app.contains("FuelEventHistoryPanel(events = state.fuelEvents)"))
-        assertTrue(app.contains("WasteDetectionPanel(windows = state.wasteWindows24h)"))
+        assertTrue(app.contains("WasteDetectionPanel(providers = state.wasteByProvider)"))
         assertTrue(mobile.contains("MobileFleetEmptyState("))
         assertTrue(mobile.contains("if (state.acpAgents.isEmpty() && state.settings.providers.isEmpty())"))
     }

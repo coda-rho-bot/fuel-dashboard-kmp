@@ -51,9 +51,9 @@ Conversations display human-readable titles instead of UUIDs. Title resolution i
 
 `Model Consumption` correlates gauge drops with active models at poll time — correlational, not exact. Useful for drain-rate feel (`%/hr` per model); don't use it for accounting (use metered usage).
 
-## Waste detection
+## Wasted quota
 
-Compares hourly gauge drops against metered tokens in the same window (with ~10-minute ingestion-lag tolerance). A window with ≥1% drop and <1K metered tokens is flagged unattributed. See [Usage tab](tabs/usage.md#waste-detection).
+Per-provider: the fuel level at each quota-window expiry (window length from the provider's own metadata) — the quota that evaporated unused. Sampling the gauge at each window boundary yields adjacent, non-overlapping windows. See [Usage tab](tabs/usage.md#wasted-quota).
 
 ## The advisor
 

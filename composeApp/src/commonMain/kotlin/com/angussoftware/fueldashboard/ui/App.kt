@@ -227,7 +227,7 @@ private fun DesktopLayout(
                     if (state.modelDrainRates.isNotEmpty()) {
                         ModelDrainRatesPanel(rates = state.modelDrainRates)
                     }
-                    WasteDetectionPanel(windows = state.wasteWindows24h)
+                    WasteDetectionPanel(providers = state.wasteByProvider)
                 }
             }
 

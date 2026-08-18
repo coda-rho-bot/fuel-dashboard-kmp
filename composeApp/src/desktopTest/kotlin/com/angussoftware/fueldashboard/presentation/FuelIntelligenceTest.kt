@@ -37,67 +37,61 @@ class FuelIntelligenceTest {
     private val hour = 3_600_000L
 
     // ------------------------------------------------------------------
-    // Waste windows
+    // Expired-quota waste (provider-aware)
     // ------------------------------------------------------------------
 
-    @Test
-    fun wasteWindowFlagsDropWithoutMeteredUsage() {
-        val h0 = 1_000_000_000_000L / hour * hour
-        val snaps = listOf(
-            snapshot(h0 + 0, 80.0),
-            snapshot(h0 + minute(10), 75.0), // -5% consumption
-            snapshot(h0 + minute(20), 75.0),
+    private fun psnap(ts: Long, pct: Double, windowHours: Double = 5.0, provider: String = "zai") =
+        com.angussoftware.fueldashboard.database.ProviderFuelSnapshot(
+            id = 0L, timestamp = ts, providerId = provider, providerName = provider,
+            providerType = "WINDOW_CREDIT", remainingPct = pct, resetAt = null, windowHours = windowHours,
         )
-        val windows = FuelIntelligence.wasteWindows(snaps, usage = emptyList(), hours = 24)
-        assertEquals(1, windows.size)
-        val w = windows.first()
-        assertEquals(5.0, w.fuelConsumedPct, 0.001)
-        assertEquals(0L, w.meteredTokens)
-        assertTrue(w.unattributed)
+
+    @Test
+    fun unusedWindowIsFullyWasted() {
+        // 5h window, gauge stays at 100% remaining the whole time
+        val t0 = 1_000_000_000_000L
+        val snaps = (0..3).map { h ->
+            psnap(t0 + h * 5 * hour, 100.0)
+        }
+        val waste = FuelIntelligence.providerWaste(snaps, since = t0, now = t0 + 4 * 5 * hour)
+        assertEquals(1, waste.size)
+        assertEquals(100.0, waste.first().wastedPctAvg, 0.01)
     }
 
     @Test
-    fun wasteWindowDoesNotFlagDropWithMeteredUsage() {
-        val h0 = 1_000_000_000_000L / hour * hour
-        val snaps = listOf(
-            snapshot(h0 + 0, 80.0),
-            snapshot(h0 + minute(10), 75.0), // -5%
-        )
-        val usage = listOf(usage(h0 + minute(5), 50_000))
-        val windows = FuelIntelligence.wasteWindows(snaps, usage, hours = 24)
-        assertEquals(1, windows.size)
-        assertTrue(!windows.first().unattributed)
-        assertEquals(50_000L, windows.first().meteredTokens)
+    fun windowEndingAtTenPercentWastesTen() {
+        val t0 = 1_000_000_000_000L
+        // boundary samples: 90% used at each expiry → 10% remaining wasted
+        val snaps = (1..3).map { k -> psnap(t0 + k * 5 * hour, 10.0) }
+        val waste = FuelIntelligence.providerWaste(snaps, since = t0, now = t0 + 3 * 5 * hour)
+        assertEquals(10.0, waste.first().wastedPctAvg, 0.01)
     }
 
     @Test
-    fun wasteWindowIgnoresRisesAndTinyDrops() {
-        val h0 = 1_000_000_000_000L / hour * hour
-        val snaps = listOf(
-            snapshot(h0 + 0, 80.0),
-            snapshot(h0 + minute(10), 90.0), // rise (window expiry) — not consumption
-            snapshot(h0 + minute(20), 89.8), // -0.2% below threshold
-        )
-        val windows = FuelIntelligence.wasteWindows(snaps, usage = emptyList(), hours = 24)
-        // 89.8 bucket: 0.2 consumed, but below 1.0 threshold → window exists, unattributed=false
-        assertEquals(1, windows.size)
-        assertTrue(!windows.first().unattributed)
-        assertEquals(0.2, windows.first().fuelConsumedPct, 0.001)
+    fun exhaustedWindowsWasteNothing() {
+        val t0 = 1_000_000_000_000L
+        val snaps = (1..3).map { k -> psnap(t0 + k * 5 * hour, 0.0) }
+        val waste = FuelIntelligence.providerWaste(snaps, since = t0, now = t0 + 3 * 5 * hour)
+        assertEquals(0.0, waste.first().wastedPctAvg, 0.01)
+        assertTrue(waste.first().daily.all { it.anyExhausted })
     }
 
     @Test
-    fun wasteWindowsBucketsByHour() {
-        val h0 = 1_000_000_000_000L / hour * hour
-        val snaps = listOf(
-            snapshot(h0 + minute(59), 80.0),
-            snapshot(h0 + hour + minute(1), 70.0), // bucket 2: -10%
-            snapshot(h0 + hour + minute(30), 68.0), // bucket 2: -2% (total 12)
-            snapshot(h0 + 2 * hour, 60.0), // bucket 3: -8%
+    fun providerWindowLengthComesFromItsOwnMetadata() {
+        val t0 = 1_000_000_000_000L
+        // zai: 5h windows; letta-daily: 24h windows — same timeline
+        val zai = (1..2).map { k -> psnap(t0 + k * 5 * hour, 50.0, windowHours = 5.0, provider = "zai") }
+        val letta = listOf(
+            psnap(t0, 90.0, windowHours = 24.0, provider = "letta"),
+            psnap(t0 + 24 * hour, 80.0, windowHours = 24.0, provider = "letta"),
         )
-        val windows = FuelIntelligence.wasteWindows(snaps, usage = emptyList(), hours = 24)
-        assertEquals(2, windows.size)
-        assertEquals(12.0, windows[0].fuelConsumedPct, 0.001)
-        assertEquals(8.0, windows[1].fuelConsumedPct, 0.001)
+        val waste = FuelIntelligence.providerWaste(zai + letta, since = t0, now = t0 + 24 * hour)
+        assertEquals(2, waste.size)
+        val z = waste.first { it.providerId == "zai" }
+        val l = waste.first { it.providerId == "letta" }
+        assertEquals(5 * hour, z.windowMs)
+        assertEquals(24 * hour, l.windowMs)
+        assertEquals(1, l.daily.first().windows) // one 24h window observed
     }
 
     // ------------------------------------------------------------------

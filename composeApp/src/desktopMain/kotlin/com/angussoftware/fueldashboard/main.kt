@@ -337,9 +337,10 @@ fun main() = application {
         val now = com.angussoftware.fueldashboard.util.epochMillis()
         val day = now - 24 * 3_600_000L
         val week = now - 7 * 24 * 3_600_000L
-        val windows = com.angussoftware.fueldashboard.presentation.FuelIntelligence.wasteWindows(
-            snapshots = fuelSnapshotRepo.getSince(day),
-            usage = usageRepo.getSince(day),
+        val providerWaste = com.angussoftware.fueldashboard.presentation.FuelIntelligence.providerWaste(
+            snapshots = fuelSnapshotRepo.getProviderSnapshotsSince(week),
+            since = week,
+            now = now,
         )
         // Fuel Advisor v3: regime from 7d snapshots, routine classification from 7d usage
         val snapshots7d = fuelSnapshotRepo.getSince(week)
@@ -382,7 +383,7 @@ fun main() = application {
             },
         )
         com.angussoftware.fueldashboard.presentation.IntelligenceData(
-            wasteWindows = windows,
+            wasteByProvider = providerWaste,
             fuelEvents = events,
             advice = advice,
         )

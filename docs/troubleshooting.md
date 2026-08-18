@@ -46,13 +46,11 @@ Titles resolve through a layered pipeline (summary → `Agent · Date` fallback 
 
 If both are true, an empty timeline means no threshold-crossing events. Tune **Settings → Intelligence → drop threshold** down (0.5) for a fuller timeline.
 
-## Waste detection flags windows with obvious usage
+## Wasted quota shows unexpected values
 
-Possible causes:
-
-- **Metering lag >10 min** — usage records arriving very late attribute to the wrong hour; the detector tolerates ~10 minutes
-- **Consumption the metering can't see** — non-Letta usage that nobody reported (that's exactly what waste detection is *for*: fuel with no receipt)
-- **Restart storms** — legitimate flag; app restarts burn ~10× normal re-initializing agents
+- **High waste is not an error** — it means quota windows expired with fuel remaining (unused capacity). Cross-check with the advisor: surplus regime = high expected waste.
+- **Missing days** — the dashboard must have been running to observe window expiries; gaps in uptime show as missing daily rows.
+- **Window counts** — a full day has ~4-5 five-hour windows (z.ai) or 1 daily window (Letta). Fewer means some expiries weren't observed.
 
 ## Agents show "disconnected" / no ACP agents
 

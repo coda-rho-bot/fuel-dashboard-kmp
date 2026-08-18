@@ -91,6 +91,9 @@ SELECT DISTINCT provider_id FROM provider_fuel_snapshots;
 selectRecentProviderSnapshots:
 SELECT * FROM provider_fuel_snapshots ORDER BY timestamp DESC LIMIT :limit;
 
+selectProviderSnapshotsSince:
+SELECT * FROM provider_fuel_snapshots WHERE timestamp >= :since ORDER BY timestamp ASC;
+
 deleteOldProviderFuelSnapshots:
 DELETE FROM provider_fuel_snapshots WHERE timestamp < :cutoff;
 

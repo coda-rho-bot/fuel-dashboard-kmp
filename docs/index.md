@@ -27,7 +27,7 @@ It runs as a Kotlin Multiplatform app (desktop + Android) with an embedded API s
     The "am I OK?" glance: fuel status card (levels, burn rate, projection, sparkline, advisor advice), one tile per provider, last-update status.
 
 === "Usage"
-    The "where did it go?" view: metered usage by source, model, conversation, and agent×model cross-tab (24h / 7d), per-model consumption attributed from gauge drops, and waste detection for unattributed drain.
+    The "where did it go?" view: metered usage by source, model, conversation, and agent×model cross-tab (24h / 7d), per-model consumption attributed from gauge drops, and wasted-quota tracking (capacity that expired unused).
 
 === "Intel"
     The "what happened?" timeline: fuel drops (burst-aggregated), agent model switches, and recommendation changes — newest first, deduplicated.

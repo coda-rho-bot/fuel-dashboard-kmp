@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,82 +23,87 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * Waste detection: hourly windows where the fuel gauge dropped while
- * metered usage showed (nearly) nothing. Unattributed drain = idle
- * polling, restart storms, or consumption the metering doesn't see.
+ * Expired-quota waste: how much quota evaporated unused when each 5h window
+ * slid. A window that slides with fuel still remaining wasted that fuel —
+ * it did not carry over. 100% remaining at expiry = the whole window wasted;
+ * exhausted to 0% = nothing wasted.
  */
 @Composable
 fun WasteDetectionPanel(
-    windows: List<FuelIntelligence.WasteWindow>,
+    providers: List<FuelIntelligence.ProviderWaste>,
     modifier: Modifier = Modifier,
 ) {
-    if (windows.isEmpty()) return
+    if (providers.isEmpty()) return
 
-    val flagged = windows.filter { it.unattributed }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Waste Detection",
+                text = "Wasted Quota",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.width(4.dp))
-            HelpIcon("Hours where fuel dropped but metered usage was near zero — unattributed drain from idle polling, restart storms, or unmetered consumption")
+            HelpIcon(
+                "Quota that expired unused when each window closed. A window that ends with fuel remaining wasted it — quota does not carry over. " +
+                    "Window length follows each provider\u2019s own quota mechanics (z.ai 5h, Letta daily 24h, pools = refill period). " +
+                    "High waste = capacity you paid for went unused.",
+            )
         }
         Spacer(Modifier.height(8.dp))
 
-        if (flagged.isEmpty()) {
-            Text(
-                text = "No unattributed drain in the last 24h — every significant drop lines up with metered usage. ✅",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Text(
-                text = "${flagged.size} hour${if (flagged.size == 1) "" else "s"} with unattributed fuel consumption:",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.error,
-            )
+        providers.forEach { pw ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = pw.providerName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "${pw.wastedPctAvg.toInt()}% avg/day wasted",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (pw.wastedPctAvg > 60) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
             Spacer(Modifier.height(4.dp))
-            flagged.forEach { window ->
-                WasteRow(window)
+            pw.daily.take(7).forEach { day ->
+                DailyWasteRow(day, windowMs = pw.windowMs)
                 HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
             }
+            Spacer(Modifier.height(8.dp))
         }
-
-        // Compact per-hour consumption summary (context, newest last)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = windows.joinToString("  ") { w ->
-                "${formatHour(w.hourStart)} ${"%.1f".format(w.fuelConsumedPct)}%"
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
 @Composable
-private fun WasteRow(window: FuelIntelligence.WasteWindow) {
+private fun DailyWasteRow(day: FuelIntelligence.DailyWaste, windowMs: Long) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = formatHour(window.hourStart),
+            text = formatDate(day.dayStart),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
         )
         Column(horizontalAlignment = Alignment.End) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${day.wastedPctAvg.toInt()}% wasted",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        day.wastedPctAvg > 70 -> MaterialTheme.colorScheme.tertiary
+                        day.wastedPctAvg > 40 -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.primary
+                    },
+                )
+            }
             Text(
-                text = "${"%.1f".format(window.fuelConsumedPct)}% consumed · ${formatTokens(window.meteredTokens)} metered",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Text(
-                text = "${"%.1f".format(window.avgActiveAgents)} avg active agents",
+                text = "${day.windows} × ${formatWindow(windowMs)}" +
+                    if (day.anyExhausted) " · hit 0% at least once" else "",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -105,14 +111,12 @@ private fun WasteRow(window: FuelIntelligence.WasteWindow) {
     }
 }
 
-private fun formatHour(epochMs: Long): String {
+private fun formatWindow(windowMs: Long): String =
+    if (windowMs >= 24 * 3_600_000L) "${(windowMs / (24 * 3_600_000L))}d window"
+    else "${(windowMs / 3_600_000L)}h window"
+
+private fun formatDate(epochMs: Long): String {
     val local = Instant.fromEpochMilliseconds(epochMs)
         .toLocalDateTime(TimeZone.currentSystemDefault())
-    return "${local.hour.toString().padStart(2, '0')}:00"
-}
-
-private fun formatTokens(tokens: Long): String = when {
-    tokens >= 1_000_000 -> "${"%.1f".format(tokens / 1_000_000.0)}M"
-    tokens >= 1_000 -> "${"%.1f".format(tokens / 1_000.0)}K"
-    else -> tokens.toString()
+    return "${local.monthNumber.toString().padStart(2, '0')}-${local.dayOfMonth.toString().padStart(2, '0')}"
 }

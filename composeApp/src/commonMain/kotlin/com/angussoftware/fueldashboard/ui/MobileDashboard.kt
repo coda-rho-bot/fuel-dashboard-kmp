@@ -152,7 +152,7 @@ fun MobileDashboard(
                     }
 
                     // Waste detection (unattributed drain)
-                    WasteDetectionPanel(windows = state.wasteWindows24h)
+                    WasteDetectionPanel(providers = state.wasteByProvider)
                 }
             }
 

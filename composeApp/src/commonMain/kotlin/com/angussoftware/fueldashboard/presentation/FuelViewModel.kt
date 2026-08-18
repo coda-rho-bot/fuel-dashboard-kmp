@@ -139,7 +139,7 @@ data class MeteredUsageWindows(
 
 /** Fuel Intelligence tab data — waste windows + merged event timeline. */
 data class IntelligenceData(
-    val wasteWindows: List<FuelIntelligence.WasteWindow> = emptyList(),
+    val wasteByProvider: List<FuelIntelligence.ProviderWaste> = emptyList(),
     val fuelEvents: List<FuelIntelligence.FuelEvent> = emptyList(),
     val advice: FuelAdvisor.Advice? = null,
 )
@@ -243,7 +243,7 @@ data class DashboardState(
     val meteredByConversation7d: List<ConversationUsageDisplay> = emptyList(),
     val meteredByAgentModel24h: List<AgentModelUsageDisplay> = emptyList(),
     val meteredByAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
-    val wasteWindows24h: List<FuelIntelligence.WasteWindow> = emptyList(),
+    val wasteByProvider: List<FuelIntelligence.ProviderWaste> = emptyList(),
     val fuelEvents: List<FuelIntelligence.FuelEvent> = emptyList(),
     val fuelAdvice: FuelAdvisor.Advice? = null,
 ) {
@@ -985,7 +985,7 @@ class FuelViewModel {
             meteredByConversation7d = metered?.byConversation7d ?: emptyList(),
             meteredByAgentModel24h = metered?.byAgentModel24h ?: emptyList(),
             meteredByAgentModel7d = metered?.byAgentModel7d ?: emptyList(),
-            wasteWindows24h = intelligence?.wasteWindows ?: emptyList(),
+            wasteByProvider = intelligence?.wasteByProvider ?: emptyList(),
             fuelEvents = intelligence?.fuelEvents ?: emptyList(),
             fuelAdvice = intelligence?.advice,
         )

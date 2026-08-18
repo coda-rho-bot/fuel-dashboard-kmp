@@ -259,6 +259,21 @@ class FuelSnapshotRepository(driver: SqlDriver) {
         )
     }
 
+    /** All providers' snapshots since a cutoff (ascending). */
+    fun getProviderSnapshotsSince(since: Long): List<ProviderFuelSnapshot> =
+        queries.selectProviderSnapshotsSince(since).executeAsList().map { row ->
+            ProviderFuelSnapshot(
+                id = row.id,
+                timestamp = row.timestamp,
+                providerId = row.provider_id,
+                providerName = row.provider_name,
+                providerType = row.provider_type,
+                remainingPct = row.remaining_pct,
+                resetAt = row.reset_at,
+                windowHours = row.window_hours,
+            )
+        }
+
     fun getAllProviderBurnRates(windowMs: Long = 3_600_000): List<ProviderBurnRate> {
         val providerIds = queries.selectAllLatestProviderSnapshots().executeAsList()
         val now = epochMillis()

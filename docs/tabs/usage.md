@@ -22,12 +22,15 @@ Per-model fuel consumption **attributed from gauge drops**: when the z.ai gauge 
 !!! note "Attribution vs metering"
     Metered Usage (above) is *exact* — per-run token counts. Model Consumption is *correlational* — gauge drops matched against active models. Use metered for "who/what"; use consumption for "%/hr drain feel".
 
-## Waste Detection
+## Wasted Quota
 
-Flags hourly windows where **the gauge dropped but metered usage shows nearly nothing** (≥1% consumed, <1K tokens metered). Unattributed drain means one of:
+How much quota **expired unused** when each window closed. A window that ends with fuel still remaining wasted it — quota does not carry over:
 
-- **Idle/background consumption** the metering doesn't see (e.g. provider-side overhead)
-- **Restart storms** — app restarts re-initialize every agent simultaneously (historically ~10× normal burn)
-- **Metering lag** — usage records that arrive after the hour bucket they belong to (the detector tolerates ~10 minutes of lag; beyond that shows as unattributed)
+- A 5h window passes with no usage → **100% wasted**
+- A window slides with 10% remaining → **10% wasted**
+- A window exhausted to 0% → **0% wasted** (you used everything you had)
 
+The window length follows each provider's own quota mechanics — z.ai's 5-hour sliding window, Letta's daily 24h, credit pools' refill period — read from each provider's snapshot metadata, not hardcoded. Daily rows show the average remaining-at-expiry across that day's windows, with an "hit 0% at least once" marker when any window ran dry.
+
+High waste means capacity went unused (the advisor's surplus regime pairs with this: it's when downgrades are pointless — but also when extra smart-model work is effectively free).
 A clean day shows the all-clear line explicitly. Persistent unattributed windows are worth investigating — that's fuel with no receipt.
