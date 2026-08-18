@@ -72,3 +72,7 @@ The Android app is the same dashboard (Fuel / Usage / Agents / Intel / Settings 
 | MCP endpoint | `http://127.0.0.1:8322/mcp` (Streamable HTTP) |
 
 See [Self-Hosting & API](self-hosting.md) for the full API surface.
+
+## Reporting issues from the app
+
+Settings → Feedback → **Report an issue** files a real issue on the project's Forgejo repo. One-time setup: a Forgejo API token with the `write:issue` scope (Settings → Feedback → token field; shared to mobile via QR settings sync). Reports land in the issue tracker you already watch — nothing disappears into an inbox.

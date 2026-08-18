@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -61,6 +62,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +78,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
@@ -137,6 +140,11 @@ fun SettingsPanel(
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
+            // --- Feedback / issue reporting ---
+            FeedbackSection()
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
             // --- Providers section ---
             ProvidersSection(
                 settings = settings,
@@ -195,6 +203,186 @@ fun SettingsPanel(
             }
         }
     }
+}
+
+@Composable
+private fun FeedbackSection() {
+    var showReportDialog by remember { mutableStateOf(false) }
+    var forgejoUrl by remember {
+        mutableStateOf(
+            com.angussoftware.fueldashboard.settings.loadStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_URL,
+                "https://git.angussoftware.dev",
+            ),
+        )
+    }
+    var repo by remember {
+        mutableStateOf(
+            com.angussoftware.fueldashboard.settings.loadStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_REPO,
+                "coda/fuel-dashboard-kmp",
+            ),
+        )
+    }
+    var token by remember {
+        mutableStateOf(
+            com.angussoftware.fueldashboard.settings.loadStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_TOKEN, "",
+            ),
+        )
+    }
+
+    Text(
+        text = "Feedback",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = "Report issues from the app — they land as Forgejo issues on the project repo.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(8.dp))
+
+    OutlinedTextField(
+        value = forgejoUrl,
+        onValueChange = {
+            forgejoUrl = it
+            com.angussoftware.fueldashboard.settings.saveStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_URL, it,
+            )
+        },
+        label = { Text("Forgejo URL") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(4.dp))
+    OutlinedTextField(
+        value = repo,
+        onValueChange = {
+            repo = it
+            com.angussoftware.fueldashboard.settings.saveStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_REPO, it,
+            )
+        },
+        label = { Text("Repository (owner/name)") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(4.dp))
+    OutlinedTextField(
+        value = token,
+        onValueChange = {
+            token = it
+            com.angussoftware.fueldashboard.settings.saveStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_TOKEN, it,
+            )
+        },
+        label = { Text("API token (write:issue scope)") },
+        supportingText = { Text("Create once in Forgejo Settings → Applications; shared to mobile via settings sync.") },
+        visualTransformation = PasswordVisualTransformation(),
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(8.dp))
+    Button(onClick = { showReportDialog = true }) {
+        Text("Report an issue")
+    }
+
+    if (showReportDialog) {
+        ReportIssueDialog(
+            forgejoUrl = forgejoUrl,
+            repo = repo,
+            token = token,
+            onDismiss = { showReportDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun ReportIssueDialog(
+    forgejoUrl: String,
+    repo: String,
+    token: String,
+    onDismiss: () -> Unit,
+) {
+    var title by remember { mutableStateOf("") }
+    var body by remember { mutableStateOf("") }
+    var submitting by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<com.angussoftware.fueldashboard.network.FeedbackSubmitter.Result?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!submitting) onDismiss() },
+        title = { Text("Report an issue") },
+        text = {
+            Column {
+                if (result != null) {
+                    when (val r = result) {
+                        is com.angussoftware.fueldashboard.network.FeedbackSubmitter.Result.Success -> {
+                            Text("Issue #${'$'}{r.number} created:", fontWeight = FontWeight.Bold)
+                            Text(r.url, color = MaterialTheme.colorScheme.primary)
+                        }
+                        is com.angussoftware.fueldashboard.network.FeedbackSubmitter.Result.Failure -> {
+                            Text("Failed: ${'$'}{r.message}", color = MaterialTheme.colorScheme.error)
+                        }
+                        null -> {}
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Title") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = body,
+                        onValueChange = { body = it },
+                        label = { Text("What happened? (steps, expected, actual)") },
+                        minLines = 4,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            when (result) {
+                is com.angussoftware.fueldashboard.network.FeedbackSubmitter.Result.Success -> {
+                    TextButton(onClick = onDismiss) { Text("Done") }
+                }
+                is com.angussoftware.fueldashboard.network.FeedbackSubmitter.Result.Failure -> {
+                    TextButton(onClick = { result = null }) { Text("Try again") }
+                }
+                null -> {
+                    TextButton(
+                        onClick = {
+                            if (title.isBlank()) return@TextButton
+                            submitting = true
+                            scope.launch {
+                                result = com.angussoftware.fueldashboard.network.FeedbackSubmitter.submit(
+                                    forgejoUrl = forgejoUrl,
+                                    repo = repo,
+                                    token = token,
+                                    title = "[app feedback] ${'$'}title",
+                                    body = body,
+                                )
+                                submitting = false
+                            }
+                        },
+                        enabled = title.isNotBlank() && !submitting,
+                    ) { Text(if (submitting) "Submitting…" else "Submit") }
+                }
+            }
+        },
+        dismissButton = {
+            if (result == null) {
+                TextButton(onClick = onDismiss, enabled = !submitting) { Text("Cancel") }
+            }
+        },
+    )
 }
 
 @Composable

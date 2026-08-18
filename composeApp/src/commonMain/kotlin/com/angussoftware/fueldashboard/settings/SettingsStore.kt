@@ -29,4 +29,7 @@ internal object FuelSettingsKeys {
     const val SERVER_API_KEY = "serverApiKey"
     const val USAGE_SOURCES = "usageSourcesSettings"     // JSON: UsageSourcesSettings
     const val EVENT_DROP_THRESHOLD = "fuelEventDropThresholdPct" // double, pct
+    const val FEEDBACK_URL = "feedbackForgejoUrl"
+    const val FEEDBACK_REPO = "feedbackForgejoRepo"
+    const val FEEDBACK_TOKEN = "feedbackForgejoToken"
 }

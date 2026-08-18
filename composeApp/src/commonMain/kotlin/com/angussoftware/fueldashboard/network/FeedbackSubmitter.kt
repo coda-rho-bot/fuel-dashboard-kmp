@@ -1,0 +1,73 @@
+package com.angussoftware.fueldashboard.network
+
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+
+/**
+ * Submits in-app feedback as a Forgejo issue on the project repo —
+ * a traditional issue tracker where reports are tracked and discussed.
+ *
+ * Requires a Forgejo API token with `write:issue` scope, configured once
+ * in Settings → Feedback (shared to mobile via settings sync).
+ */
+object FeedbackSubmitter {
+
+    sealed class Result {
+        /** Issue created; [url] links to it. */
+        data class Success(val url: String, val number: Int) : Result()
+        /** Submission failed; [message] explains why (auth, network, scope). */
+        data class Failure(val message: String) : Result()
+    }
+
+    suspend fun submit(
+        forgejoUrl: String,
+        repo: String,
+        token: String,
+        title: String,
+        body: String,
+    ): Result {
+        if (token.isBlank()) return Result.Failure("No feedback token configured — add one in Settings → Feedback.")
+        val url = forgejoUrl.trimEnd('/') + "/api/v1/repos/$repo/issues"
+        return try {
+            val response = SharedHttpClient.client.post(url) {
+                header(HttpHeaders.Authorization, "token $token")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("title", title)
+                        put("body", body)
+                    }.toString(),
+                )
+            }
+            if (response.status.isSuccess()) {
+                val issue = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                val htmlUrl = issue["html_url"]?.jsonPrimitive?.content ?: "$forgejoUrl/$repo/issues"
+                val number = issue["number"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1
+                Result.Success(url = htmlUrl, number = number)
+            } else {
+                val text = response.bodyAsText().take(300)
+                Result.Failure(
+                    when (response.status.value) {
+                        403 -> "Token rejected (403) — it needs the 'write:issue' scope."
+                        401 -> "Token invalid (401) — check Settings → Feedback."
+                        else -> "HTTP ${response.status.value}: $text"
+                    },
+                )
+            }
+        } catch (e: Exception) {
+            Result.Failure("Could not reach $forgejoUrl — ${e.message ?: e::class.simpleName}")
+        }
+    }
+}
