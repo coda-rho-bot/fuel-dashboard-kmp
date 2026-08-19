@@ -36,28 +36,35 @@ steps:
       - gradle-cache-fuel-dashboard:/root/.gradle/caches
       - gradle-wrapper-fuel-dashboard:/root/.gradle/wrapper
 
+  fetch-ci-scripts:
+    # Plugin step (settings, no commands) — filtered secrets are only
+    # allowed in plugins. Clones the private ci-scripts repo into the
+    # shared workspace using the same netrc injection as the clone step.
+    image: woodpeckerci/plugin-git
+    settings:
+      remote: https://git.angussoftware.dev/coda/ci-scripts.git
+      path: ci-scripts
+      depth: 1
+    environment:
+      CI_NETRC_MACHINE: git.angussoftware.dev
+      CI_NETRC_USERNAME: coda
+      CI_NETRC_PASSWORD:
+        from_secret: FORGE_CLONE_TOKEN
+
   commitlint:
     image: alpine:latest
     when:
       event: pull_request
-    environment:
-      FORGE_CLONE_TOKEN:
-        from_secret: FORGE_CLONE_TOKEN
     commands:
       - apk add --no-cache git bash
-      - git clone https://coda:${FORGE_CLONE_TOKEN}@git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
-      - bash /tmp/ci-scripts/scripts/validate-commits.sh "origin/main...HEAD"
+      - bash ci-scripts/scripts/validate-commits.sh "origin/main...HEAD"
 
   auto-tag:
     image: alpine:latest
     when:
       event: push
       branch: [main, master]
-    environment:
-      FORGE_CLONE_TOKEN:
-        from_secret: FORGE_CLONE_TOKEN
     commands:
       - apk add --no-cache git bash curl
-      - git clone https://coda:${FORGE_CLONE_TOKEN}@git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
       - git fetch --tags "https://x-access-token:${GPR_TOKEN}@github.com/RhoMancer/fuel-dashboard-kmp.git" 2>&1 || true
-      - REPO=RhoMancer/fuel-dashboard-kmp sh /tmp/ci-scripts/scripts/auto-tag.sh
+      - REPO=RhoMancer/fuel-dashboard-kmp sh ci-scripts/scripts/auto-tag.sh
