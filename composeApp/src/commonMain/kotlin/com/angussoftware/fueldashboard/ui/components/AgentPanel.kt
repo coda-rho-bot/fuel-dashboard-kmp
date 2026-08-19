@@ -72,6 +72,8 @@ data class AcpAgentDisplay(
     val currentMode: String?,
     val availableModes: List<String>,
     val status: String, // "connected", "disconnected", "idle", "thinking"
+    /** Last connection error when status == "error" — diagnostics. */
+    val errorMessage: String? = null,
     val capabilities: List<String> = emptyList(),
     val framework: String? = null,
     val command: String? = null,

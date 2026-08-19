@@ -172,6 +172,7 @@ fun main() = application {
                     AcpAgentStatus.DISCONNECTED -> "disconnected"
                 },
                 capabilities = info.capabilities,
+                errorMessage = info.errorMessage,
                 lastSeen = if (info.status == AcpAgentStatus.CONNECTED) epochMillis() else null,
             )
         }

@@ -123,6 +123,7 @@ object DashboardSnapshot {
                 put(a.name, buildJsonObject {
                     put("id", a.id)
                     put("status", a.status)
+                    a.errorMessage?.let { put("error", it) }
                     a.currentModel?.let { put("session_model", it) }
                     a.lastSeen?.let { put("last_seen", it) }
                 })
