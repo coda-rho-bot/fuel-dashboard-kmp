@@ -1,3 +1,15 @@
+# Repos are private on Forgejo — the server-side netrc injection does not
+# work with this setup, so clone auth is provided explicitly via the
+# global Woodpecker secret FORGE_CLONE_TOKEN.
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    environment:
+      CI_NETRC_MACHINE: git.angussoftware.dev
+      CI_NETRC_USERNAME: coda
+      CI_NETRC_PASSWORD:
+        from_secret: FORGE_CLONE_TOKEN
+
 when:
   # Feature branches are validated by the pull_request pipeline — skipping
   # the push event there halves concurrency and avoids two pipelines
@@ -30,7 +42,7 @@ steps:
       event: pull_request
     commands:
       - apk add --no-cache git bash
-      - git clone https://git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
+      - git clone https://coda:${FORGE_CLONE_TOKEN}@git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
       - bash /tmp/ci-scripts/scripts/validate-commits.sh "origin/main...HEAD"
 
   auto-tag:
@@ -40,6 +52,6 @@ steps:
       branch: [main, master]
     commands:
       - apk add --no-cache git bash curl
-      - git clone https://git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
+      - git clone https://coda:${FORGE_CLONE_TOKEN}@git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
       - git fetch --tags "https://x-access-token:${GPR_TOKEN}@github.com/RhoMancer/fuel-dashboard-kmp.git" 2>&1 || true
       - REPO=RhoMancer/fuel-dashboard-kmp sh /tmp/ci-scripts/scripts/auto-tag.sh
