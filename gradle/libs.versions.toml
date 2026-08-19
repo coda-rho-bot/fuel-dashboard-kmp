@@ -8,7 +8,7 @@ androidx-lifecycle = "2.10.0"
 composeMultiplatform = "1.9.0"
 kotlin = "2.3.21"
 kover = "0.9.8"
-angusSoftware-theming = "0.10.4"
+angusSoftware-theming = "0.11.0"
 angusSoftware-gradle = "0.3.0"
 ktor = "3.4.3"
 kotlinx-coroutines = "1.11.0"
@@ -59,7 +59,7 @@ androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle
 qrcode-kotlin = { module = "io.github.g0dkar:qrcode-kotlin", version.ref = "qrcode-kotlin" }
 
 # Angus Software
-angusSoftware-theming-compose = { module = "com.angussoftware.theming:compose", version.ref = "angusSoftware-theming" }
+angusSoftware-theming-compose = { module = "com.angussoftware.theming:theming-compose", version.ref = "angusSoftware-theming" }
 
 # QR Scanner (Android only)
 zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing-android-embedded" }

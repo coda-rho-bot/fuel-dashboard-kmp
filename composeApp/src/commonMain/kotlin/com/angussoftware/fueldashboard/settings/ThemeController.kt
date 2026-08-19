@@ -1,87 +1,32 @@
 package com.angussoftware.fueldashboard.settings
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import com.angussoftware.theming.compose.ui.settings.ThemeSettings
 import com.angussoftware.theming.compose.ui.theme.ColorTheme
 import com.angussoftware.theming.compose.ui.theme.ThemeMode
-import com.angussoftware.theming.compose.ui.theme.initializeThemeMode
 
 /**
- * Global theme state controller with persistence.
- *
- * Stores separate [lightColorTheme] and [darkColorTheme] selections so the user can
- * pick different color schemes for light and dark modes (matching the AngusSoftwareApp
- * pattern). The [colorThemeFor] function resolves which one to use based on the
- * current dark/light state.
+ * App adapter over the LIBRARY's shared ThemeSettings (theming-compose
+ * ui.settings). State, persistence hooks, and resolution logic now live in
+ * the library; this object keeps the app's singleton access pattern and
+ * wires the app's SettingsStore persistence.
  */
 object ThemeController {
 
-    private const val KEY_LIGHT_COLOR_THEME = "lightColorTheme"
-    private const val KEY_DARK_COLOR_THEME = "darkColorTheme"
-    private const val KEY_THEME_MODE = "themeMode"
-
-    /**
-     * Color theme to use when the app is in light mode. Persists on change.
-     */
-    var lightColorTheme: ColorTheme by mutableStateOf(
-        loadColorTheme(KEY_LIGHT_COLOR_THEME, ColorTheme.Angus)
-    )
-        private set
-
-    /**
-     * Color theme to use when the app is in dark mode. Persists on change.
-     */
-    var darkColorTheme: ColorTheme by mutableStateOf(
-        loadColorTheme(KEY_DARK_COLOR_THEME, ColorTheme.AngusDark)
-    )
-        private set
-
-    /**
-     * Selected theme mode (Light/Dark/System). Persists on change.
-     */
-    var themeMode: ThemeMode by mutableStateOf(
-        loadThemeMode()
-    )
-        private set
-
-    init {
-        // Sync the theming library's internal ThemeMode state
-        initializeThemeMode(themeMode)
+    val settings: ThemeSettings by lazy {
+        ThemeSettings.load(
+            load = { key -> loadStringSetting(key, "").ifBlank { null } },
+            save = { key, value -> saveStringSetting(key, value) },
+        )
     }
 
-    /**
-     * The color theme that should actually be applied, resolved from the
-     * current dark/light state. Platform DashboardTheme actuals resolve the
-     * dark/light state (from themeMode + system theme) and call this —
-     * community palettes carry their own light/dark identity, so the palette
-     * must be picked from the resolved state, not from themeMode alone.
-     */
-    fun colorThemeFor(darkTheme: Boolean): ColorTheme =
-        if (darkTheme) darkColorTheme else lightColorTheme
+    // Compatibility accessors (existing call sites unchanged)
+    val themeMode: ThemeMode get() = settings.themeMode
+    val lightColorTheme: ColorTheme get() = settings.lightColorTheme
+    val darkColorTheme: ColorTheme get() = settings.darkColorTheme
 
-    fun updateLightColorTheme(theme: ColorTheme) {
-        lightColorTheme = theme
-        saveStringSetting(KEY_LIGHT_COLOR_THEME, theme.name)
-    }
+    fun colorThemeFor(darkTheme: Boolean): ColorTheme = settings.colorThemeFor(darkTheme)
 
-    fun updateDarkColorTheme(theme: ColorTheme) {
-        darkColorTheme = theme
-        saveStringSetting(KEY_DARK_COLOR_THEME, theme.name)
-    }
-
-    fun updateThemeMode(mode: ThemeMode) {
-        themeMode = mode
-        saveStringSetting(KEY_THEME_MODE, mode.name)
-    }
-
-    private fun loadColorTheme(key: String, default: ColorTheme): ColorTheme {
-        val name = loadStringSetting(key, default.name)
-        return runCatching { ColorTheme.valueOf(name) }.getOrDefault(default)
-    }
-
-    private fun loadThemeMode(): ThemeMode {
-        val name = loadStringSetting(KEY_THEME_MODE, ThemeMode.SYSTEM.name)
-        return runCatching { ThemeMode.valueOf(name) }.getOrDefault(ThemeMode.SYSTEM)
-    }
+    fun updateLightColorTheme(theme: ColorTheme) = settings.updateLightColorTheme(theme)
+    fun updateDarkColorTheme(theme: ColorTheme) = settings.updateDarkColorTheme(theme)
+    fun updateThemeMode(mode: ThemeMode) = settings.updateThemeMode(mode)
 }

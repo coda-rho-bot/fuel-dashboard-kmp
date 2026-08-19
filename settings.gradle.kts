@@ -31,6 +31,8 @@ pluginManagement {
 val forgejoToken: String? = providers.gradleProperty("forgejo.token").orNull ?: System.getenv("FORGEJO_TOKEN")
 
 dependencyResolutionManagement {
+    // Local theming builds before registry publish
+    repositories { mavenLocal() }
     repositories {
         google {
             androidxAndGoogleOnly()
