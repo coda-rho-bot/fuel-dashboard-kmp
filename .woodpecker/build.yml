@@ -40,6 +40,9 @@ steps:
     image: alpine:latest
     when:
       event: pull_request
+    environment:
+      FORGE_CLONE_TOKEN:
+        from_secret: FORGE_CLONE_TOKEN
     commands:
       - apk add --no-cache git bash
       - git clone https://coda:${FORGE_CLONE_TOKEN}@git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
@@ -50,6 +53,9 @@ steps:
     when:
       event: push
       branch: [main, master]
+    environment:
+      FORGE_CLONE_TOKEN:
+        from_secret: FORGE_CLONE_TOKEN
     commands:
       - apk add --no-cache git bash curl
       - git clone https://coda:${FORGE_CLONE_TOKEN}@git.angussoftware.dev/coda/ci-scripts.git /tmp/ci-scripts
