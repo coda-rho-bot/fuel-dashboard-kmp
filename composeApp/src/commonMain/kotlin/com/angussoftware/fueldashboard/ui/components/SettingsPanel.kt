@@ -89,6 +89,7 @@ import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
 import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.settings.ThemeController
+import com.angussoftware.theming.compose.ui.settings.ThemeSettingsPanel
 import com.angussoftware.fueldashboard.ui.rememberQrScanner
 import com.angussoftware.fueldashboard.ui.supportsQrScanning
 import com.angussoftware.theming.compose.ui.theme.ColorTheme
@@ -154,13 +155,8 @@ fun SettingsPanel(
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
-            // --- Theme mode toggle ---
-            ThemeModeSection(themeController)
-
-            Spacer(Modifier.height(12.dp))
-
-            // --- Color theme picker ---
-            ColorThemePicker(themeController)
+            // --- Theme settings (shared library panel) ---
+            ThemeSettingsPanel(themeController.settings)
 
             Spacer(Modifier.height(8.dp))
 
@@ -1203,42 +1199,6 @@ private fun AgentConfigRow(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ThemeModeSection(themeController: ThemeController) {
-    Text(
-        text = "Appearance",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(6.dp))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ThemeModeChip(
-            label = "System",
-            icon = Icons.Default.SettingsApplications,
-            isSelected = themeController.themeMode == ThemeMode.SYSTEM,
-            onClick = { themeController.updateThemeMode(ThemeMode.SYSTEM) },
-            modifier = Modifier.weight(1f),
-        )
-        ThemeModeChip(
-            label = "Light",
-            icon = Icons.Default.LightMode,
-            isSelected = themeController.themeMode == ThemeMode.LIGHT,
-            onClick = { themeController.updateThemeMode(ThemeMode.LIGHT) },
-            modifier = Modifier.weight(1f),
-        )
-        ThemeModeChip(
-            label = "Dark",
-            icon = Icons.Default.DarkMode,
-            isSelected = themeController.themeMode == ThemeMode.DARK,
-            onClick = { themeController.updateThemeMode(ThemeMode.DARK) },
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
 private fun ThemeModeChip(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1285,95 +1245,6 @@ private fun ThemeModeChip(
 // ---------------------------------------------------------------------------
 // Color Theme Picker
 // ---------------------------------------------------------------------------
-
-@Composable
-private fun ColorThemePicker(themeController: ThemeController) {
-    var isExpanded by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { isExpanded = !isExpanded }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = Icons.Default.Palette,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Color Theme",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = activeThemeSummary(themeController),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-        }
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = if (isExpanded) "Collapse" else "Expand",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .size(20.dp)
-                .graphicsLayer { rotationZ = if (isExpanded) 90f else 0f },
-        )
-    }
-
-    AnimatedVisibility(
-        visible = isExpanded,
-        enter = expandVertically(),
-        exit = shrinkVertically(),
-    ) {
-        when (themeController.themeMode) {
-            ThemeMode.LIGHT -> ThemeOptionList(
-                label = "Light Themes",
-                options = ColorTheme.lightOptions,
-                selected = themeController.lightColorTheme,
-                showWarningIfMismatch = false,
-                isForLightMode = true,
-                onSelect = { themeController.updateLightColorTheme(it) },
-            )
-
-            ThemeMode.DARK -> ThemeOptionList(
-                label = "Dark Themes",
-                options = ColorTheme.darkOptions,
-                selected = themeController.darkColorTheme,
-                showWarningIfMismatch = false,
-                isForLightMode = false,
-                onSelect = { themeController.updateDarkColorTheme(it) },
-            )
-
-            ThemeMode.SYSTEM -> Column {
-                ThemeOptionList(
-                    label = "Light Themes",
-                    options = ColorTheme.allWithNames,
-                    selected = themeController.lightColorTheme,
-                    showWarningIfMismatch = true,
-                    isForLightMode = true,
-                    onSelect = { themeController.updateLightColorTheme(it) },
-                )
-                Spacer(Modifier.height(8.dp))
-                ThemeOptionList(
-                    label = "Dark Themes",
-                    options = ColorTheme.allWithNames,
-                    selected = themeController.darkColorTheme,
-                    showWarningIfMismatch = true,
-                    isForLightMode = false,
-                    onSelect = { themeController.updateDarkColorTheme(it) },
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun ThemeOptionList(
@@ -1454,16 +1325,6 @@ private fun ColorThemeRow(
                 modifier = Modifier.size(18.dp),
             )
         }
-    }
-}
-
-private fun activeThemeSummary(controller: ThemeController): String {
-    val lightName = themeDisplayName(controller.lightColorTheme)
-    val darkName = themeDisplayName(controller.darkColorTheme)
-    return if (controller.lightColorTheme == controller.darkColorTheme) {
-        lightName
-    } else {
-        "$lightName / $darkName"
     }
 }
 
