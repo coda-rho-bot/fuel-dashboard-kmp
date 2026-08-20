@@ -131,9 +131,17 @@ class EmbeddedServer(
 
     fun start() {
         if (server != null) return
-        server = embeddedServer(CIO, host = host, port = port) { configureRouting() }
-        server?.start(wait = false)
-        println("[EmbeddedServer] Listening on http://$host:$port")
+        try {
+            server = embeddedServer(CIO, host = host, port = port) { configureRouting() }
+            server?.start(wait = false)
+            println("[EmbeddedServer] Listening on http://$host:$port")
+        } catch (e: java.net.BindException) {
+            println("[EmbeddedServer] FAILED to bind port $port — already in use. Is another instance running? Error: ${e.message}")
+            server = null
+        } catch (e: Exception) {
+            println("[EmbeddedServer] FAILED to start: ${e::class.simpleName}: ${e.message}")
+            server = null
+        }
     }
 
     fun stop() {
@@ -368,7 +376,11 @@ class EmbeddedServer(
                 onProvidersChanged()
 
                 call.respondText(
-                    text = """{"status":"synced","providers_imported":${syncData.providers.size},"agents_imported":${syncData.agentSettings.agents.size}}""",
+                    text = kotlinx.serialization.json.buildJsonObject {
+                        put("status", "synced")
+                        put("providers_imported", syncData.providers.size)
+                        put("agents_imported", syncData.agentSettings.agents.size)
+                    }.toString(),
                     contentType = ContentType.Application.Json,
                 )
             }
@@ -405,7 +417,11 @@ class EmbeddedServer(
                 }
 
                 call.respondText(
-                    text = """{"status":"recorded","source":"$source","model":"$model"}""",
+                    text = kotlinx.serialization.json.buildJsonObject {
+                        put("status", "recorded")
+                        put("source", source)
+                        put("model", model)
+                    }.toString(),
                     contentType = ContentType.Application.Json,
                 )
             }

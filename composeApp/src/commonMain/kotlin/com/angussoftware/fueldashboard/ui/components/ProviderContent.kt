@@ -181,7 +181,7 @@ private fun ProviderCreditBalance(report: ProviderReport, showHelp: Boolean, box
 
     Column(modifier) {
         if (boxed) {
-            Text("${report.creditsTotal}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = contentColor)
+            Text(formatCredits(report.creditsTotal), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = contentColor)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("credits remaining", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = subColor)
                 if (showHelp) {
@@ -191,7 +191,7 @@ private fun ProviderCreditBalance(report: ProviderReport, showHelp: Boolean, box
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${report.creditsTotal}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = contentColor)
+                Text(formatCredits(report.creditsTotal), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = contentColor)
                 if (showHelp) {
                     Spacer(Modifier.width(4.dp))
                     HelpIcon("Your purchased credits.")
@@ -203,8 +203,8 @@ private fun ProviderCreditBalance(report: ProviderReport, showHelp: Boolean, box
             Spacer(Modifier.height(6.dp))
             val overLimit = report.creditsUsed > report.creditsLimit
             Text(
-                if (overLimit) "${report.creditsUsed} used (${report.creditsLimit} included monthly, rest pay-as-you-go)"
-                else "${report.creditsUsed} / ${report.creditsLimit} used this month",
+                if (overLimit) "${formatCredits(report.creditsUsed)} used (${formatCredits(report.creditsLimit)} included monthly, rest pay-as-you-go)"
+                else "${formatCredits(report.creditsUsed)} / ${formatCredits(report.creditsLimit)} used this month",
                 style = MaterialTheme.typography.bodyMedium,
                 color = subColor,
             )
@@ -218,6 +218,22 @@ private fun ProviderCreditBalance(report: ProviderReport, showHelp: Boolean, box
                 resetsAt = resetAt,
                 windowMs = 2_592_000_000L, // 30 days default
             )
+        }
+    }
+}
+
+/**
+ * Formats an integer with thousands separators (e.g., 1234567 → "1,234,567").
+ * Pure-Kotlin (no java.text dependency) for commonMain compatibility.
+ */
+private fun formatCredits(n: Int?): String {
+    if (n == null) return "—"
+    val s = n.toString()
+    return buildString {
+        val len = s.length
+        for (i in s.indices) {
+            if (i > 0 && (len - i) % 3 == 0) append(',')
+            append(s[i])
         }
     }
 }
