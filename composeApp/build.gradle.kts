@@ -169,6 +169,9 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm,
             )
+            // java.sql: SQLDelight JDBC loads DriverManager reflectively — jdeps can't see it
+            // jdk.crypto.ec: EC crypto for HTTPS TLS — not always included in jlink suggestions
+            modules("java.sql", "jdk.crypto.ec")
             packageName = "fuel-dashboard"
             packageVersion = project.version.toString()
             description = "Fuel Dashboard for Letta — AI provider fuel monitoring"
