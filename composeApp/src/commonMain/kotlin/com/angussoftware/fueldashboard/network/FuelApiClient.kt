@@ -41,6 +41,13 @@ class FuelApiClient(
         client.get("$base/alerts") { withAuth() }.body()
 
     /** Health check never requires auth. */
+    /** Raw /dashboard snapshot JSON (complete display state). */
+    suspend fun getDashboardSnapshot(): String? = try {
+        client.get("$base/dashboard") { withAuth() }.body()
+    } catch (_: Exception) {
+        null
+    }
+
     suspend fun getHealth(): String =
         client.get("$base/health").bodyAsText()
 

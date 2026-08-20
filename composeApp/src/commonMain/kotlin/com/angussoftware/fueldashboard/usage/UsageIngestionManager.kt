@@ -90,6 +90,15 @@ class UsageIngestionManager(
                 } catch (e: Exception) {
                     _status.value = _status.value.copy(lastError = "manager: ${e.message}")
                 }
+                // Daily retention sweep of the ingestion dedup table — without
+                // this, ingested_runs grows one row per run forever.
+                if (cycle % CLEANUP_EVERY_N_POLLS == 0) {
+                    try {
+                        ingestionRepository.cleanup()
+                    } catch (e: Exception) {
+                        // non-fatal: retry next cycle
+                    }
+                }
                 cycle++
                 delay(POLL_INTERVAL_MS)
             }
@@ -132,6 +141,7 @@ class UsageIngestionManager(
     companion object {
         private const val POLL_INTERVAL_MS = 5 * 60 * 1000L       // 5 minutes
         private const val METADATA_EVERY_N_POLLS = 6              // ~30 minutes
+        private const val CLEANUP_EVERY_N_POLLS = 288             // ~24 hours
     }
 }
 

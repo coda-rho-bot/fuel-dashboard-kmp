@@ -2,6 +2,7 @@ package com.angussoftware.fueldashboard.presentation
 
 import com.angussoftware.fueldashboard.database.FuelSnapshotRecord
 import com.angussoftware.fueldashboard.database.UsageRecord
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Fuel Advisor v3 — regime-aware fuel advice.
@@ -85,8 +86,9 @@ object FuelAdvisor {
 
     // ── Tunables ────────────────────────────────────────────────────────
 
-    /** A window "exhausts" when TOKENS_PCT reaches this level. */
-    const val EXHAUSTION_THRESHOLD_PCT = 95.0
+    /** A window "exhausts" when REMAINING pct falls to/below this level.
+     *  tokensPct in fuel_snapshots is REMAINING % (0 = exhausted, 100 = full). */
+    const val EXHAUSTION_THRESHOLD_PCT = 5.0
 
     /** >= this many exhaustions in the analysis span = persistent pressure. */
     const val PRESSURE_EXHAUSTION_COUNT = 4
@@ -112,24 +114,26 @@ object FuelAdvisor {
         val withPct = snapshots.mapNotNull { s -> s.tokensPct?.let { s.timestamp to it } }
             .sortedBy { it.first }
 
-        // Exhaustion events: threshold crossings clustered together
+        // Exhaustion events: remaining falls to/below threshold. Clustering keys
+        // on RECOVERY above the threshold (a poll gap within an exhausted
+        // plateau must not split one event into many), with a time cap.
         var exhaustions = 0
-        var lastExhaustionTs = -1L
-        for ((ts, pct) in withPct) {
-            if (pct >= EXHAUSTION_THRESHOLD_PCT && ts - lastExhaustionTs > EXHAUSTION_CLUSTER_MS) {
-                exhaustions++
-                lastExhaustionTs = ts
-            }
+        var inExhaustion = false
+        for ((_, pct) in withPct) {
+            val exhausted = pct <= EXHAUSTION_THRESHOLD_PCT
+            if (exhausted && !inExhaustion) exhaustions++
+            inExhaustion = exhausted
         }
 
         // Burn rate from the last 2h of data
         val burn = burnRate(withPct, now)
 
-        // Projection: current pct + burn × hours-to-reset
+        // Projection: remaining FALLS by burn × hours-to-reset
+        // (tokensPct is REMAINING % — consumption erodes it toward 0)
         val current = withPct.lastOrNull()?.second
         val resetIn = resetAt?.let { it - now }?.takeIf { it > 0 }
         val projected = if (current != null && burn != null && resetIn != null) {
-            (current + burn * (resetIn / 3_600_000.0)).coerceAtMost(100.0)
+            (current - burn * (resetIn / 3_600_000.0)).coerceIn(0.0, 100.0)
         } else {
             null
         }
@@ -177,7 +181,10 @@ object FuelAdvisor {
             .groupBy { it.conversationId!! }
 
         val results = byConversation.mapNotNull { (convId, records) ->
-            val days = records.map { it.timestamp / 86_400_000 }.distinct().size
+            val tz = kotlinx.datetime.TimeZone.currentSystemDefault()
+            val days = records.map {
+                kotlinx.datetime.Instant.fromEpochMilliseconds(it.timestamp).toLocalDateTime(tz).date.toEpochDays()
+            }.distinct().size
             if (days < ROUTINE_MIN_DAYS) return@mapNotNull null
 
             // Dominant model = the one carrying most tokens
@@ -227,31 +234,31 @@ object FuelAdvisor {
         val routine = routineConsumers(usage, now)
         val projected = regime.projectedPctAtReset
         val burn = regime.burnPctPerHr ?: DEFAULT_BURN_PCT_PER_HR
-        val current = snapshots.mapNotNull { it.tokensPct }.maxOrNull()
+        val current = snapshots.mapNotNull { it.tokensPct }.lastOrNull()
 
         return when {
             // Persistent pressure: history says the quota runs out regularly
             regime.exhaustions >= PRESSURE_EXHAUSTION_COUNT ->
                 Advice.PersistentPressure(regime, routine)
 
-            // This window at risk: projected to exhaust before reset
-            projected != null && projected >= 100.0 ->
+            // This window at risk: projected to exhaust (remaining → 0) before reset
+            projected != null && projected <= 0.0 ->
                 Advice.AtRisk(regime, exhaustInMs(current, burn), routine)
 
-            // Surplus regime: rarely exhausts — say so and recommend nothing
-            regime.exhaustions <= 1 && (projected == null || projected < 90.0) ->
+            // Surplus regime: rarely exhausts and this window keeps healthy headroom
+            regime.exhaustions <= 1 && (projected == null || projected > 10.0) ->
                 Advice.Surplus(regime)
 
             // Normal and healthy
-            else -> Advice.Healthy(regime, 100.0 - (projected ?: 100.0))
+            else -> Advice.Healthy(regime, projected ?: 100.0)
         }
     }
 
-    /** ms until exhaustion at the given burn rate, from the current level. */
+    /** ms until exhaustion (remaining → 0) at the given burn rate. */
     private fun exhaustInMs(currentPct: Double?, burnPctPerHr: Double): Long? {
         val pct = currentPct ?: return null
         if (burnPctPerHr <= 0) return null
-        return ((100.0 - pct) / burnPctPerHr * 3_600_000).toLong()
+        return ((pct / burnPctPerHr) * 3_600_000).toLong()
     }
 
     private const val EXHAUSTION_CLUSTER_MS = 6 * 3_600_000 // one event per ~window

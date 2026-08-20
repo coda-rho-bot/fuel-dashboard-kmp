@@ -306,6 +306,17 @@ private fun ReportIssueDialog(
     repo: String,
     token: String,
     onDismiss: () -> Unit,
+    /** Injectable for tests/preview — defaults to the real Forgejo submission. */
+    onSubmit: suspend (title: String, body: String) -> com.angussoftware.fueldashboard.network.FeedbackSubmitter.Result =
+        { t, b ->
+            com.angussoftware.fueldashboard.network.FeedbackSubmitter.submit(
+                forgejoUrl = forgejoUrl,
+                repo = repo,
+                token = token,
+                title = "[app feedback] " + t,
+                body = b,
+            )
+        },
 ) {
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
@@ -321,11 +332,11 @@ private fun ReportIssueDialog(
                 if (result != null) {
                     when (val r = result) {
                         is com.angussoftware.fueldashboard.network.FeedbackSubmitter.Result.Success -> {
-                            Text("Issue #${'$'}{r.number} created:", fontWeight = FontWeight.Bold)
+                            Text("Issue #" + r.number + " created:", fontWeight = FontWeight.Bold)
                             Text(r.url, color = MaterialTheme.colorScheme.primary)
                         }
                         is com.angussoftware.fueldashboard.network.FeedbackSubmitter.Result.Failure -> {
-                            Text("Failed: ${'$'}{r.message}", color = MaterialTheme.colorScheme.error)
+                            Text("Failed: " + r.message, color = MaterialTheme.colorScheme.error)
                         }
                         null -> {}
                     }
@@ -362,13 +373,7 @@ private fun ReportIssueDialog(
                             if (title.isBlank()) return@TextButton
                             submitting = true
                             scope.launch {
-                                result = com.angussoftware.fueldashboard.network.FeedbackSubmitter.submit(
-                                    forgejoUrl = forgejoUrl,
-                                    repo = repo,
-                                    token = token,
-                                    title = "[app feedback] ${'$'}title",
-                                    body = body,
-                                )
+                                result = onSubmit(title, body)
                                 submitting = false
                             }
                         },

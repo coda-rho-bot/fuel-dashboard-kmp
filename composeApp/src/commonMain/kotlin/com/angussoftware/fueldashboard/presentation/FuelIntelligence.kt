@@ -188,6 +188,9 @@ object FuelIntelligence {
      * from windows we DID observe (tokens <-> gauge-% correspondence).
      * Requires >=2 calibration points; otherwise missing windows stay missing
      * — never fabricate without basis. Reconstructed tiles are marked estimated.
+     * Boundaries derive from measured windowEnds (aligned with the provider's
+     * actual reset sequence), never a synthetic grid — a misanchored grid
+     * fabricates phantom tiles beside already-measured windows.
      */
     private fun reconstructGaps(
         measured: List<WasteTile>,
@@ -208,13 +211,35 @@ object FuelIntelligence {
         if (calibrations.size < 2) return measured
         val perPct = calibrations.sorted()[calibrations.size / 2] // median tokens per 1%
 
+        // Boundaries are derived from the MEASURED tiles' windowEnds, never a
+        // synthetic grid: fixed-reset ends sit at actual resetAt times that no
+        // dataStart-anchored grid can match, so grid boundaries would fall
+        // beside measured windows and fabricate phantom duplicates. We fill
+        // the gaps between consecutive measured ends (dashboard-down windows),
+        // extend the tail to `now`, and extend the head back to `dataStart`.
+        // The half-window guard keeps slightly-drifting reset times from
+        // spawning near-duplicate tiles next to a measured end.
+        val ends = measured.map { it.windowEnd }.sorted()
+        val have = ends.toHashSet()
+        val half = windowMs / 2
         val boundaries = mutableListOf<Long>()
-        var b = dataStart + windowMs
+        for (i in 0 until ends.size - 1) {
+            var b = ends[i] + windowMs
+            while (ends[i + 1] - b > half) {
+                boundaries.add(b)
+                b += windowMs
+            }
+        }
+        var b = ends.last() + windowMs
         while (b <= now) {
             boundaries.add(b)
             b += windowMs
         }
-        val have = measured.map { it.windowEnd }.toHashSet()
+        b = ends.first() - windowMs
+        while (b > dataStart) {
+            boundaries.add(b)
+            b -= windowMs
+        }
 
         val reconstructed = boundaries.filter { it !in have }.map { boundary ->
             val tokens = usage.filter { it.timestamp in (boundary - windowMs)..boundary }

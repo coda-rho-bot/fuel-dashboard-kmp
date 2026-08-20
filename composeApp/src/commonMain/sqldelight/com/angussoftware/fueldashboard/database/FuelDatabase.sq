@@ -210,6 +210,9 @@ SELECT COUNT(*) >= 1 AS found FROM ingested_runs WHERE run_key = ?;
 deleteOldIngestedRuns:
 DELETE FROM ingested_runs WHERE ingested_at < :cutoff;
 
+releaseIngestedRun:
+DELETE FROM ingested_runs WHERE run_key = ?;
+
 CREATE TABLE agent_model_history (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     agent_id TEXT NOT NULL,

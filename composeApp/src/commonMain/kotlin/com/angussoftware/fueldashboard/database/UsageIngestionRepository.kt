@@ -43,6 +43,16 @@ class UsageIngestionRepository(
     }
 
     /**
+     * Releases a claim taken by [claimRun] when ingestion ultimately failed
+     * (e.g. usage fetch error) — the run was NOT ingested, so a later poll
+     * must be allowed to claim it again. Without this, a transient fetch
+     * failure permanently loses that run's usage (sticky claim).
+     */
+    fun releaseRun(connectorId: String, externalRunId: String) {
+        queries.releaseIngestedRun("$connectorId:$externalRunId")
+    }
+
+    /**
      * Records the current agent→model mapping, closing any previous record.
      * Call whenever the platform's agent configs are observed. No-op when
      * the mapping is unchanged (same agent, same model, still open).

@@ -112,7 +112,13 @@ class LettaRunsConnector(
             } catch (e: Exception) {
                 errors.add("usage fetch failed for ${run.id}: ${e.message}")
                 null
-            } ?: continue
+            }
+            if (usage == null) {
+                // Fetch failed AFTER claiming — release the claim so a later
+                // poll retries instead of permanently skipping this run.
+                ingestionRepository.releaseRun(id, run.id)
+                continue
+            }
 
             val inputTokens = usage.prompt_tokens ?: 0L
             val outputTokens = usage.completion_tokens ?: 0L
@@ -123,15 +129,23 @@ class LettaRunsConnector(
                 ?: ingestionRepository.openAgentModels()[agentId]
                 ?: "unknown"
 
-            usageRepository.insert(
-                timestamp = createdAt,
-                source = agentNames[agentId] ?: agentId,
-                model = model,
-                inputTokens = inputTokens,
-                outputTokens = outputTokens,
-                requestCount = 1,
-                conversationId = run.conversation_id,
-            )
+            try {
+                usageRepository.insert(
+                    timestamp = createdAt,
+                    source = agentNames[agentId] ?: agentId,
+                    model = model,
+                    inputTokens = inputTokens,
+                    outputTokens = outputTokens,
+                    requestCount = 1,
+                    conversationId = run.conversation_id,
+                )
+            } catch (e: Exception) {
+                // Storage failed after claiming — release so a later poll
+                // retries the run rather than silently dropping it.
+                ingestionRepository.releaseRun(id, run.id)
+                errors.add("usage insert failed for ${run.id}: ${e.message}")
+                continue
+            }
             ingested++
         }
 

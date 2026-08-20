@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 
 /**
  * State for the multi-provider dashboard.
@@ -310,6 +311,16 @@ class FuelViewModel {
     private var pollJob: Job? = null
 
     private val adapters = mutableMapOf<String, ProviderAdapter>()
+
+    /**
+     * Serializes refresh cycles. The poll timer, manual refreshNow(), and
+     * settings-change re-activations can all trigger refresh concurrently;
+     * unserialized they interleave state writes, double-log provider
+     * snapshots, and race _lastRecommendation. A mutex (rather than
+     * tryLock-skip) so a manual refresh during a slow poll waits and runs
+     * fresh data next, rather than silently doing nothing.
+     */
+    private val refreshMutex = kotlinx.coroutines.sync.Mutex()
 
     /** Tracks last recommendation to avoid duplicate logging. */
     private var _lastRecommendation: String = ""
@@ -711,6 +722,20 @@ class FuelViewModel {
         // Remote Dashboard provider is already added above in the providers list
     }
 
+    /**
+     * Connected-mode data parity: fetch the Remote Dashboard's /dashboard
+     * snapshot (mobile's only source of metered/intelligence data — no local
+     * repositories on Android). Returns null when not in connected mode or
+     * the fetch fails.
+     */
+    private suspend fun fetchConnectedDashboardSnapshot(): RemoteDashboardSnapshot? {
+        val entry = adapters.entries.firstOrNull {
+            it.value is com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter
+        } ?: return null
+        val config = _state.value.settings.providers.firstOrNull { it.id == entry.key } ?: return null
+        return RemoteDashboardFetcher.fetch(config.resolvedServerUrl(), config.apiKey)
+    }
+
     // --- Internals ---
 
     private fun activateAdapters(settings: MultiProviderSettings) {
@@ -793,7 +818,7 @@ class FuelViewModel {
      */
     private fun pollIntervalMs(): Long = 30_000L
 
-    private suspend fun refresh() {
+    private suspend fun refresh() = refreshMutex.withLock {
         if (adapters.isEmpty()) {
             _state.value = _state.value.copy(
                 isLoading = false,
@@ -962,6 +987,14 @@ class FuelViewModel {
         val dataPoints = history.size
         val burnRate = BurnRateCalculator.compute(history)
 
+        // Connected-mode data parity (mobile): when a Remote Dashboard is
+        // configured, fetch its /dashboard snapshot and populate the metered /
+        // intelligence state locally — mobile has no local repos, so this is
+        // the ONLY source of usage/waste/events data on Android.
+        val remoteSnapshot = fetchConnectedDashboardSnapshot()
+        val remoteMetered = remoteSnapshot?.metered
+        val remoteIntelligence = remoteSnapshot?.intelligence
+
         _state.value = _state.value.copy(
             providerReports = reports,
             providerErrors = errors,
@@ -977,17 +1010,17 @@ class FuelViewModel {
             modelDrainRates = onGetModelDrainRates?.invoke() ?: emptyList(),
             fuelHistory = onGetFuelHistory?.invoke() ?: emptyList(),
             providerBurnRates = providerBurnRates,
-            meteredBySource24h = metered?.bySource24h ?: emptyList(),
-            meteredByModel24h = metered?.byModel24h ?: emptyList(),
-            meteredBySource7d = metered?.bySource7d ?: emptyList(),
-            meteredByModel7d = metered?.byModel7d ?: emptyList(),
-            meteredByConversation24h = metered?.byConversation24h ?: emptyList(),
-            meteredByConversation7d = metered?.byConversation7d ?: emptyList(),
-            meteredByAgentModel24h = metered?.byAgentModel24h ?: emptyList(),
-            meteredByAgentModel7d = metered?.byAgentModel7d ?: emptyList(),
-            wasteByProvider = intelligence?.wasteByProvider ?: emptyList(),
-            fuelEvents = intelligence?.fuelEvents ?: emptyList(),
-            fuelAdvice = intelligence?.advice,
+            meteredBySource24h = metered?.bySource24h ?: remoteMetered?.bySource24h ?: emptyList(),
+            meteredByModel24h = metered?.byModel24h ?: remoteMetered?.byModel24h ?: emptyList(),
+            meteredBySource7d = metered?.bySource7d ?: remoteMetered?.bySource7d ?: emptyList(),
+            meteredByModel7d = metered?.byModel7d ?: remoteMetered?.byModel7d ?: emptyList(),
+            meteredByConversation24h = metered?.byConversation24h ?: remoteMetered?.byConversation24h ?: emptyList(),
+            meteredByConversation7d = metered?.byConversation7d ?: remoteMetered?.byConversation7d ?: emptyList(),
+            meteredByAgentModel24h = metered?.byAgentModel24h ?: remoteMetered?.byAgentModel24h ?: emptyList(),
+            meteredByAgentModel7d = metered?.byAgentModel7d ?: remoteMetered?.byAgentModel7d ?: emptyList(),
+            wasteByProvider = intelligence?.wasteByProvider ?: remoteIntelligence?.wasteByProvider ?: emptyList(),
+            fuelEvents = intelligence?.fuelEvents ?: remoteIntelligence?.fuelEvents ?: emptyList(),
+            fuelAdvice = intelligence?.advice ?: remoteIntelligence?.advice,
         )
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel

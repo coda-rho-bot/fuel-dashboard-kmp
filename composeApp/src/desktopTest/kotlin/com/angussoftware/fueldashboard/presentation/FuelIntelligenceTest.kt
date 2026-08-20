@@ -126,6 +126,53 @@ class FuelIntelligenceTest {
     }
 
     @Test
+    fun fixedResetGapReconstructionAlignsWithMeasuredResets() {
+        // Regression (adversarial review): reconstruction boundaries used to be
+        // a grid anchored at dataStart, but fixed-reset measured tiles end at
+        // ACTUAL resetAt times — the grid fell beside measured windows and
+        // fabricated phantom tiles. Expected here: 2 measured (r1, r2) + 2
+        // genuinely-missing gap windows (r3, r4) reconstructed, nothing else.
+        val t0 = 1_000_000_000_000L
+        val r1 = t0 + 12 * hour
+        val r2 = r1 + 24 * hour
+        val r3 = r2 + 24 * hour
+        val r4 = r3 + 24 * hour
+        val r5 = r4 + 24 * hour
+        fun letta(ts: Long, pct: Double, reset: Long) =
+            psnap(ts, pct, windowHours = 24.0, provider = "letta").copy(resetAt = reset)
+        val snaps = listOf(
+            letta(t0, 100.0, r1),
+            letta(t0 + 2 * hour, 60.0, r1),   // 40% used
+            letta(t0 + 11 * hour, 50.0, r1),   // -> measured tile at r1: 50% wasted
+            letta(r1 + minute(5), 100.0, r2),
+            letta(t0 + 20 * hour, 80.0, r2),  // 20% used
+            letta(t0 + 23 * hour, 70.0, r2),   // -> measured tile at r2: 70% wasted
+            // dashboard down t0+23h .. r4+5min — resets r3, r4 unobserved
+            letta(r4 + minute(5), 90.0, r5),  // resetAt jumps r2 -> r5
+        )
+        // Calibration: r1 window 2000 tok / 50% used, r2 window 1200 tok / 30%
+        // used → 40 tokens per 1%. Gap usage: 400 tok (r3 window) → 90% wasted,
+        // 800 tok (r4 window) → 80% wasted.
+        val usage = listOf(
+            usage(t0 + 2 * hour, 2000),
+            usage(t0 + 20 * hour, 1200),
+            usage(r2 + 12 * hour, 400),
+            usage(r3 + 12 * hour, 800),
+        )
+        val waste = FuelIntelligence.providerWaste(
+            snapshots = snaps, usage = usage, usageOwnerProviderId = "letta",
+            since = t0, now = r4 + minute(10),
+        )
+        assertEquals(1, waste.size)
+        val daily = waste.first().daily
+        assertEquals(2, daily.sumOf { it.observed }, "measured tiles: r1+r2, got ${daily.sumOf { it.observed }}")
+        assertEquals(2, daily.sumOf { it.estimated }, "gap tiles: r3+r4 only, got ${daily.sumOf { it.estimated }}")
+        assertEquals(4, daily.sumOf { it.windows }, "2 measured + 2 reconstructed, no phantoms")
+        // (50 + 70 + 90 + 80) / 4 — phantom tiles would skew this
+        assertEquals(72.5, waste.first().wastedPctAvg, 0.01)
+    }
+
+    @Test
     fun fixedResetProviderWasteMeasuredAtActualResets() {
         // Letta-style daily: resets at fixed midnight times (resetAt jumps daily).
         // Usage pattern: burns to 30% remaining by end of day 1, 60% by day 2.
