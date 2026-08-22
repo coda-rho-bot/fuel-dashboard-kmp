@@ -1,5 +1,6 @@
 package com.angussoftware.fueldashboard
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.DisposableEffect
@@ -540,7 +541,7 @@ fun main() = application {
             state = hudState,
             alwaysOnTop = DesktopStatusSurfaces.hudAlwaysOnTop.value,
             undecorated = true,
-            transparent = true,
+            transparent = false,
             resizable = true,
         ) {
             // Persist position between runs + enable dragging (undecorated
@@ -594,9 +595,7 @@ fun main() = application {
                 val state by viewModel.state.collectAsState()
                 FuelHudContent(
                     model = FuelStatusModel.from(state),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(6.dp),
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }
