@@ -93,6 +93,7 @@ import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
 import com.angussoftware.fueldashboard.settings.loadStringSetting
+import com.angussoftware.fueldashboard.status.statusSurfaces
 import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.theming.compose.ui.settings.ThemeSettingsPanel
@@ -180,6 +181,11 @@ fun SettingsPanel(
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
+            // --- Persistent status (Android notification / desktop HUD) ---
+            StatusSurfaceSection()
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
             // --- Advanced: rarely-changed config folds away by default ---
             AdvancedSection()
 
@@ -187,6 +193,45 @@ fun SettingsPanel(
 
             DocumentationFooter()
         }
+    }
+}
+
+/**
+ * Persistent status surface toggle — Android: ongoing notification;
+ * desktop: HUD mini-window. Hidden on platforms without a surface (iOS,
+ * issue #60). State applies instantly (a toggle, not a draft field).
+ */
+@Composable
+private fun StatusSurfaceSection() {
+    val surfaces = remember { statusSurfaces() }
+    if (!surfaces.supported) return
+
+    var enabled by remember { mutableStateOf(surfaces.isEnabled()) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = surfaces.label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Quota %, time to reset, and credit totals stay visible${if (surfaces.label.contains("notification")) " in the notification bar" else " in a compact window"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = {
+                enabled = it
+                surfaces.setEnabled(it)
+            },
+        )
     }
 }
 

@@ -307,6 +307,16 @@ private fun defaultModelsFor(kind: ProviderKind): List<FuelModel> = when (kind) 
 
 class FuelViewModel {
 
+    companion object {
+        /**
+         * Process-wide shared instance: the Android foreground notification
+         * service and the Activity (and any desktop windows) share ONE
+         * ViewModel so there is exactly one polling loop and one adapter set.
+         */
+        val shared: FuelViewModel by lazy { FuelViewModel() }
+    }
+
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
 

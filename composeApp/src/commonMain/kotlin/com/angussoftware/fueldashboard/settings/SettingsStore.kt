@@ -36,4 +36,9 @@ internal object FuelSettingsKeys {
     const val COLLAPSED_PROVIDERS = "settingsCollapsedProviders"
     const val COLLAPSED_USAGE = "settingsCollapsedUsage"
     const val COLLAPSED_ADVANCED = "settingsCollapsedAdvanced"
+    // Persistent status surfaces
+    const val STATUS_NOTIFICATION_ENABLED = "statusNotificationEnabled" // Android foreground notification
+    const val HUD_ENABLED = "statusHudEnabled"                           // desktop HUD mini-window
+    const val HUD_X = "statusHudX"                                       // last HUD position
+    const val HUD_Y = "statusHudY"
 }

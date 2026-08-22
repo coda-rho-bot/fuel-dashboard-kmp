@@ -1,10 +1,19 @@
 package com.angussoftware.fueldashboard
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.angussoftware.fueldashboard.model.FuelStatusModel
+import com.angussoftware.fueldashboard.status.DesktopStatusSurfaces
+import com.angussoftware.fueldashboard.ui.components.FuelHudContent
 import com.angussoftware.fueldashboard.acp.AcpAgentConfig
 import com.angussoftware.fueldashboard.acp.AcpAgentInfo
 import com.angussoftware.fueldashboard.acp.AcpAgentManager
@@ -495,6 +504,67 @@ fun main() = application {
                 viewModel = viewModel,
                 themeController = themeController,
             )
+        }
+    }
+
+    // ── Status HUD mini-window ────────────────────────────────────────────
+    // Compact always-on-top quota/credits glance, themed like the main
+    // window. Toggled from Settings → "Status HUD"; visibility observed
+    // live so the toggle needs no restart. Undecorated; last position is
+    // remembered between runs.
+    val hudVisible = DesktopStatusSurfaces.hudVisible
+    val hudState = rememberWindowState(
+        width = 260.dp,
+        height = 200.dp,
+        position = androidx.compose.ui.window.WindowPosition(
+            androidx.compose.ui.unit.Dp(
+                com.angussoftware.fueldashboard.settings.loadStringSetting(
+                    com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_X, "1200",
+                ).toFloat(),
+            ),
+            androidx.compose.ui.unit.Dp(
+                com.angussoftware.fueldashboard.settings.loadStringSetting(
+                    com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_Y, "80",
+                ).toFloat(),
+            ),
+        ),
+    )
+    if (hudVisible.value) {
+        Window(
+            onCloseRequest = { DesktopStatusSurfaces.hudVisible.value = false },
+            title = "Fuel Status",
+            state = hudState,
+            alwaysOnTop = true,
+            undecorated = true,
+            transparent = false,
+            resizable = true,
+        ) {
+            // Persist position between runs (cheap settings write per move).
+            DisposableEffect(window) {
+                val listener = object : java.awt.event.ComponentAdapter() {
+                    override fun componentMoved(e: java.awt.event.ComponentEvent?) {
+                        com.angussoftware.fueldashboard.settings.saveStringSetting(
+                            com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_X,
+                            hudState.position.x.value.toString(),
+                        )
+                        com.angussoftware.fueldashboard.settings.saveStringSetting(
+                            com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_Y,
+                            hudState.position.y.value.toString(),
+                        )
+                    }
+                }
+                window.addComponentListener(listener)
+                onDispose { window.removeComponentListener(listener) }
+            }
+            DashboardTheme {
+                val state by viewModel.state.collectAsState()
+                FuelHudContent(
+                    model = FuelStatusModel.from(state),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(6.dp),
+                )
+            }
         }
     }
 }
