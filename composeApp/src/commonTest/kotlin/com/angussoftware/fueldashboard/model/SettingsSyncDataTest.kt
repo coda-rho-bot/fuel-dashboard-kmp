@@ -48,6 +48,38 @@ class SettingsSyncDataTest {
     }
 
     @Test
+    fun syncRoundTripPreservesFeedbackToken() {
+        val syncData = SettingsSyncData(
+            providers = emptyList(),
+            themeMode = "SYSTEM",
+            lightColorTheme = "Default",
+            darkColorTheme = "Default",
+            feedbackToken = "fb-token-123",
+        )
+
+        val restored = SettingsSyncData.fromJson(syncData.toJson())
+
+        assertEquals("fb-token-123", restored?.feedbackToken)
+    }
+
+    @Test
+    fun feedbackTokenSurvivesQrSlimming() {
+        // Mobile needs the token to submit feedback directly — slimming must
+        // keep it (unlike launcher fields, it's device-agnostic).
+        val syncData = SettingsSyncData(
+            providers = emptyList(),
+            themeMode = "SYSTEM",
+            lightColorTheme = "Default",
+            darkColorTheme = "Default",
+            feedbackToken = "fb-token-123",
+        )
+
+        val slimmed = syncData.slimmedForQr()
+
+        assertEquals("fb-token-123", slimmed.feedbackToken)
+    }
+
+    @Test
     fun providerOrderRoundTripsThroughSync() {
         // Provider list order IS the user's display order — it must survive
         // serialization unchanged (no sorting on either side).
@@ -169,6 +201,9 @@ class SettingsSyncDataTest {
             serverUrl = "https://fuel.angussoftware.dev",
             serverApiKey = "fd-1234567890abcdef1234567890abcdef",
             agentSettings = AgentSettings(agents = agents),
+            usageSectionOrder = listOf("metered", "drain", "waste"),
+            intelSectionOrder = listOf("events"),
+            feedbackToken = "forgejo-feedback-9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e",
         )
 
         val qrData = syncData.toQrData()

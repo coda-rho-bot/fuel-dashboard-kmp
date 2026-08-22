@@ -19,8 +19,9 @@ import kotlinx.serialization.json.put
  * Submits in-app feedback as a Forgejo issue on the project repo —
  * a traditional issue tracker where reports are tracked and discussed.
  *
- * Requires a Forgejo API token with `write:issue` scope, configured once
- * in Settings → Feedback (shared to mobile via settings sync).
+ * Zero-config from the user's perspective: URL/repo default to the project
+ * Forgejo, and the token is distributed invisibly via settings sync (never
+ * shown in the UI).
  */
 object FeedbackSubmitter {
 
@@ -38,7 +39,7 @@ object FeedbackSubmitter {
         title: String,
         body: String,
     ): Result {
-        if (token.isBlank()) return Result.Failure("No feedback token configured — add one in Settings → Feedback.")
+        if (token.isBlank()) return Result.Failure("Feedback isn't set up on this device yet — sync settings from the main dashboard first (Settings → Sync).")
         val url = forgejoUrl.trimEnd('/') + "/api/v1/repos/$repo/issues"
         return try {
             val response = SharedHttpClient.client.post(url) {
@@ -60,14 +61,14 @@ object FeedbackSubmitter {
                 val text = response.bodyAsText().take(300)
                 Result.Failure(
                     when (response.status.value) {
-                        403 -> "Token rejected (403) — it needs the 'write:issue' scope."
-                        401 -> "Token invalid (401) — check Settings → Feedback."
+                        403 -> "Feedback token was rejected (403) — re-sync settings from the main dashboard."
+                        401 -> "Feedback token is invalid (401) — re-sync settings from the main dashboard."
                         else -> "HTTP ${response.status.value}: $text"
                     },
                 )
             }
         } catch (e: Exception) {
-            Result.Failure("Could not reach $forgejoUrl — ${e.message ?: e::class.simpleName}")
+            Result.Failure("Could not reach the issue tracker — ${e.message ?: e::class.simpleName}")
         }
     }
 }

@@ -440,15 +440,6 @@ private fun IntelligenceSettings() {
 @Composable
 private fun FeedbackSettings() {
     var showReportDialog by remember { mutableStateOf(false) }
-    var urlDraft by remember {
-        mutableStateOf(loadStringSetting(FuelSettingsKeys.FEEDBACK_URL, "https://git.angussoftware.dev"))
-    }
-    var repoDraft by remember {
-        mutableStateOf(loadStringSetting(FuelSettingsKeys.FEEDBACK_REPO, "coda/fuel-dashboard-kmp"))
-    }
-    var tokenDraft by remember {
-        mutableStateOf(loadStringSetting(FuelSettingsKeys.FEEDBACK_TOKEN, ""))
-    }
 
     Text(
         text = "Feedback",
@@ -457,56 +448,20 @@ private fun FeedbackSettings() {
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        text = "Report issues from the app — they land as Forgejo issues on the project repo.",
+        text = "Spotted a bug or have an idea? Send it straight to the team — no account needed.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(8.dp))
-
-    OutlinedTextField(
-        value = urlDraft,
-        onValueChange = { urlDraft = it },
-        label = { Text("Forgejo URL") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(4.dp))
-    OutlinedTextField(
-        value = repoDraft,
-        onValueChange = { repoDraft = it },
-        label = { Text("Repository (owner/name)") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(4.dp))
-    OutlinedTextField(
-        value = tokenDraft,
-        onValueChange = { tokenDraft = it },
-        label = { Text("API token (write:issue scope)") },
-        supportingText = { Text("Create once in Forgejo Settings → Applications; shared to mobile via settings sync.") },
-        visualTransformation = PasswordVisualTransformation(),
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = {
-            saveStringSetting(FuelSettingsKeys.FEEDBACK_URL, urlDraft.trim())
-            saveStringSetting(FuelSettingsKeys.FEEDBACK_REPO, repoDraft.trim())
-            saveStringSetting(FuelSettingsKeys.FEEDBACK_TOKEN, tokenDraft.trim())
-        }) {
-            Text("Save")
-        }
-        OutlinedButton(onClick = { showReportDialog = true }) {
-            Text("Report an issue")
-        }
+    Button(onClick = { showReportDialog = true }) {
+        Text("Send feedback")
     }
 
     if (showReportDialog) {
         ReportIssueDialog(
-            forgejoUrl = urlDraft.trim(),
-            repo = repoDraft.trim(),
-            token = tokenDraft.trim(),
+            forgejoUrl = loadStringSetting(FuelSettingsKeys.FEEDBACK_URL, "https://git.angussoftware.dev"),
+            repo = loadStringSetting(FuelSettingsKeys.FEEDBACK_REPO, "coda/fuel-dashboard-kmp"),
+            token = loadStringSetting(FuelSettingsKeys.FEEDBACK_TOKEN, ""),
             onDismiss = { showReportDialog = false },
         )
     }

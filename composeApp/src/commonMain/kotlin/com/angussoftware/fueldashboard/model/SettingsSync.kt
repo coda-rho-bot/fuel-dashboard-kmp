@@ -29,6 +29,9 @@ data class SettingsSyncData(
     // Section ordering (Usage/Intel tabs). Empty = receiver keeps its own.
     val usageSectionOrder: List<String> = emptyList(),
     val intelSectionOrder: List<String> = emptyList(),
+    // Feedback submission token (write:issue scope) — distributed invisibly;
+    // the feedback UI never exposes URL/repo/token to the user.
+    val feedbackToken: String? = null,
 ) {
     companion object {
         const val CURRENT_VERSION = 4
@@ -36,6 +39,14 @@ data class SettingsSyncData(
         private val json = Json {
             ignoreUnknownKeys = true
             encodeDefaults = true
+        }
+
+        /** Compact encoder for QR transport — drops null/default fields to
+         *  keep the payload under the reliably-scannable QR version bound
+         *  (≤20).  Receiver fills missing fields from defaults. */
+        private val qrJson = Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = false
         }
 
         /**
@@ -64,6 +75,9 @@ data class SettingsSyncData(
             junieLastChecked = junieLastChecked,
             usageSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage(),
             intelSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadIntel(),
+            feedbackToken = com.angussoftware.fueldashboard.settings
+                .loadStringSetting(com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_TOKEN, "")
+                .ifBlank { null },
         )
 
         /**
@@ -136,8 +150,7 @@ data class SettingsSyncData(
      */
     @OptIn(ExperimentalEncodingApi::class)
     fun toQrData(): String {
-        val encoded = json.encodeToString(serializer(), slimmedForQr())
-        // Debug: verify serverApiKey is in the JSON
+        val encoded = qrJson.encodeToString(serializer(), slimmedForQr())
         return Base64.encode(compress(encoded))
     }
 
