@@ -29,9 +29,6 @@ data class SettingsSyncData(
     // Section ordering (Usage/Intel tabs). Empty = receiver keeps its own.
     val usageSectionOrder: List<String> = emptyList(),
     val intelSectionOrder: List<String> = emptyList(),
-    // Feedback submission token (write:issue scope) — distributed invisibly;
-    // the feedback UI never exposes URL/repo/token to the user.
-    val feedbackToken: String? = null,
 ) {
     companion object {
         const val CURRENT_VERSION = 4
@@ -75,9 +72,6 @@ data class SettingsSyncData(
             junieLastChecked = junieLastChecked,
             usageSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage(),
             intelSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadIntel(),
-            feedbackToken = com.angussoftware.fueldashboard.settings
-                .loadStringSetting(com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_TOKEN, "")
-                .ifBlank { null },
         )
 
         /**

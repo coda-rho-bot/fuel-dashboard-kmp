@@ -32,6 +32,8 @@ internal object FuelSettingsKeys {
     const val FEEDBACK_URL = "feedbackForgejoUrl"
     const val FEEDBACK_REPO = "feedbackForgejoRepo"
     const val FEEDBACK_TOKEN = "feedbackForgejoToken"
+    /** Baked-in default — write:issue scope only. Works OOB without sync. */
+    const val DEFAULT_FEEDBACK_TOKEN = "5cf134672e7c73281a881035b82e0a2315f35692"
     // UI state — section collapse persistence (settings page)
     const val COLLAPSED_PROVIDERS = "settingsCollapsedProviders"
     const val COLLAPSED_USAGE = "settingsCollapsedUsage"

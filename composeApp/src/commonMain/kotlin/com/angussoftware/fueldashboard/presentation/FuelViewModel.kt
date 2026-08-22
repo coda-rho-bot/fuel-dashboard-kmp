@@ -715,10 +715,6 @@ class FuelViewModel {
                 syncData.intelSectionOrder,
             )
         }
-        // Feedback token — arrives invisibly; feedback UI is zero-config.
-        syncData.feedbackToken?.takeIf { it.isNotBlank() }?.let { token ->
-            saveStringSetting(FuelSettingsKeys.FEEDBACK_TOKEN, token)
-        }
         // Merge: take synced providers AND add/update a Remote Dashboard provider with the server API key
         val providers = syncData.providers.toMutableList()
         syncData.serverUrl?.let { url ->

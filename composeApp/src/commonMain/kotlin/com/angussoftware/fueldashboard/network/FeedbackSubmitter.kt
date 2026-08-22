@@ -19,9 +19,8 @@ import kotlinx.serialization.json.put
  * Submits in-app feedback as a Forgejo issue on the project repo —
  * a traditional issue tracker where reports are tracked and discussed.
  *
- * Zero-config from the user's perspective: URL/repo default to the project
- * Forgejo, and the token is distributed invisibly via settings sync (never
- * shown in the UI).
+ * Zero-config from the user's perspective: URL/repo/token default to the project
+ * Forgejo with a baked-in write:issue token. Works OOB without any sync.
  */
 object FeedbackSubmitter {
 
@@ -39,7 +38,7 @@ object FeedbackSubmitter {
         title: String,
         body: String,
     ): Result {
-        if (token.isBlank()) return Result.Failure("Feedback isn't set up on this device yet — sync settings from the main dashboard first (Settings → Sync).")
+        if (token.isBlank()) return Result.Failure("Feedback token is missing.")
         val url = forgejoUrl.trimEnd('/') + "/api/v1/repos/$repo/issues"
         return try {
             val response = SharedHttpClient.client.post(url) {

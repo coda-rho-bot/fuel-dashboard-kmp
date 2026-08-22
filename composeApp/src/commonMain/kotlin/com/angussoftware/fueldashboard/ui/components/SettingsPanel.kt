@@ -461,7 +461,7 @@ private fun FeedbackSettings() {
         ReportIssueDialog(
             forgejoUrl = loadStringSetting(FuelSettingsKeys.FEEDBACK_URL, "https://git.angussoftware.dev"),
             repo = loadStringSetting(FuelSettingsKeys.FEEDBACK_REPO, "coda/fuel-dashboard-kmp"),
-            token = loadStringSetting(FuelSettingsKeys.FEEDBACK_TOKEN, ""),
+            token = loadStringSetting(FuelSettingsKeys.FEEDBACK_TOKEN, FuelSettingsKeys.DEFAULT_FEEDBACK_TOKEN),
             onDismiss = { showReportDialog = false },
         )
     }
