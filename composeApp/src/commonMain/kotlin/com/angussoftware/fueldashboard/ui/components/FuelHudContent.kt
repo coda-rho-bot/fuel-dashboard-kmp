@@ -9,15 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.angussoftware.fueldashboard.model.FuelStatusModel
 
 /**
@@ -42,56 +39,28 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(4.dp))
 
-        // Headline: most critical provider
-        model.headline?.let { head ->
-            Row(verticalAlignment = Alignment.Bottom) {
+        // All quota providers as uniform rows — no single-provider emphasis.
+        model.quotaLines.forEach { line ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Text(
-                    text = "${head.remainingPct ?: "—"}%",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
+                    text = line.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = head.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = FuelStatusModel.formatCountdown(head.resetsAt)?.let { "resets in $it" } ?: "",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = buildString {
+                        append(line.remainingPct?.let { "$it%" } ?: "—")
+                        FuelStatusModel.formatCountdown(line.resetsAt)?.let { append(" · $it") }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
-            Spacer(Modifier.height(4.dp))
         }
-
-        // Remaining providers (headline excluded if it's the only one shown large)
-        model.quotaLines
-            .filter { it.name != model.headline?.name || model.quotaLines.size == 1 }
-            .forEach { line ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = line.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = buildString {
-                            append(line.remainingPct?.let { "$it%" } ?: "—")
-                            FuelStatusModel.formatCountdown(line.resetsAt)?.let { append(" · $it") }
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
 
         // Credit pools
         model.creditLines.forEach { credit ->
