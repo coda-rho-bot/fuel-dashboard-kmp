@@ -265,6 +265,38 @@ private fun StatusSurfaceSection() {
             )
         }
     }
+
+    // Always-on-top toggle (desktop only) — shown when HUD is enabled
+    if (enabled && surfaces.supportsAlwaysOnTopToggle) {
+        var onTop by remember { mutableStateOf(surfaces.alwaysOnTop()) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Always on top",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Keep the HUD floating above other windows",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = onTop,
+                onCheckedChange = {
+                    onTop = it
+                    surfaces.setAlwaysOnTop(it)
+                },
+            )
+        }
+    }
 }
 
 /** One-line documentation link — reference material, belongs at the bottom. */

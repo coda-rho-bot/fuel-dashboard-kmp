@@ -19,6 +19,9 @@ interface StatusSurfaces {
     /** Whether this platform supports a "show icon in status bar" toggle. */
     val supportsIconToggle: Boolean get() = false
 
+    /** Whether this platform supports an "always on top" toggle. */
+    val supportsAlwaysOnTopToggle: Boolean get() = false
+
     /** Apply the new enabled state. */
     fun setEnabled(enabled: Boolean)
 
@@ -30,6 +33,12 @@ interface StatusSurfaces {
 
     /** Current show-icon state (Android only, default true). */
     fun showIcon(): Boolean = true
+
+    /** Set whether the surface floats above other windows (desktop only). */
+    fun setAlwaysOnTop(enabled: Boolean) {}
+
+    /** Current always-on-top state (desktop only, default true). */
+    fun alwaysOnTop(): Boolean = true
 }
 
 /** Platform-provided singleton. */

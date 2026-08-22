@@ -13,6 +13,7 @@ import com.angussoftware.fueldashboard.settings.saveStringSetting
 class DesktopStatusSurfaces : StatusSurfaces {
     override val label: String = "Status HUD"
     override val supported: Boolean = true
+    override val supportsAlwaysOnTopToggle: Boolean = true
 
     override fun setEnabled(enabled: Boolean) {
         saveStringSetting(FuelSettingsKeys.HUD_ENABLED, enabled.toString())
@@ -22,10 +23,23 @@ class DesktopStatusSurfaces : StatusSurfaces {
     override fun isEnabled(): Boolean =
         loadStringSetting(FuelSettingsKeys.HUD_ENABLED, "false").toBoolean()
 
+    override fun setAlwaysOnTop(enabled: Boolean) {
+        saveStringSetting(FuelSettingsKeys.HUD_ALWAYS_ON_TOP, enabled.toString())
+        hudAlwaysOnTop.value = enabled
+    }
+
+    override fun alwaysOnTop(): Boolean =
+        loadStringSetting(FuelSettingsKeys.HUD_ALWAYS_ON_TOP, "true").toBoolean()
+
     companion object {
         /** Observed by main.kt to show/hide the HUD window. */
         val hudVisible = mutableStateOf(
             loadStringSetting(FuelSettingsKeys.HUD_ENABLED, "false").toBoolean(),
+        )
+
+        /** Observed by main.kt to pin/unpin the HUD window live. */
+        val hudAlwaysOnTop = mutableStateOf(
+            loadStringSetting(FuelSettingsKeys.HUD_ALWAYS_ON_TOP, "true").toBoolean(),
         )
     }
 }

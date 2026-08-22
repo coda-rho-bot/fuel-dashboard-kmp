@@ -538,9 +538,9 @@ fun main() = application {
             },
             title = "Fuel Status",
             state = hudState,
-            alwaysOnTop = true,
+            alwaysOnTop = DesktopStatusSurfaces.hudAlwaysOnTop.value,
             undecorated = true,
-            transparent = false,
+            transparent = true,
             resizable = true,
         ) {
             // Persist position between runs + enable dragging (undecorated
