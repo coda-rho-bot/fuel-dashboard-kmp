@@ -31,6 +31,8 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun WasteDetectionPanel(
     providers: List<FuelIntelligence.ProviderWaste>,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (providers.isEmpty()) return
@@ -48,6 +50,8 @@ fun WasteDetectionPanel(
                     "Window length follows each provider\u2019s own quota mechanics (z.ai 5h, Letta daily 24h, pools = refill period). " +
                     "High waste = capacity you paid for went unused.",
             )
+            Spacer(Modifier.weight(1f))
+            ReorderControls(onMoveUp = onMoveUp, onMoveDown = onMoveDown)
         }
         Spacer(Modifier.height(8.dp))
 

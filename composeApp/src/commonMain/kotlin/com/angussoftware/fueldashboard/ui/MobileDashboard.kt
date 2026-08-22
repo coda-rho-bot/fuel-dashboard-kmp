@@ -134,25 +134,26 @@ fun MobileDashboard(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    // Metered usage (exact token counts from usage sources)
-                    MeteredUsagePanel(
-                        bySource24h = state.meteredBySource24h,
-                        byModel24h = state.meteredByModel24h,
-                        bySource7d = state.meteredBySource7d,
-                        byModel7d = state.meteredByModel7d,
-                        byConversation24h = state.meteredByConversation24h,
-                        byConversation7d = state.meteredByConversation7d,
-                        byAgentModel24h = state.meteredByAgentModel24h,
-                        byAgentModel7d = state.meteredByAgentModel7d,
-                    )
-
-                    // Model consumption breakdown
-                    if (state.modelDrainRates.isNotEmpty()) {
-                        ModelDrainRatesPanel(rates = state.modelDrainRates)
+                    // Sections in the user's synced order (reordered on desktop;
+                    // order syncs across devices via SettingsSyncData)
+                    for (key in remember { com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage() }) {
+                        when (key) {
+                            "metered" -> MeteredUsagePanel(
+                                bySource24h = state.meteredBySource24h,
+                                byModel24h = state.meteredByModel24h,
+                                bySource7d = state.meteredBySource7d,
+                                byModel7d = state.meteredByModel7d,
+                                byConversation24h = state.meteredByConversation24h,
+                                byConversation7d = state.meteredByConversation7d,
+                                byAgentModel24h = state.meteredByAgentModel24h,
+                                byAgentModel7d = state.meteredByAgentModel7d,
+                            )
+                            "drain" -> if (state.modelDrainRates.isNotEmpty()) {
+                                ModelDrainRatesPanel(rates = state.modelDrainRates)
+                            }
+                            "waste" -> WasteDetectionPanel(providers = state.wasteByProvider)
+                        }
                     }
-
-                    // Waste detection (unattributed drain)
-                    WasteDetectionPanel(providers = state.wasteByProvider)
                 }
             }
 

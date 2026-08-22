@@ -43,4 +43,7 @@ internal object FuelSettingsKeys {
     const val HUD_ALWAYS_ON_TOP = "statusHudAlwaysOnTop"                 // desktop HUD pinning
     const val HUD_X = "statusHudX"                                       // last HUD position
     const val HUD_Y = "statusHudY"
+    // Section order persistence (Usage/Intel tabs) — JSON array of section keys
+    const val SECTION_ORDER_USAGE = "sectionOrderUsage"
+    const val SECTION_ORDER_INTEL = "sectionOrderIntel"
 }

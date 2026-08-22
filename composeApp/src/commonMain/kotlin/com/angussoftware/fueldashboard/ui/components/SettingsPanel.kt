@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
@@ -742,11 +743,13 @@ private fun ProvidersSection(
                 // Show Help toggle being on.
                 HelpText("Welcome! Add a provider using the + Add button above.")
             } else {
-                settings.providers.forEach { config ->
+                settings.providers.forEachIndexed { index, config ->
                     ProviderConfigRow(
                         config = config,
                         onUpdate = { viewModel.updateProvider(it) },
                         onRemove = { viewModel.removeProvider(config.id) },
+                        onMoveUp = if (index > 0) ({ viewModel.moveProvider(config.id, -1) }) else null,
+                        onMoveDown = if (index < settings.providers.size - 1) ({ viewModel.moveProvider(config.id, +1) }) else null,
                         showHelp = showHelp,
                     )
                     Spacer(Modifier.height(4.dp))
@@ -928,6 +931,8 @@ private fun ProviderConfigRow(
     config: ProviderConfig,
     onUpdate: (ProviderConfig) -> Unit,
     onRemove: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
     showHelp: Boolean,
 ) {
     var isEditing by remember { mutableStateOf(false) }
@@ -990,6 +995,27 @@ private fun ProviderConfigRow(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                }
+                // Re-order controls — move provider up/down in the user-ordered list
+                if (onMoveUp != null) {
+                    IconButton(onClick = onMoveUp, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Move up",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (onMoveDown != null) {
+                    IconButton(onClick = onMoveDown, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Move down",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }

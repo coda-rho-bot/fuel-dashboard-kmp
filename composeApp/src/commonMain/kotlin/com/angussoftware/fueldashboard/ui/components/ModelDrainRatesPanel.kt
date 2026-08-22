@@ -31,6 +31,8 @@ import kotlin.math.roundToInt
 @Composable
 fun ModelDrainRatesPanel(
     rates: List<ModelDrainRateDisplay>,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (rates.isEmpty()) return
@@ -44,6 +46,8 @@ fun ModelDrainRatesPanel(
             )
             Spacer(Modifier.width(4.dp))
             HelpIcon("Measured fuel consumption attributed to each model based on when fuel dropped while that model was active")
+            Spacer(Modifier.weight(1f))
+            ReorderControls(onMoveUp = onMoveUp, onMoveDown = onMoveDown)
         }
         Spacer(Modifier.height(8.dp))
 

@@ -248,10 +248,9 @@ data class DashboardState(
     val fuelEvents: List<FuelIntelligence.FuelEvent> = emptyList(),
     val fuelAdvice: FuelAdvisor.Advice? = null,
 ) {
-    /** All configured providers (have enough info to poll). */
+    /** All configured providers (have enough info to poll), in user order. */
     val activeProviders: List<ProviderConfig>
         get() = settings.providers.filter { it.isConfigured }
-            .sortedByDescending { it.kind == ProviderKind.CONNECTED_API }
 
     /** Whether any connected API (orchestrator) is active — used for agents/alerts panel visibility. */
     val hasConnectedApi: Boolean
@@ -615,6 +614,24 @@ class FuelViewModel {
         )
     }
 
+    /**
+     * Moves a provider up (-1) or down (+1) in the user-ordered list.
+     * Order flows everywhere: Overview sections, HUD, notification rows, sync.
+     * Lightweight — reports are keyed by id, so no adapter restart is needed.
+     */
+    fun moveProvider(providerId: String, offset: Int) {
+        val providers = _state.value.settings.providers.toMutableList()
+        val index = providers.indexOfFirst { it.id == providerId }
+        if (index < 0) return
+        val target = index + offset
+        if (target < 0 || target >= providers.size) return
+        val item = providers.removeAt(index)
+        providers.add(target, item)
+        val newSettings = _state.value.settings.copy(providers = providers)
+        FuelSettingsStore.saveMultiProvider(newSettings)
+        _state.value = _state.value.copy(settings = newSettings)
+    }
+
     // --- Agent settings ---
 
     /**
@@ -639,8 +656,32 @@ class FuelViewModel {
     /**
      * Removes an ACP agent from settings by ID.
      */
-    fun removeAgent(agentId: String) {
-        // Remove from ACP agent settings
+    /**
+     * Moves an agent up (-1) or down (+1) in the user-ordered list.
+     * Order persists in AgentSettings and syncs across devices.
+     */
+    fun moveAgent(agentId: String, offset: Int) {
+        val agents = _state.value.agentSettings.agents.toMutableList()
+        val index = agents.indexOfFirst { it.id == agentId }
+        if (index < 0) return
+        val target = index + offset
+        if (target < 0 || target >= agents.size) return
+        val item = agents.removeAt(index)
+        agents.add(target, item)
+        val updated = _state.value.agentSettings.copy(agents = agents)
+        AgentSettingsStore.save(updated)
+        _state.value = _state.value.copy(agentSettings = updated)
+        onAgentSettingsChanged?.invoke(updated)
+        // Reorder the display list to match (MCP/HTTP-registered agents not
+        // in settings keep their relative order at the end)
+        val displayById = _state.value.acpAgents.associateBy { it.id }
+        val agentIds = agents.map { it.id }.toSet()
+        val reordered = agents.mapNotNull { displayById[it.id] }
+        val extras = _state.value.acpAgents.filter { it.id !in agentIds }
+        _state.value = _state.value.copy(acpAgents = reordered + extras)
+    }
+
+    fun removeAgent(agentId: String) {        // Remove from ACP agent settings
         val updated = _state.value.agentSettings.copy(
             agents = _state.value.agentSettings.agents.filterNot { it.id == agentId },
         )
@@ -661,6 +702,19 @@ class FuelViewModel {
      * Replaces all current providers, agent configurations, and theme with the imported data.
      */
     fun importSyncedSettings(syncData: com.angussoftware.fueldashboard.model.SettingsSyncData) {
+        // Section orders (Usage/Intel tabs) — empty lists keep the receiver's own.
+        if (syncData.usageSectionOrder.isNotEmpty()) {
+            com.angussoftware.fueldashboard.settings.SectionOrder.save(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_USAGE,
+                syncData.usageSectionOrder,
+            )
+        }
+        if (syncData.intelSectionOrder.isNotEmpty()) {
+            com.angussoftware.fueldashboard.settings.SectionOrder.save(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_INTEL,
+                syncData.intelSectionOrder,
+            )
+        }
         // Merge: take synced providers AND add/update a Remote Dashboard provider with the server API key
         val providers = syncData.providers.toMutableList()
         syncData.serverUrl?.let { url ->

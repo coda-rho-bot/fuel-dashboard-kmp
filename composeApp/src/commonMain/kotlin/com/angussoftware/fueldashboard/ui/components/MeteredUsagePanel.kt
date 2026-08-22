@@ -44,6 +44,8 @@ fun MeteredUsagePanel(
     byConversation7d: List<ConversationUsageDisplay> = emptyList(),
     byAgentModel24h: List<AgentModelUsageDisplay> = emptyList(),
     byAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (bySource24h.isEmpty() && bySource7d.isEmpty() &&
@@ -67,6 +69,7 @@ fun MeteredUsagePanel(
             Spacer(Modifier.width(4.dp))
             HelpIcon("Exact token counts metered from usage sources (agent runs), not inferred from gauge drops")
             Spacer(Modifier.weight(1f))
+            ReorderControls(onMoveUp = onMoveUp, onMoveDown = onMoveDown)
             FilterChip(
                 selected = !window7d,
                 onClick = { window7d = false },

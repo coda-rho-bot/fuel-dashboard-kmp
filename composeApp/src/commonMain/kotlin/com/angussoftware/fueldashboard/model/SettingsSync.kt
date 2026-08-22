@@ -26,9 +26,12 @@ data class SettingsSyncData(
     val junieBalance: Double? = null,
     val junieLicense: String? = null,
     val junieLastChecked: Long? = null,
+    // Section ordering (Usage/Intel tabs). Empty = receiver keeps its own.
+    val usageSectionOrder: List<String> = emptyList(),
+    val intelSectionOrder: List<String> = emptyList(),
 ) {
     companion object {
-        const val CURRENT_VERSION = 3
+        const val CURRENT_VERSION = 4
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -59,6 +62,8 @@ data class SettingsSyncData(
             junieBalance = junieBalance,
             junieLicense = junieLicense,
             junieLastChecked = junieLastChecked,
+            usageSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage(),
+            intelSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadIntel(),
         )
 
         /**

@@ -117,4 +117,50 @@ class FuelStatusModelTest {
         assertEquals("Alive", model.quotaLines[0].name)
         assertEquals("Alive", model.headline!!.name)
     }
+
+    @Test
+    fun quotaLinesFollowUserProviderOrderNotAlphabetical() {
+        // Settings order: zeta first, alpha second, beta third — deliberately
+        // NOT alphabetical. Reports must render in this exact order.
+        val settings = MultiProviderSettings(
+            providers = listOf(
+                ProviderConfig(id = "zeta", kind = ProviderKind.ZAI, apiKey = "k"),
+                ProviderConfig(id = "alpha", kind = ProviderKind.LETTA_CLOUD, apiKey = "k"),
+                ProviderConfig(id = "beta", kind = ProviderKind.OPENAI, apiKey = "k"),
+            ),
+        )
+        val state = DashboardState(
+            settings = settings,
+            providerReports = mapOf(
+                "beta" to report("beta", "Beta", remainingPct = 50),
+                "alpha" to report("alpha", "Alpha", remainingPct = 60),
+                "zeta" to report("zeta", "Zeta", remainingPct = 40),
+            ),
+        )
+        val model = FuelStatusModel.from(state)
+
+        assertEquals(listOf("Zeta", "Alpha", "Beta"), model.quotaLines.map { it.name })
+    }
+
+    @Test
+    fun unknownProviderReportsFallBackAlphabeticallyAfterKnownOnes() {
+        // "orphan" is not in settings; "zeta" is. Known order first, then
+        // unknown reports alphabetically.
+        val settings = MultiProviderSettings(
+            providers = listOf(
+                ProviderConfig(id = "zeta", kind = ProviderKind.ZAI, apiKey = "k"),
+            ),
+        )
+        val state = DashboardState(
+            settings = settings,
+            providerReports = mapOf(
+                "zeta" to report("zeta", "Zeta", remainingPct = 40),
+                "orphan" to report("orphan", "Orphan", remainingPct = 10),
+            ),
+        )
+        val model = FuelStatusModel.from(state)
+
+        assertEquals("Zeta", model.quotaLines[0].name)
+        assertEquals("Orphan", model.quotaLines[1].name)
+    }
 }

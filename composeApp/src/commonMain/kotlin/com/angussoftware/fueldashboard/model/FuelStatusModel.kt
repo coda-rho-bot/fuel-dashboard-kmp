@@ -59,9 +59,19 @@ data class FuelStatusModel(
 
     companion object {
         fun from(state: DashboardState): FuelStatusModel {
+            // Order by the user's provider order (Settings list); reports for
+            // providers missing from settings (e.g. removed mid-flight) keep
+            // alphabetical fallback. Ordering flows to HUD + notification rows.
+            val orderIndex = state.settings.providers
+                .mapIndexed { i, p -> p.id to i }.toMap()
             val reports = state.providerReports.values
                 .filter { it.available }
-                .sortedBy { it.displayName.lowercase() }
+                .sortedWith(
+                    compareBy(
+                        { orderIndex[it.providerId] ?: Int.MAX_VALUE },
+                        { it.displayName.lowercase() },
+                    ),
+                )
 
             // Windowed quotas only — credit-only providers have no %/reset and
             // are represented in creditLines instead (no duplicate "—" rows).

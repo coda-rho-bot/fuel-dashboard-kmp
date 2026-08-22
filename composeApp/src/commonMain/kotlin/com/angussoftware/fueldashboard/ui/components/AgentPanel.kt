@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
@@ -110,6 +111,7 @@ fun AgentPanel(
     showHelp: Boolean = false,
     usageByAgentModel24h: List<com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay> = emptyList(),
     usageByConversation24h: List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay> = emptyList(),
+    onMoveAgent: ((agentId: String, offset: Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
@@ -198,7 +200,7 @@ fun AgentPanel(
                 .groupBy { norm(it.agentName) to it.model }
                 .mapValues { (_, v) -> v.map { it.conversationId }.distinct().size }
 
-            agents.forEach { agent ->
+            agents.forEachIndexed { index, agent ->
                 val key = norm(agent.name)
                 val usageRows = usageByName[key].orEmpty()
                 val convCounts = convCountByAgentModel
@@ -210,6 +212,8 @@ fun AgentPanel(
                     showHelp = showHelp,
                     usageRows24h = usageRows,
                     conversationCountsByModel = convCounts,
+                    onMoveUp = if (onMoveAgent != null && index > 0) ({ onMoveAgent(agent.id, -1) }) else null,
+                    onMoveDown = if (onMoveAgent != null && index < agents.size - 1) ({ onMoveAgent(agent.id, +1) }) else null,
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -541,6 +545,8 @@ private fun AgentCard(
     showHelp: Boolean = false,
     usageRows24h: List<com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay> = emptyList(),
     conversationCountsByModel: Map<String, Int> = emptyMap(),
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val isSyncedOnly = agent.status.equals("synced", ignoreCase = true)
@@ -578,6 +584,28 @@ private fun AgentCard(
                             text = formatLastSeen(seen),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                // Re-order controls — move agent up/down in the user-ordered list
+                if (onMoveUp != null) {
+                    IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Move up",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                if (onMoveDown != null) {
+                    IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Move down",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }

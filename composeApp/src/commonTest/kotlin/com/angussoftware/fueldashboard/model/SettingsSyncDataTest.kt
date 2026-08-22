@@ -31,6 +31,43 @@ class SettingsSyncDataTest {
     }
 
     @Test
+    fun syncRoundTripPreservesSectionOrders() {
+        val syncData = SettingsSyncData(
+            providers = emptyList(),
+            themeMode = "SYSTEM",
+            lightColorTheme = "Default",
+            darkColorTheme = "Default",
+            usageSectionOrder = listOf("waste", "metered", "drain"),
+            intelSectionOrder = listOf("events"),
+        )
+
+        val restored = SettingsSyncData.fromJson(syncData.toJson())
+
+        assertEquals(listOf("waste", "metered", "drain"), restored?.usageSectionOrder)
+        assertEquals(listOf("events"), restored?.intelSectionOrder)
+    }
+
+    @Test
+    fun providerOrderRoundTripsThroughSync() {
+        // Provider list order IS the user's display order — it must survive
+        // serialization unchanged (no sorting on either side).
+        val providers = listOf(
+            ProviderConfig(id = "z", kind = ProviderKind.ZAI, apiKey = "k1"),
+            ProviderConfig(id = "a", kind = ProviderKind.OPENAI, apiKey = "k2"),
+        )
+        val syncData = SettingsSyncData(
+            providers = providers,
+            themeMode = "SYSTEM",
+            lightColorTheme = "Default",
+            darkColorTheme = "Default",
+        )
+
+        val restored = SettingsSyncData.fromJson(syncData.toJson())
+
+        assertEquals(providers.map { it.id }, restored?.providers?.map { it.id })
+    }
+
+    @Test
     fun syncDataWithoutAgentsUsesEmptyAgentSettings() {
         val restored = SettingsSyncData.fromJson(
             """{"version":2,"providers":[],"themeMode":"SYSTEM","lightColorTheme":"Default","darkColorTheme":"Default"}""",

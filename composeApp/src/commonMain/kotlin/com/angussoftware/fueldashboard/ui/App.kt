@@ -61,6 +61,7 @@ import com.angussoftware.fueldashboard.network.canCheckJunieBalance
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
+import com.angussoftware.fueldashboard.settings.SectionOrder
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.ui.components.AgentPanel
@@ -206,6 +207,16 @@ private fun DesktopLayout(
             }
 
             DesktopTab.USAGE -> {
+                // User-ordered sections (Settings → reorder via the arrows on each panel)
+                var usageOrder by remember { mutableStateOf(SectionOrder.loadUsage()) }
+                fun moveUsage(key: String, offset: Int) {
+                    usageOrder = SectionOrder.move(
+                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_USAGE,
+                        SectionOrder.USAGE_KEYS,
+                        key,
+                        offset,
+                    )
+                }
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -214,24 +225,46 @@ private fun DesktopLayout(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    MeteredUsagePanel(
-                        bySource24h = state.meteredBySource24h,
-                        byModel24h = state.meteredByModel24h,
-                        bySource7d = state.meteredBySource7d,
-                        byModel7d = state.meteredByModel7d,
-                        byConversation24h = state.meteredByConversation24h,
-                        byConversation7d = state.meteredByConversation7d,
-                        byAgentModel24h = state.meteredByAgentModel24h,
-                        byAgentModel7d = state.meteredByAgentModel7d,
-                    )
-                    if (state.modelDrainRates.isNotEmpty()) {
-                        ModelDrainRatesPanel(rates = state.modelDrainRates)
+                    val sections = usageOrder.mapIndexed { i, key ->
+                        key to (
+                            (if (i > 0) ({ moveUsage(key, -1) }) else null) to
+                                (if (i < usageOrder.size - 1) ({ moveUsage(key, +1) }) else null)
+                            )
+                    }.toMap()
+                    for ((key, moves) in sections) {
+                        val (up, down) = moves
+                        when (key) {
+                            "metered" -> MeteredUsagePanel(
+                                bySource24h = state.meteredBySource24h,
+                                byModel24h = state.meteredByModel24h,
+                                bySource7d = state.meteredBySource7d,
+                                byModel7d = state.meteredByModel7d,
+                                byConversation24h = state.meteredByConversation24h,
+                                byConversation7d = state.meteredByConversation7d,
+                                byAgentModel24h = state.meteredByAgentModel24h,
+                                byAgentModel7d = state.meteredByAgentModel7d,
+                                onMoveUp = up,
+                                onMoveDown = down,
+                            )
+                            "drain" -> if (state.modelDrainRates.isNotEmpty()) {
+                                ModelDrainRatesPanel(rates = state.modelDrainRates, onMoveUp = up, onMoveDown = down)
+                            }
+                            "waste" -> WasteDetectionPanel(providers = state.wasteByProvider, onMoveUp = up, onMoveDown = down)
+                        }
                     }
-                    WasteDetectionPanel(providers = state.wasteByProvider)
                 }
             }
 
             DesktopTab.INTEL -> {
+                var intelOrder by remember { mutableStateOf(SectionOrder.loadIntel()) }
+                fun moveIntel(key: String, offset: Int) {
+                    intelOrder = SectionOrder.move(
+                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_INTEL,
+                        SectionOrder.INTEL_KEYS,
+                        key,
+                        offset,
+                    )
+                }
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -240,7 +273,18 @@ private fun DesktopLayout(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    FuelEventHistoryPanel(events = state.fuelEvents)
+                    val sections = intelOrder.mapIndexed { i, key ->
+                        key to (
+                            (if (i > 0) ({ moveIntel(key, -1) }) else null) to
+                                (if (i < intelOrder.size - 1) ({ moveIntel(key, +1) }) else null)
+                            )
+                    }.toMap()
+                    for ((key, moves) in sections) {
+                        val (up, down) = moves
+                        when (key) {
+                            "events" -> FuelEventHistoryPanel(events = state.fuelEvents, onMoveUp = up, onMoveDown = down)
+                        }
+                    }
                 }
             }
 
@@ -278,6 +322,7 @@ private fun DesktopLayout(
                         showHelp = state.showHelp,
                         usageByAgentModel24h = state.meteredByAgentModel24h,
                         usageByConversation24h = state.meteredByConversation24h,
+                        onMoveAgent = { agentId, offset -> viewModel.moveAgent(agentId, offset) },
                     )
                 }
             }
