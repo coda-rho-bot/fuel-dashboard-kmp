@@ -125,8 +125,17 @@ class FuelStatusService : Service() {
             }.ifEmpty { getString(R.string.loading_status) }
         }
 
+        // Choose small icon: real icon or transparent (hide from status bar)
+        // while keeping the notification at IMPORTANCE_LOW (not minimized).
+        val showIcon = loadStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_SHOW_ICON, "true").toBoolean()
+        val smallIcon = if (showIcon) {
+            android.R.drawable.stat_sys_download_done // placeholder until app icon set
+        } else {
+            R.drawable.ic_status_transparent
+        }
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done) // placeholder until app icon set
+            .setSmallIcon(smallIcon)
             .setContentTitle(title)
             .setContentText(body)
             .setOngoing(true)

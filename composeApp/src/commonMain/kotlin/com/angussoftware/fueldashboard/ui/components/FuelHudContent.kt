@@ -1,6 +1,7 @@
 package com.angussoftware.fueldashboard.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,15 +32,25 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
+        // Title header — fixed "Fuel Status" label, not the provider name
+        Text(
+            text = "Fuel Status",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.height(4.dp))
+
         // Headline: most critical provider
         model.headline?.let { head ->
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = "${head.remainingPct ?: "—"}%",
-                    fontSize = 26.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -48,7 +59,7 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
                     Text(
                         text = head.name,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = FuelStatusModel.formatCountdown(head.resetsAt)?.let { "resets in $it" } ?: "",
@@ -57,7 +68,7 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
         }
 
         // Remaining providers (headline excluded if it's the only one shown large)
@@ -71,7 +82,7 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
                     Text(
                         text = line.name,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = buildString {
@@ -80,6 +91,7 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
                         },
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -93,7 +105,7 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
                 Text(
                     text = credit.name,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = when {
@@ -103,6 +115,7 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
                     },
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }

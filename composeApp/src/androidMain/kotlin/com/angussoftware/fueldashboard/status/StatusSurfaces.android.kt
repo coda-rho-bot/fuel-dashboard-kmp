@@ -13,6 +13,7 @@ import com.angussoftware.fueldashboard.settings.saveStringSetting
 class AndroidStatusSurfaces(private val appContext: Context) : StatusSurfaces {
     override val label: String = "Persistent status notification"
     override val supported: Boolean = true
+    override val supportsIconToggle: Boolean = true
 
     override fun setEnabled(enabled: Boolean) {
         saveStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_ENABLED, enabled.toString())
@@ -24,6 +25,18 @@ class AndroidStatusSurfaces(private val appContext: Context) : StatusSurfaces {
     }
 
     override fun isEnabled(): Boolean = FuelStatusService.isEnabled()
+
+    override fun setShowIcon(show: Boolean) {
+        saveStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_SHOW_ICON, show.toString())
+        // Restart the service so it picks up the new icon
+        if (isEnabled()) {
+            FuelStatusService.stop(appContext)
+            FuelStatusService.start(appContext)
+        }
+    }
+
+    override fun showIcon(): Boolean =
+        loadStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_SHOW_ICON, "true").toBoolean()
 }
 
 private var instance: StatusSurfaces? = null

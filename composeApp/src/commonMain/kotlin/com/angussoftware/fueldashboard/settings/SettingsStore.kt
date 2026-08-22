@@ -38,6 +38,7 @@ internal object FuelSettingsKeys {
     const val COLLAPSED_ADVANCED = "settingsCollapsedAdvanced"
     // Persistent status surfaces
     const val STATUS_NOTIFICATION_ENABLED = "statusNotificationEnabled" // Android foreground notification
+    const val STATUS_NOTIFICATION_SHOW_ICON = "statusNotificationShowIcon" // Android: show icon in status bar
     const val HUD_ENABLED = "statusHudEnabled"                           // desktop HUD mini-window
     const val HUD_X = "statusHudX"                                       // last HUD position
     const val HUD_Y = "statusHudY"

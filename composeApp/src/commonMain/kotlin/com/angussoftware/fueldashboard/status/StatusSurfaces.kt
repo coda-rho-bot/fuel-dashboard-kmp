@@ -16,11 +16,20 @@ interface StatusSurfaces {
     /** Whether this platform has a persistent status surface at all. */
     val supported: Boolean
 
+    /** Whether this platform supports a "show icon in status bar" toggle. */
+    val supportsIconToggle: Boolean get() = false
+
     /** Apply the new enabled state. */
     fun setEnabled(enabled: Boolean)
 
     /** Current enabled state (read from settings). */
     fun isEnabled(): Boolean
+
+    /** Set whether the status bar icon is shown (Android only). */
+    fun setShowIcon(show: Boolean) {}
+
+    /** Current show-icon state (Android only, default true). */
+    fun showIcon(): Boolean = true
 }
 
 /** Platform-provided singleton. */

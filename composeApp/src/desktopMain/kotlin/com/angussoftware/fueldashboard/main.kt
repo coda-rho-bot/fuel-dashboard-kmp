@@ -514,8 +514,8 @@ fun main() = application {
     // remembered between runs.
     val hudVisible = DesktopStatusSurfaces.hudVisible
     val hudState = rememberWindowState(
-        width = 260.dp,
-        height = 200.dp,
+        width = 280.dp,
+        height = 240.dp,
         position = androidx.compose.ui.window.WindowPosition(
             androidx.compose.ui.unit.Dp(
                 com.angussoftware.fueldashboard.settings.loadStringSetting(

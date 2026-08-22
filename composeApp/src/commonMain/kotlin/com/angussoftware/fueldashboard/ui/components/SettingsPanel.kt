@@ -207,6 +207,7 @@ private fun StatusSurfaceSection() {
     if (!surfaces.supported) return
 
     var enabled by remember { mutableStateOf(surfaces.isEnabled()) }
+    var showIcon by remember { mutableStateOf(surfaces.showIcon()) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -232,6 +233,37 @@ private fun StatusSurfaceSection() {
                 surfaces.setEnabled(it)
             },
         )
+    }
+
+    // Icon visibility toggle (Android only) — shown when notification is enabled
+    if (enabled && surfaces.supportsIconToggle) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Show icon in status bar",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Hide the status bar icon while keeping the notification visible",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = showIcon,
+                onCheckedChange = {
+                    showIcon = it
+                    surfaces.setShowIcon(it)
+                },
+            )
+        }
     }
 }
 
