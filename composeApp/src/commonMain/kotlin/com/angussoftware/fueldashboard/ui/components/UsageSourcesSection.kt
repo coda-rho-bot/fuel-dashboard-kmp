@@ -3,7 +3,6 @@ package com.angussoftware.fueldashboard.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,9 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.HorizontalDivider
@@ -32,8 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -71,38 +66,21 @@ fun UsageSourcesSection(
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable {
-                    isCollapsed = !isCollapsed
-                    saveStringSetting(FuelSettingsKeys.COLLAPSED_USAGE, isCollapsed.toString())
-                }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = if (isCollapsed) "Expand" else "Collapse",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .size(18.dp)
-                    .graphicsLayer { rotationZ = if (isCollapsed) 0f else 90f },
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "Usage Sources",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = if (config.enabled) "Letta: on" else "off",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        CollapsibleSectionHeader(
+            title = "Usage Sources",
+            isCollapsed = isCollapsed,
+            onToggle = {
+                isCollapsed = !isCollapsed
+                saveStringSetting(FuelSettingsKeys.COLLAPSED_USAGE, isCollapsed.toString())
+            },
+            trailing = {
+                Text(
+                    text = if (config.enabled) "Letta: on" else "off",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+        )
 
         AnimatedVisibility(
             visible = !isCollapsed,
@@ -147,6 +125,7 @@ fun UsageSourcesSection(
                     statusLine = if (enabled) "Enabled — polling starts within 5 min" else "Disabled"
                     if (enabled && isCollapsed) {
                         isCollapsed = false
+                        saveStringSetting(FuelSettingsKeys.COLLAPSED_USAGE, "false")
                     }
                 },
             )
