@@ -531,7 +531,11 @@ fun main() = application {
     )
     if (hudVisible.value) {
         Window(
-            onCloseRequest = { DesktopStatusSurfaces.hudVisible.value = false },
+            onCloseRequest = {
+                // Persist the closed state — otherwise the HUD resurrects on
+                // next launch despite the user dismissing it.
+                DesktopStatusSurfaces().setEnabled(false)
+            },
             title = "Fuel Status",
             state = hudState,
             alwaysOnTop = true,
