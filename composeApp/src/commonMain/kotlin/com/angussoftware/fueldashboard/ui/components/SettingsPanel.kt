@@ -240,7 +240,7 @@ private fun AdvancedSection() {
 
 /** Shared header for collapsible sections — one treatment across the page. */
 @Composable
-private fun CollapsibleSectionHeader(
+internal fun CollapsibleSectionHeader(
     title: String,
     isCollapsed: Boolean,
     onToggle: () -> Unit,
