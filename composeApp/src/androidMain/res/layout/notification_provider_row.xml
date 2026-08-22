@@ -16,21 +16,35 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="?android:attr/textColorPrimary" />
+            android:textColor="@color/fuel_on_surface" />
 
         <TextView
             android:id="@+id/provider_detail"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="?android:attr/textColorSecondary" />
+            android:textColor="@color/fuel_on_surface_variant" />
     </LinearLayout>
 
+    <!-- Quota remaining gauge -->
     <ProgressBar
         android:id="@+id/provider_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:max="100" />
+        android:max="100"
+        android:progressTint="@color/fuel_primary"
+        android:progressBackgroundTint="@color/fuel_progress_track" />
+
+    <!-- Time remaining gauge (window countdown) -->
+    <ProgressBar
+        android:id="@+id/timer_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:max="100"
+        android:progressTint="@color/fuel_outline"
+        android:progressBackgroundTint="@color/fuel_progress_track" />
 </LinearLayout>

@@ -31,7 +31,22 @@ data class FuelStatusModel(
         val remainingPct: Int?,
         val resetsAt: Long?,
         val available: Boolean,
-    )
+        /** Window duration in hours — used for timer gauge bars. */
+        val windowHours: Double = 0.0,
+    ) {
+        /**
+         * Time remaining as a percentage of the total window, for timer
+         * gauge bars. 100 = window just started, 0 = window about to reset.
+         */
+        fun timeRemainingPct(now: Long = epochMillis()): Int? {
+            if (resetsAt == null || windowHours <= 0.0) return null
+            val windowMs = (windowHours * 3_600_000).toLong()
+            if (windowMs <= 0) return null
+            val remaining = resetsAt - now
+            if (remaining <= 0) return 0
+            return ((remaining.toDouble() / windowMs) * 100).toInt().coerceIn(0, 100)
+        }
+    }
 
     data class CreditLine(
         val name: String,
@@ -58,6 +73,7 @@ data class FuelStatusModel(
                         remainingPct = r.remainingPct,
                         resetsAt = r.resetsAt,
                         available = r.available,
+                        windowHours = r.windowHours,
                     )
                 }
 

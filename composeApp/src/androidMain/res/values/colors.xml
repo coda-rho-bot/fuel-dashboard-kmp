@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors matching AngusTheme (AngusColor.kt) -->
+    <color name="fuel_primary">#FF004F50</color>
+    <color name="fuel_on_surface">#FF171D1E</color>
+    <color name="fuel_surface">#FFF5FAFB</color>
+    <color name="fuel_on_surface_variant">#FF3F4949</color>
+    <color name="fuel_outline">#FF6F7979</color>
+    <color name="fuel_progress_track">#FFDAE4E4</color>
+</resources>

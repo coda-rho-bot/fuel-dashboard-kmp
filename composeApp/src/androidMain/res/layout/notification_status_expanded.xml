@@ -18,12 +18,12 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="?android:attr/textColorSecondary" />
+        android:textColor="@color/fuel_on_surface_variant" />
 
     <TextView
         android:id="@+id/updated_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="?android:attr/textColorSecondary" />
+        android:textColor="@color/fuel_on_surface_variant" />
 </LinearLayout>

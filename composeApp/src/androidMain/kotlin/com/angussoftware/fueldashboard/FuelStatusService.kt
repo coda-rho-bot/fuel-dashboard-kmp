@@ -109,10 +109,12 @@ class FuelStatusService : Service() {
         val body: CharSequence = when {
             model == null || !model.hasAnyData -> getString(R.string.loading_status)
             else -> buildString {
-                model.headline?.let { h ->
-                    val pct = h.remainingPct?.let { "$it%" } ?: "—"
-                    val cd = FuelStatusModel.formatCountdown(h.resetsAt)
-                    append(if (cd != null) "${h.name} $pct · $cd" else "${h.name} $pct")
+                // Show ALL quota providers in collapsed text (not just headline)
+                for ((i, line) in model.quotaLines.withIndex()) {
+                    if (i > 0) append("  ·  ")
+                    val pct = line.remainingPct?.let { "$it%" } ?: "—"
+                    val cd = FuelStatusModel.formatCountdown(line.resetsAt)
+                    append(if (cd != null) "${line.name} $pct · $cd" else "${line.name} $pct")
                 }
                 model.creditLines.firstOrNull { it.creditsTotal != null }?.let {
                     append("  ·  ${it.name} ${it.creditsTotal} cr")
@@ -149,7 +151,16 @@ class FuelStatusService : Service() {
                     R.id.provider_detail,
                     if (cd != null) "${line.remainingPct ?: 0}% · $cd" else "${line.remainingPct ?: 0}%",
                 )
+                // Quota remaining gauge
                 row.setProgressBar(R.id.provider_progress, 100, line.remainingPct ?: 0, false)
+                // Time remaining gauge (window countdown)
+                val timePct = line.timeRemainingPct()
+                row.setProgressBar(R.id.timer_progress, 100, timePct ?: 0, false)
+                // Show/hide timer bar — hide if no window data
+                row.setViewVisibility(
+                    R.id.timer_progress,
+                    if (timePct != null) android.view.View.VISIBLE else android.view.View.GONE,
+                )
                 expanded.addView(R.id.provider_rows, row)
             }
             val creditsText = model.creditLines.mapNotNull { c ->
