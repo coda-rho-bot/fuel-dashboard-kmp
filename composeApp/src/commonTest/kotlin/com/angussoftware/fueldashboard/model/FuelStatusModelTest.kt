@@ -87,6 +87,23 @@ class FuelStatusModelTest {
     }
 
     @Test
+    fun creditOnlyProvidersAreExcludedFromQuotaLines() {
+        val state = DashboardState(
+            providerReports = mapOf(
+                "zai" to report("zai", "z.ai", remainingPct = 55, resetsAt = 9000L),
+                "letta" to report("letta", "Letta Cloud", creditsTotal = 1234, remainingPct = null),
+            ),
+        )
+        val model = FuelStatusModel.from(state)
+
+        // Credit-only provider appears ONLY in creditLines — no "—" quota row.
+        assertEquals(1, model.quotaLines.size)
+        assertEquals("z.ai", model.quotaLines[0].name)
+        assertEquals(1, model.creditLines.size)
+        assertEquals("Letta Cloud", model.creditLines[0].name)
+    }
+
+    @Test
     fun unavailableProvidersAreExcluded() {
         val state = DashboardState(
             providerReports = mapOf(

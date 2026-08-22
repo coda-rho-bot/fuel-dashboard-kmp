@@ -48,14 +48,18 @@ data class FuelStatusModel(
                 .filter { it.available }
                 .sortedBy { it.displayName.lowercase() }
 
-            val quotaLines = reports.map { r ->
-                QuotaLine(
-                    name = r.displayName,
-                    remainingPct = r.remainingPct,
-                    resetsAt = r.resetsAt,
-                    available = r.available,
-                )
-            }
+            // Windowed quotas only — credit-only providers have no %/reset and
+            // are represented in creditLines instead (no duplicate "—" rows).
+            val quotaLines = reports
+                .filter { it.remainingPct != null }
+                .map { r ->
+                    QuotaLine(
+                        name = r.displayName,
+                        remainingPct = r.remainingPct,
+                        resetsAt = r.resetsAt,
+                        available = r.available,
+                    )
+                }
 
             // Headline: the lowest remaining percentage; providers without a
             // percentage (credit pools) never headline — they're in creditLines.
