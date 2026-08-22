@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,6 +48,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -79,20 +81,19 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderCategory
 import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.supportsMonthlyBudget
-import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import com.angussoftware.fueldashboard.model.SettingsSyncData
 import androidx.compose.runtime.collectAsState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.ServerApiKeyStore
 import com.angussoftware.fueldashboard.settings.loadStringSetting
+import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.theming.compose.ui.settings.ThemeSettingsPanel
 import com.angussoftware.fueldashboard.ui.rememberQrScanner
@@ -118,6 +119,10 @@ fun SettingsPanel(
         ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            Spacer(Modifier.height(12.dp))
+
+            // Header row: title + global Show Help toggle (affects the whole page,
+            // so it lives up top instead of buried at the bottom).
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -131,21 +136,21 @@ fun SettingsPanel(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "Show Help",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Switch(
+                    checked = state.showHelp,
+                    onCheckedChange = viewModel::setShowHelp,
+                )
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // --- Documentation link ---
-            DocumentationSection()
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-            // --- Feedback / issue reporting ---
-            FeedbackSection()
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-            // --- Providers section ---
+            // --- Providers section (core config — first) ---
             ProvidersSection(
                 settings = settings,
                 agentSettings = state.agentSettings,
@@ -170,66 +175,169 @@ fun SettingsPanel(
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
-            // --- Theme settings (shared library panel) — supersedes the old
-            // ThemeModeSection + ColorThemePicker UI from the overhaul branch ---
+            // --- Theme settings (shared library panel) ---
             ThemeSettingsPanel(themeController.settings)
 
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            // --- Advanced: rarely-changed config folds away by default ---
+            AdvancedSection()
+
             Spacer(Modifier.height(16.dp))
-            IntelligenceSection()
 
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Show Help",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "Show helpful explanations throughout the dashboard",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = state.showHelp,
-                    onCheckedChange = viewModel::setShowHelp,
-                )
-            }
+            DocumentationFooter()
         }
     }
 }
 
+/** One-line documentation link — reference material, belongs at the bottom. */
 @Composable
-private fun FeedbackSection() {
+private fun DocumentationFooter() {
+    val uriHandler = LocalUriHandler.current
+    Text(
+        text = "Documentation: docs.angussoftware.dev/fuel-dashboard",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        textDecoration = TextDecoration.Underline,
+        modifier = Modifier.clickable {
+            uriHandler.openUri("https://docs.angussoftware.dev/fuel-dashboard")
+        },
+    )
+}
+
+/**
+ * Advanced settings — rarely-changed config folded away by default.
+ * Contains the intelligence tuning knob and the issue-tracker wiring.
+ * Text inputs use explicit Save (local draft state), NOT save-per-keystroke.
+ */
+@Composable
+private fun AdvancedSection() {
+    var isCollapsed by remember {
+        mutableStateOf(loadStringSetting(FuelSettingsKeys.COLLAPSED_ADVANCED, "true").toBoolean())
+    }
+
+    CollapsibleSectionHeader(
+        title = "Advanced",
+        isCollapsed = isCollapsed,
+        onToggle = {
+            isCollapsed = !isCollapsed
+            saveStringSetting(FuelSettingsKeys.COLLAPSED_ADVANCED, isCollapsed.toString())
+        },
+    )
+
+    AnimatedVisibility(
+        visible = !isCollapsed,
+        enter = expandVertically(),
+        exit = shrinkVertically(),
+    ) {
+        Column(modifier = Modifier.padding(top = 8.dp)) {
+            IntelligenceSettings()
+            Spacer(Modifier.height(16.dp))
+            FeedbackSettings()
+        }
+    }
+}
+
+/** Shared header for collapsible sections — one treatment across the page. */
+@Composable
+private fun CollapsibleSectionHeader(
+    title: String,
+    isCollapsed: Boolean,
+    onToggle: () -> Unit,
+    trailing: @Composable RowScope.() -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable { onToggle() }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = if (isCollapsed) "Expand" else "Collapse",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(18.dp)
+                .graphicsLayer { rotationZ = if (isCollapsed) 0f else 90f },
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        trailing()
+    }
+}
+
+/**
+ * Fuel event drop threshold — explicit Save with validation.
+ * The displayed draft can diverge from the persisted value while typing;
+ * Save is the only path that writes, and invalid drafts are rejected with
+ * a visible error instead of silently keeping the old value.
+ */
+@Composable
+private fun IntelligenceSettings() {
+    var draft by remember {
+        mutableStateOf(loadStringSetting(FuelSettingsKeys.EVENT_DROP_THRESHOLD, "1.0"))
+    }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    Text(
+        text = "Intelligence",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = draft,
+            onValueChange = {
+                draft = it
+                error = null
+            },
+            label = { Text("Fuel event drop threshold (%)") },
+            supportingText = {
+                Text(error ?: "Gauge drops ≥ this become history events. Default 1. Applies on next poll.")
+            },
+            isError = error != null,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        TextButton(onClick = {
+            val v = draft.toDoubleOrNull()
+            if (v == null || v !in 0.1..20.0) {
+                error = "Enter a number between 0.1 and 20.0"
+            } else {
+                saveStringSetting(FuelSettingsKeys.EVENT_DROP_THRESHOLD, v.toString())
+                error = null
+            }
+        }) {
+            Text("Save")
+        }
+    }
+}
+
+/**
+ * Issue-tracker wiring + report action. Config fields are drafts until
+ * Save — no more write-per-keystroke into persisted settings.
+ */
+@Composable
+private fun FeedbackSettings() {
     var showReportDialog by remember { mutableStateOf(false) }
-    var forgejoUrl by remember {
-        mutableStateOf(
-            com.angussoftware.fueldashboard.settings.loadStringSetting(
-                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_URL,
-                "https://git.angussoftware.dev",
-            ),
-        )
+    var urlDraft by remember {
+        mutableStateOf(loadStringSetting(FuelSettingsKeys.FEEDBACK_URL, "https://git.angussoftware.dev"))
     }
-    var repo by remember {
-        mutableStateOf(
-            com.angussoftware.fueldashboard.settings.loadStringSetting(
-                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_REPO,
-                "coda/fuel-dashboard-kmp",
-            ),
-        )
+    var repoDraft by remember {
+        mutableStateOf(loadStringSetting(FuelSettingsKeys.FEEDBACK_REPO, "coda/fuel-dashboard-kmp"))
     }
-    var token by remember {
-        mutableStateOf(
-            com.angussoftware.fueldashboard.settings.loadStringSetting(
-                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_TOKEN, "",
-            ),
-        )
+    var tokenDraft by remember {
+        mutableStateOf(loadStringSetting(FuelSettingsKeys.FEEDBACK_TOKEN, ""))
     }
 
     Text(
@@ -246,39 +354,24 @@ private fun FeedbackSection() {
     Spacer(Modifier.height(8.dp))
 
     OutlinedTextField(
-        value = forgejoUrl,
-        onValueChange = {
-            forgejoUrl = it
-            com.angussoftware.fueldashboard.settings.saveStringSetting(
-                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_URL, it,
-            )
-        },
+        value = urlDraft,
+        onValueChange = { urlDraft = it },
         label = { Text("Forgejo URL") },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(4.dp))
     OutlinedTextField(
-        value = repo,
-        onValueChange = {
-            repo = it
-            com.angussoftware.fueldashboard.settings.saveStringSetting(
-                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_REPO, it,
-            )
-        },
+        value = repoDraft,
+        onValueChange = { repoDraft = it },
         label = { Text("Repository (owner/name)") },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(4.dp))
     OutlinedTextField(
-        value = token,
-        onValueChange = {
-            token = it
-            com.angussoftware.fueldashboard.settings.saveStringSetting(
-                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FEEDBACK_TOKEN, it,
-            )
-        },
+        value = tokenDraft,
+        onValueChange = { tokenDraft = it },
         label = { Text("API token (write:issue scope)") },
         supportingText = { Text("Create once in Forgejo Settings → Applications; shared to mobile via settings sync.") },
         visualTransformation = PasswordVisualTransformation(),
@@ -286,15 +379,24 @@ private fun FeedbackSection() {
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(8.dp))
-    Button(onClick = { showReportDialog = true }) {
-        Text("Report an issue")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = {
+            saveStringSetting(FuelSettingsKeys.FEEDBACK_URL, urlDraft.trim())
+            saveStringSetting(FuelSettingsKeys.FEEDBACK_REPO, repoDraft.trim())
+            saveStringSetting(FuelSettingsKeys.FEEDBACK_TOKEN, tokenDraft.trim())
+        }) {
+            Text("Save")
+        }
+        OutlinedButton(onClick = { showReportDialog = true }) {
+            Text("Report an issue")
+        }
     }
 
     if (showReportDialog) {
         ReportIssueDialog(
-            forgejoUrl = forgejoUrl,
-            repo = repo,
-            token = token,
+            forgejoUrl = urlDraft.trim(),
+            repo = repoDraft.trim(),
+            token = tokenDraft.trim(),
             onDismiss = { showReportDialog = false },
         )
     }
@@ -391,27 +493,6 @@ private fun ReportIssueDialog(
 }
 
 @Composable
-private fun DocumentationSection() {
-    val uriHandler = LocalUriHandler.current
-
-    Text(
-        text = "Documentation",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(4.dp))
-    Text(
-        text = "https://docs.angussoftware.dev/fuel-dashboard",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.primary,
-        textDecoration = TextDecoration.Underline,
-        modifier = Modifier.clickable {
-            uriHandler.openUri("https://docs.angussoftware.dev/fuel-dashboard")
-        },
-    )
-}
-
-@Composable
 private fun ServerApiKeySection(
     apiKey: String,
     onCopy: () -> Unit,
@@ -478,7 +559,9 @@ private fun ProvidersSection(
     var showQrSyncDialog by remember { mutableStateOf(false) }
     var showImportEntryDialog by remember { mutableStateOf(false) }
     var scannedSyncData by remember { mutableStateOf<SettingsSyncData?>(null) }
-    var isCollapsed by remember { mutableStateOf(false) }
+    var isCollapsed by remember {
+        mutableStateOf(loadStringSetting(FuelSettingsKeys.COLLAPSED_PROVIDERS, "false").toBoolean())
+    }
 
     // QR scanner — only functional on Android (no-op on desktop)
     val qrScanner = rememberQrScanner { scannedText ->
@@ -491,29 +574,14 @@ private fun ProvidersSection(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { isCollapsed = !isCollapsed }
-                .padding(end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = if (isCollapsed) "Expand" else "Collapse",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .size(18.dp)
-                    .graphicsLayer { rotationZ = if (isCollapsed) 0f else 90f },
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "Providers (${settings.providers.size})",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        CollapsibleSectionHeader(
+            title = "Providers (${settings.providers.size})",
+            isCollapsed = isCollapsed,
+            onToggle = {
+                isCollapsed = !isCollapsed
+                saveStringSetting(FuelSettingsKeys.COLLAPSED_PROVIDERS, isCollapsed.toString())
+            },
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { showQrSyncDialog = true }) {
                 Icon(Icons.Default.QrCode2, contentDescription = "Sync to mobile", modifier = Modifier.size(16.dp))
@@ -561,9 +629,9 @@ private fun ProvidersSection(
     ) {
         Column(modifier = Modifier.padding(top = 8.dp)) {
             if (settings.providers.isEmpty()) {
-                if (showHelp) {
-                    HelpText("Welcome! Add a provider by clicking + Add in Providers below.")
-                }
+                // Unconditional empty state — guidance must not depend on the
+                // Show Help toggle being on.
+                HelpText("Welcome! Add a provider using the + Add button above.")
             } else {
                 settings.providers.forEach { config ->
                     ProviderConfigRow(
@@ -824,12 +892,35 @@ private fun ProviderConfigRow(
                         modifier = Modifier.size(16.dp),
                     )
                 }
-                IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
+                var showRemoveConfirm by remember { mutableStateOf(false) }
+                IconButton(onClick = { showRemoveConfirm = true }, modifier = Modifier.size(24.dp)) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Remove",
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp),
+                    )
+                }
+                if (showRemoveConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showRemoveConfirm = false },
+                        title = { Text("Remove provider?") },
+                        text = {
+                            Text("Remove \"${config.resolvedDisplayName()}\"? Its saved API key and settings are deleted. This cannot be undone.")
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showRemoveConfirm = false
+                                onRemove()
+                            }) {
+                                Text("Remove", color = MaterialTheme.colorScheme.error)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showRemoveConfirm = false }) {
+                                Text("Cancel")
+                            }
+                        },
                     )
                 }
                 IconButton(onClick = { isEditing = !isEditing }, modifier = Modifier.size(24.dp)) {
@@ -1218,243 +1309,5 @@ private fun AddProviderDialog(
             }
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Agents Section
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun AgentsSection(
-    agentSettings: AgentSettings,
-    viewModel: FuelViewModel,
-    liveAgents: List<AcpAgentDisplay>,
-    showHelp: Boolean,
-) {
-    var showAddDialog by remember { mutableStateOf(false) }
-    var isCollapsed by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { isCollapsed = !isCollapsed }
-                .padding(end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = if (isCollapsed) "Expand" else "Collapse",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .size(18.dp)
-                    .graphicsLayer { rotationZ = if (isCollapsed) 0f else 90f },
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "Agents (${liveAgents.size})",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
-            )
-            if (showHelp) {
-                Spacer(Modifier.width(4.dp))
-                HelpIcon("Agents auto-register via MCP or can be added manually")
-            }
-        }
-        TextButton(onClick = { showAddDialog = true }) {
-            Icon(Icons.Default.Add, contentDescription = "Add agent", modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text("Add", style = MaterialTheme.typography.labelSmall)
-        }
-    }
-
-    AnimatedVisibility(
-        visible = !isCollapsed,
-        enter = expandVertically(),
-        exit = shrinkVertically(),
-    ) {
-        Column(modifier = Modifier.padding(top = 8.dp)) {
-            if (liveAgents.isEmpty() && agentSettings.agents.isEmpty()) {
-                if (showHelp) {
-                    HelpText("Agents can self-register via MCP (http://localhost:8322/mcp, requires server API key as Bearer token). Or add an agent manually below.")
-                }
-            } else {
-                // Show live (MCP/HTTP-registered) agents
-                liveAgents.forEach { agent ->
-                    LiveAgentRow(
-                        name = agent.name,
-                        model = agent.currentModel,
-                        status = agent.status,
-                        onRemove = { viewModel.removeAgent(agent.id) },
-                    )
-                    Spacer(Modifier.height(4.dp))
-                }
-                // Show manually configured ACP agents that aren't live yet
-                agentSettings.agents.forEach { agent ->
-                    if (liveAgents.none { it.id == agent.id }) {
-                        AgentConfigRow(
-                            agent = agent,
-                            onRemove = { viewModel.removeAgent(agent.id) },
-                        )
-                        Spacer(Modifier.height(4.dp))
-                    }
-                }
-            }
-        }
-    }
-
-    if (showAddDialog) {
-        AddAgentDialog(
-            onDismiss = { showAddDialog = false },
-            onAdd = { name, command, args ->
-                viewModel.addAgent(name, command, args)
-                showAddDialog = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun LiveAgentRow(
-    name: String,
-    model: String?,
-    status: String,
-    onRemove: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Status dot
-            Box(
-                modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp))
-                    .background(when (status) { "connected" -> Color(0xFF4CAF50); "idle" -> Color(0xFFFFA726); else -> MaterialTheme.colorScheme.outline }),
-            )
-            Spacer(Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                model?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace) }
-            }
-            var showConfirm by remember { mutableStateOf(false) }
-            IconButton(onClick = { showConfirm = true }, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Remove agent", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-            }
-            if (showConfirm) {
-                AlertDialog(
-                    onDismissRequest = { showConfirm = false },
-                    title = { Text("Remove $name?") },
-                    text = { Text("This will remove $name from the dashboard. They can re-register later.") },
-                    confirmButton = {
-                        TextButton(onClick = { onRemove(); showConfirm = false }) { Text("Remove") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showConfirm = false }) { Text("Cancel") }
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AgentConfigRow(
-    agent: AgentConfig,
-    onRemove: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SmartToy,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = agent.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        text = if (agent.args.isNotBlank()) {
-                            "${agent.command} ${agent.args}"
-                        } else {
-                            agent.command
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Remove agent",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Theme sections (unchanged)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun IntelligenceSection() {
-    var threshold by remember {
-        mutableStateOf(
-            com.angussoftware.fueldashboard.settings.loadStringSetting(
-                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.EVENT_DROP_THRESHOLD, "1.0",
-            ),
-        )
-    }
-    Text(
-        text = "Intelligence",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(6.dp))
-    OutlinedTextField(
-        value = threshold,
-        onValueChange = { raw ->
-            threshold = raw
-            raw.toDoubleOrNull()?.let { v ->
-                if (v in 0.1..20.0) {
-                    com.angussoftware.fueldashboard.settings.saveStringSetting(
-                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.EVENT_DROP_THRESHOLD,
-                        v.toString(),
-                    )
-                }
-            }
-        },
-        label = { Text("Fuel event drop threshold (%)") },
-        supportingText = { Text("Gauge drops ≥ this become history events. Default 1. Applies on next poll.") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 

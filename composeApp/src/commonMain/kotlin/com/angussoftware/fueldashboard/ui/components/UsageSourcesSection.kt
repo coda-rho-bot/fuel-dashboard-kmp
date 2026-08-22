@@ -1,5 +1,9 @@
 package com.angussoftware.fueldashboard.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,8 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.HorizontalDivider
@@ -17,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,12 +32,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.UsageSourcesStore
+import com.angussoftware.fueldashboard.settings.loadStringSetting
+import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.usage.IngestionStatus
 import com.angussoftware.fueldashboard.usage.LettaSourceConfig
 import java.text.SimpleDateFormat
@@ -49,15 +62,54 @@ fun UsageSourcesSection(
 ) {
     var config by remember { mutableStateOf(UsageSourcesStore.load().letta) }
     var statusLine by remember { mutableStateOf("") }
+    // Section collapses when the connector is off; the state persists so the
+    // page doesn't re-expand something the user folded away.
+    var isCollapsed by remember {
+        mutableStateOf(
+            loadStringSetting(FuelSettingsKeys.COLLAPSED_USAGE, (!config.enabled).toString()).toBoolean(),
+        )
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = "Usage Sources",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable {
+                    isCollapsed = !isCollapsed
+                    saveStringSetting(FuelSettingsKeys.COLLAPSED_USAGE, isCollapsed.toString())
+                }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = if (isCollapsed) "Expand" else "Collapse",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer { rotationZ = if (isCollapsed) 0f else 90f },
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "Usage Sources",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = if (config.enabled) "Letta: on" else "off",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        AnimatedVisibility(
+            visible = !isCollapsed,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            Column(modifier = Modifier.padding(top = 4.dp)) {
         Text(
             text = "Pull-side metering: polls platforms that track token usage server-side " +
                 "and meters it into the universal usage store.",
@@ -93,18 +145,22 @@ fun UsageSourcesSection(
                     config = config.copy(enabled = enabled)
                     UsageSourcesStore.saveLetta(config)
                     statusLine = if (enabled) "Enabled — polling starts within 5 min" else "Disabled"
+                    if (enabled && isCollapsed) {
+                        isCollapsed = false
+                    }
                 },
             )
         }
 
         if (config.enabled) {
             Spacer(Modifier.height(8.dp))
+            // Draft-and-save: text fields edit local state; Save commits to
+            // the store in one write (no partial URLs reaching the connector).
+            var urlDraft by remember(config.enabled) { mutableStateOf(config.baseUrl) }
+            var keyDraft by remember(config.enabled) { mutableStateOf(config.apiKey) }
             OutlinedTextField(
-                value = config.baseUrl,
-                onValueChange = { url ->
-                    config = config.copy(baseUrl = url)
-                    UsageSourcesStore.saveLetta(config)
-                },
+                value = urlDraft,
+                onValueChange = { urlDraft = it },
                 label = { Text("Server URL") },
                 placeholder = { Text("https://api.letta.com") },
                 singleLine = true,
@@ -114,18 +170,38 @@ fun UsageSourcesSection(
             Spacer(Modifier.height(6.dp))
             var keyVisible by remember { mutableStateOf(false) }
             OutlinedTextField(
-                value = config.apiKey,
-                onValueChange = { key ->
-                    config = config.copy(apiKey = key)
-                    UsageSourcesStore.saveLetta(config)
-                },
+                value = keyDraft,
+                onValueChange = { keyDraft = it },
                 label = { Text("API key") },
                 placeholder = { Text("sk-let-… (app.letta.com → API keys)") },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    TextButton(onClick = { keyVisible = !keyVisible }) {
+                        Text(if (keyVisible) "Hide" else "Show", style = MaterialTheme.typography.labelSmall)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = {
+                    urlDraft = config.baseUrl
+                    keyDraft = config.apiKey
+                }) {
+                    Text("Reset")
+                }
+                TextButton(onClick = {
+                    config = config.copy(baseUrl = urlDraft.trim(), apiKey = keyDraft.trim())
+                    UsageSourcesStore.saveLetta(config)
+                    statusLine = "Saved — applies on next poll"
+                }) {
+                    Text("Save")
+                }
+            }
         }
 
         // --- Live status ---
@@ -166,6 +242,8 @@ fun UsageSourcesSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+        }
         }
     }
 }
