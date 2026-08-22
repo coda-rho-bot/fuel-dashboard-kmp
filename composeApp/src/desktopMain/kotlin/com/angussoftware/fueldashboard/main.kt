@@ -490,6 +490,9 @@ fun main() = application {
         height = 800.dp,
     )
 
+    // Reference to the main window — the HUD's double-click brings it to front.
+    val mainWindowRef = remember { java.util.concurrent.atomic.AtomicReference<java.awt.Window?>(null) }
+
     Window(
         onCloseRequest = {
             agentManager.stopMonitoring()
@@ -500,6 +503,10 @@ fun main() = application {
         title = "Fuel Dashboard",
         state = windowState,
     ) {
+        DisposableEffect(window) {
+            mainWindowRef.set(window)
+            onDispose { mainWindowRef.compareAndSet(window, null) }
+        }
         DashboardTheme {
             FuelDashboardApp(
                 viewModel = viewModel,
@@ -580,6 +587,18 @@ fun main() = application {
                         val dx = e.locationOnScreen.x - ds.x
                         val dy = e.locationOnScreen.y - ds.y
                         window.location = java.awt.Point(ws.x + dx, ws.y + dy)
+                    }
+                    // Double-click → bring the main dashboard window to front
+                    override fun mouseClicked(e: java.awt.event.MouseEvent?) {
+                        e ?: return
+                        if (e.clickCount == 2) {
+                            val main = mainWindowRef.get() ?: return
+                            if (main is java.awt.Frame && main.state != java.awt.Frame.NORMAL) {
+                                main.state = java.awt.Frame.NORMAL // un-minimize
+                            }
+                            main.toFront()
+                            main.requestFocus()
+                        }
                     }
                 }
                 window.addMouseListener(mouseListener)
