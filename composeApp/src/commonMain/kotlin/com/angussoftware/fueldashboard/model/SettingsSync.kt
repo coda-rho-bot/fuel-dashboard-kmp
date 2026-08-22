@@ -109,12 +109,29 @@ data class SettingsSyncData(
         json.encodeToString(serializer(), this)
 
     /**
+     * Slimmed copy for QR transport: agent launcher fields (command paths,
+     * localhost socket URLs, env maps) are desktop-local and worthless on the
+     * receiving phone — mobile only renders agent id/name — but they dominate
+     * the payload and push the QR into marginally-scannable versions (21+).
+     *
+     * The copy-paste text code ([toCode]) keeps full fidelity, since bytes
+     * are free there.
+     */
+    fun slimmedForQr(): SettingsSyncData = copy(
+        agentSettings = AgentSettings(
+            agents = agentSettings.agents.map { config ->
+                config.copy(command = "", args = "", env = emptyMap())
+            },
+        ),
+    )
+
+    /**
      * Compressed + base64-encoded data for QR codes.
      * Reduces QR density by ~50% for better scannability.
      */
     @OptIn(ExperimentalEncodingApi::class)
     fun toQrData(): String {
-        val encoded = json.encodeToString(serializer(), this)
+        val encoded = json.encodeToString(serializer(), slimmedForQr())
         // Debug: verify serverApiKey is in the JSON
         return Base64.encode(compress(encoded))
     }
