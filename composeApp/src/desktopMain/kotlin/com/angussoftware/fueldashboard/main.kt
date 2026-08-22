@@ -543,9 +543,12 @@ fun main() = application {
             transparent = false,
             resizable = true,
         ) {
-            // Persist position between runs (cheap settings write per move).
+            // Persist position between runs + enable dragging (undecorated
+            // windows have no title bar to grab). Compose Desktop 1.9.0 has
+            // no WindowDraggableArea, so we use AWT mouse listeners.
             DisposableEffect(window) {
-                val listener = object : java.awt.event.ComponentAdapter() {
+                // Position persistence
+                val compListener = object : java.awt.event.ComponentAdapter() {
                     override fun componentMoved(e: java.awt.event.ComponentEvent?) {
                         com.angussoftware.fueldashboard.settings.saveStringSetting(
                             com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_X,
@@ -557,8 +560,35 @@ fun main() = application {
                         )
                     }
                 }
-                window.addComponentListener(listener)
-                onDispose { window.removeComponentListener(listener) }
+                window.addComponentListener(compListener)
+
+                // Dragging: record initial click + window position on press,
+                // move window on drag.
+                var dragStart: java.awt.Point? = null
+                var winStart: java.awt.Point? = null
+                val mouseListener = object : java.awt.event.MouseAdapter() {
+                    override fun mousePressed(e: java.awt.event.MouseEvent?) {
+                        e ?: return
+                        dragStart = e.locationOnScreen
+                        winStart = window.location
+                    }
+                    override fun mouseDragged(e: java.awt.event.MouseEvent?) {
+                        e ?: return
+                        val ds = dragStart ?: return
+                        val ws = winStart ?: return
+                        val dx = e.locationOnScreen.x - ds.x
+                        val dy = e.locationOnScreen.y - ds.y
+                        window.location = java.awt.Point(ws.x + dx, ws.y + dy)
+                    }
+                }
+                window.addMouseListener(mouseListener)
+                window.addMouseMotionListener(mouseListener)
+
+                onDispose {
+                    window.removeComponentListener(compListener)
+                    window.removeMouseListener(mouseListener)
+                    window.removeMouseMotionListener(mouseListener)
+                }
             }
             DashboardTheme {
                 val state by viewModel.state.collectAsState()

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="fuel_status">Fuel status</string>
+    <string name="fuel_status">Fuel Status</string>
     <string name="loading_status">Loading fuel status…</string>
     <string name="stop">Stop</string>
+    <string name="updated_ago">Updated %1$d min ago</string>
 </resources>

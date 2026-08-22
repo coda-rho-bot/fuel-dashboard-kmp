@@ -103,40 +103,30 @@ class FuelStatusService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val title: String
-        val body: CharSequence
-        if (model == null || !model.hasAnyData) {
-            title = getString(R.string.fuel_status)
-            body = getString(R.string.loading_status)
-        } else {
-            val head = model.headline
-            val countdown = FuelStatusModel.formatCountdown(head?.resetsAt)
-            title = when {
-                head?.remainingPct != null && countdown != null ->
-                    "${head.name} ${head.remainingPct}% · resets in $countdown"
-                head?.remainingPct != null -> "${head.name} ${head.remainingPct}%"
-                else -> "Fuel status"
-            }
-            body = buildString {
-                model.quotaLines.forEach { line ->
-                    val pct = line.remainingPct?.let { "$it%" } ?: "—"
-                    val reset = FuelStatusModel.formatCountdown(line.resetsAt)
-                    appendLine(if (reset != null) "${line.name}: $pct · $reset" else "${line.name}: $pct")
+        // Fixed app title; data lives in the body / expanded HUD — the
+        // headline provider no longer masquerades as the notification title.
+        val title = getString(R.string.fuel_status)
+        val body: CharSequence = when {
+            model == null || !model.hasAnyData -> getString(R.string.loading_status)
+            else -> buildString {
+                model.headline?.let { h ->
+                    val pct = h.remainingPct?.let { "$it%" } ?: "—"
+                    val cd = FuelStatusModel.formatCountdown(h.resetsAt)
+                    append(if (cd != null) "${h.name} $pct · $cd" else "${h.name} $pct")
                 }
-                model.creditLines.forEach { c ->
-                    when {
-                        c.creditsTotal != null -> appendLine("${c.name}: ${c.creditsTotal} credits")
-                        c.junieBalance != null -> appendLine("${c.name}: \$${"%.2f".format(c.junieBalance)}")
-                    }
+                model.creditLines.firstOrNull { it.creditsTotal != null }?.let {
+                    append("  ·  ${it.name} ${it.creditsTotal} cr")
                 }
-            }.trim()
+                model.creditLines.firstOrNull { it.junieBalance != null }?.let {
+                    append("  ·  ${it.name} $${"%.2f".format(it.junieBalance!!)}")
+                }
+            }.ifEmpty { getString(R.string.loading_status) }
         }
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download_done) // placeholder until app icon set
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
@@ -144,7 +134,44 @@ class FuelStatusService : Service() {
             .addAction(0, getString(R.string.stop), stop)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
+
+        // Expanded view: mini HUD — one progress-bar row per provider,
+        // credit totals beneath. Falls back to plain big text if the model
+        // is empty.
+        if (model != null && model.hasAnyData) {
+            val expanded = android.widget.RemoteViews(packageName, R.layout.notification_status_expanded)
+            expanded.removeAllViews(R.id.provider_rows)
+            for (line in model.quotaLines) {
+                val row = android.widget.RemoteViews(packageName, R.layout.notification_provider_row)
+                row.setTextViewText(R.id.provider_name, line.name)
+                val cd = FuelStatusModel.formatCountdown(line.resetsAt)
+                row.setTextViewText(
+                    R.id.provider_detail,
+                    if (cd != null) "${line.remainingPct ?: 0}% · $cd" else "${line.remainingPct ?: 0}%",
+                )
+                row.setProgressBar(R.id.provider_progress, 100, line.remainingPct ?: 0, false)
+                expanded.addView(R.id.provider_rows, row)
+            }
+            val creditsText = model.creditLines.mapNotNull { c ->
+                when {
+                    c.creditsTotal != null -> "${c.name}: ${c.creditsTotal} cr"
+                    c.junieBalance != null -> "${c.name}: $${"%.2f".format(c.junieBalance)}"
+                    else -> null
+                }
+            }.joinToString("  ·  ")
+            expanded.setTextViewText(R.id.credits_text, creditsText)
+            val mins = (System.currentTimeMillis() - model.lastUpdated) / 60_000
+            expanded.setTextViewText(
+                R.id.updated_text,
+                if (model.lastUpdated > 0) getString(R.string.updated_ago, mins) else "",
+            )
+            builder.setCustomBigContentView(expanded)
+                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+        } else {
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+        }
+
+        return builder.build()
     }
 
     companion object {
