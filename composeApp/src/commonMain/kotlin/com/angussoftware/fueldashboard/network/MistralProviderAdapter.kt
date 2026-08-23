@@ -33,8 +33,10 @@ import com.angussoftware.fueldashboard.util.formatRoot
  *
  * 1. **Usage API** (SPEND_BUDGET): `GET /v1/admin/usage`
  *    Returns monthly usage broken down by category (chat, completion, ocr, audio,
- *    connectors, fine_tuning) with per-model token counts and costs.
- *    - Each category contains a `models` array with nested usage/cost data.
+ *    connectors, fine_tuning, libraries_api, vibe_code) with per-model token counts.
+ *    - Each category contains a `models` object mapping model names to usage entries.
+ *    - Usage entries have `input`/`output`/`cached` arrays of billing records.
+ *    - A `prices` array provides per-unit pricing keyed by `billing_metric::billing_group`.
  *    - The response includes `currency`, `start_date`, and `end_date`.
  *
  * 2. **Spend Limit API**: `GET /v1/admin/spend-limit`
@@ -52,11 +54,16 @@ import com.angussoftware.fueldashboard.util.formatRoot
  * **Graceful degradation**: If the usage API fails, the adapter still reports rate-limit
  * and spend-limit data. Each endpoint is polled independently.
  *
- * **Cost extraction**: The usage endpoint's `models` arrays contain deeply nested data
- * with both token counts (integers) and costs (decimal numbers). We recursively traverse
- * the structure and sum all decimal-valued numbers as approximate costs, since token
- * counts are always serialized as integers (no decimal point) and costs always include
- * fractional digits.
+ * **Cost extraction**: The usage endpoint returns a `prices` array (each entry has
+ * `billing_metric`, `billing_group`, and `price` as a string) and per-category usage
+ * data. Each category (chat, completion, ocr, etc.) has a `models` object mapping model
+ * names to usage entries. Each usage entry has `input`, `output`, and/or `cached` arrays
+ * of token-count records. Each record carries `value_paid` (or `value`) as the token
+ * count, plus `billing_metric` and `billing_group` for price lookup.
+ *
+ * We build a price index from the `prices` array, then recursively traverse all
+ * categories, multiplying each token count by its looked-up price
+ * (`{billing_metric}::{billing_group}`) to compute total spend.
  *
  * Auth: `Authorization: Bearer <admin-api-key>` (also accepts `x-api-key` header)
  *
@@ -84,16 +91,26 @@ class MistralProviderAdapter(
         private const val RATE_LIMIT_PATH = "/v1/admin/rate-limit"
 
         /**
-         * Categories in the usage response that contain per-model usage data.
-         * Each has a `models` array with token counts and costs.
+         * Keys in the usage response that are arrays of usage entries (token counts)
+         * rather than structural objects. When traversing the JSON tree, we look for
+         * these keys to identify arrays of billing records.
          */
-        private val USAGE_CATEGORIES = listOf(
-            "chat",
-            "completion",
-            "ocr",
-            "audio",
-            "connectors",
-            "fine_tuning",
+        private val USAGE_ENTRY_KEYS = setOf("input", "output", "cached")
+
+        /**
+         * Top-level keys in the usage response that are NOT usage categories and
+         * should be skipped during cost accumulation.
+         */
+        private val NON_CATEGORY_KEYS = setOf(
+            "prices",
+            "currency",
+            "currency_symbol",
+            "date",
+            "start_date",
+            "end_date",
+            "next_month",
+            "previous_month",
+            "vibe_usage", // legacy field, always 0
         )
     }
 
@@ -130,10 +147,15 @@ class MistralProviderAdapter(
 
             val body: JsonObject = json.parseToJsonElement(response.bodyAsText()).jsonObject
 
-            val totalCost = USAGE_CATEGORIES.sumOf { category ->
-                val catObj = body[category] as? JsonObject
-                val modelsArray = catObj?.get("models") as? JsonArray
-                if (modelsArray != null) extractCosts(modelsArray) else 0.0
+            // Build price index from the `prices` array.
+            val priceIndex = buildPriceIndex(body)
+
+            // Accumulate cost across all top-level keys (skip non-category keys).
+            var totalCost = 0.0
+            for ((key, value) in body) {
+                if (key !in NON_CATEGORY_KEYS) {
+                    accumulateCost(value, priceIndex) { totalCost += it }
+                }
             }
 
             val currency = body["currency"]?.jsonPrimitive?.contentOrNull
@@ -152,26 +174,68 @@ class MistralProviderAdapter(
     }
 
     /**
-     * Recursively traverses a JSON element and sums all decimal-valued numbers.
+     * Builds a price index from the `prices` array in the usage response.
      *
-     * Token counts are serialized as integers (e.g., `1000000`), while costs are
-     * serialized as decimals (e.g., `2.50`). By checking for a decimal point in the
-     * raw content, we reliably distinguish costs from token counts.
+     * Each price entry has `billing_metric`, `billing_group`, and `price` (as a string).
+     * The index key is `"{billing_metric}::{billing_group}"`.
      */
-    private fun extractCosts(element: JsonElement): Double {
-        return when (element) {
-            is JsonArray -> element.sumOf { extractCosts(it) }
-            is JsonObject -> element.values.sumOf { extractCosts(it) }
-            is JsonPrimitive -> {
-                val content = element.contentOrNull ?: return 0.0
-                // Only count decimal values — costs always have fractional digits,
-                // while token counts are always integers.
-                if (content.contains('.')) {
-                    content.toDoubleOrNull() ?: 0.0
-                } else {
-                    0.0
+    private fun buildPriceIndex(body: JsonObject): Map<String, Double> {
+        val index = mutableMapOf<String, Double>()
+        val pricesArray = body["prices"] as? JsonArray ?: return index
+        for (priceEntry in pricesArray) {
+            val obj = priceEntry as? JsonObject ?: continue
+            val metric = obj["billing_metric"]?.jsonPrimitive?.contentOrNull
+            val group = obj["billing_group"]?.jsonPrimitive?.contentOrNull
+            val priceStr = obj["price"]?.jsonPrimitive?.contentOrNull
+            if (metric != null && group != null && priceStr != null) {
+                priceStr.toDoubleOrNull()?.let { price ->
+                    index["$metric::$group"] = price
                 }
             }
+        }
+        return index
+    }
+
+    /**
+     * Recursively traverses the JSON tree, accumulating cost from usage entries.
+     *
+     * When a key is "input", "output", or "cached" and its value is an array, each
+     * element is treated as a billing record with:
+     * - `value_paid` or `value` (token count as integer)
+     * - `billing_metric` and `billing_group` (for price lookup)
+     *
+     * The cost for each record is `tokenCount * price(metric, group)`.
+     */
+    private fun accumulateCost(element: JsonElement, priceIndex: Map<String, Double>, add: (Double) -> Unit) {
+        when (element) {
+            is JsonObject -> {
+                for ((key, value) in element) {
+                    if (key in USAGE_ENTRY_KEYS && value is JsonArray) {
+                        for (entry in value) {
+                            val entryObj = entry as? JsonObject ?: continue
+                            val units = entryObj["value_paid"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                                ?: entryObj["value"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                                ?: 0L
+                            val metric = entryObj["billing_metric"]?.jsonPrimitive?.contentOrNull
+                            val group = entryObj["billing_group"]?.jsonPrimitive?.contentOrNull
+                            if (metric != null && group != null) {
+                                val priceKey = "$metric::$group"
+                                priceIndex[priceKey]?.let { price ->
+                                    add(units.toDouble() * price)
+                                }
+                            }
+                        }
+                    } else {
+                        accumulateCost(value, priceIndex, add)
+                    }
+                }
+            }
+            is JsonArray -> {
+                for (item in element) {
+                    accumulateCost(item, priceIndex, add)
+                }
+            }
+            else -> {}
         }
     }
 
