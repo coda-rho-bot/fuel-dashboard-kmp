@@ -2,18 +2,28 @@ package com.angussoftware.fueldashboard.network
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 internal actual suspend fun runJunieCredits(): String = withContext(Dispatchers.IO) {
     val script = extractBundledScript()
     val process = ProcessBuilder("python3", script.absolutePath)
         .redirectErrorStream(true)
         .start()
-    val output = process.inputStream.bufferedReader().use { it.readText() }
-    if (process.waitFor() != 0) {
-        throw IllegalStateException(output.ifBlank { "junie-credits script failed" })
+    try {
+        // 60s timeout — a stalled CLI (auth prompt) would block forever
+        withTimeout(60_000L) {
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            if (process.waitFor() != 0) {
+                throw IllegalStateException(output.ifBlank { "junie-credits script failed" })
+            }
+            output
+        }
+    } catch (e: Exception) {
+        process.destroyForcibly()
+        throw e
     }
-    output
 }
 
 /**
