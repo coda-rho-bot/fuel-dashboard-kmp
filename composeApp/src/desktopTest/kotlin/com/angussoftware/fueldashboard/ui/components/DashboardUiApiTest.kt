@@ -65,7 +65,9 @@ class DashboardUiApiTest {
 
     @Test
     fun fuelScreensExplainProviderStatesAndManagement() {
-        val expectedEmptyState = "No providers configured. Add a provider in Settings to start monitoring fuel levels. \\u2192"
+        // Settings lives in the top app bar (not a nav tab) — the empty state
+        // points users at the app bar settings icon.
+        val expectedEmptyState = "No providers configured. Tap the settings icon above to add a provider and start monitoring fuel levels."
 
         listOf("ui/App.kt", "ui/MobileDashboard.kt").forEach { path ->
             val source = sourceFile(path).readText()

@@ -51,7 +51,7 @@ fun FuelEventHistoryPanel(
         }
         Spacer(Modifier.height(8.dp))
 
-        events.forEach { event ->
+        PagedRows(events) { event ->
             FuelEventRow(event)
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
         }

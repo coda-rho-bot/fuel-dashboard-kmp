@@ -75,7 +75,7 @@ fun WasteDetectionPanel(
                 )
             }
             Spacer(Modifier.height(4.dp))
-            pw.daily.take(7).forEach { day ->
+            PagedRows(pw.daily) { day ->
                 DailyWasteRow(day, windowMs = pw.windowMs)
                 HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
             }

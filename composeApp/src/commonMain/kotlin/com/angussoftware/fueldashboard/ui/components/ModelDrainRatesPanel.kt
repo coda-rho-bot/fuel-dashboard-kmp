@@ -54,7 +54,7 @@ fun ModelDrainRatesPanel(
 
         val maxConsumed = rates.maxOfOrNull { it.totalFuelConsumed } ?: 1.0
 
-        rates.forEach { rate ->
+        PagedRows(rates) { rate ->
             ModelDrainRow(rate, maxConsumed)
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
         }

@@ -92,7 +92,7 @@ fun MeteredUsagePanel(
             fontWeight = FontWeight.SemiBold,
         )
         val maxSourceTokens = (bySource.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
-        bySource.forEach { MeteredUsageRow(it, maxSourceTokens, showCost = false) }
+        PagedRows(bySource) { MeteredUsageRow(it, maxSourceTokens, showCost = false) }
 
         if (byAgentModel.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
@@ -107,7 +107,7 @@ fun MeteredUsagePanel(
                 HelpIcon("Cost-accurate breakdown: each agent's tokens split by the model that ran them (models have different credit multipliers)")
             }
             val maxAgentModelTokens = (byAgentModel.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
-            byAgentModel.forEach { AgentModelUsageRow(it, maxAgentModelTokens) }
+            PagedRows(byAgentModel) { AgentModelUsageRow(it, maxAgentModelTokens) }
         }
 
         Spacer(Modifier.height(10.dp))
@@ -118,7 +118,7 @@ fun MeteredUsagePanel(
             fontWeight = FontWeight.SemiBold,
         )
         val maxModelTokens = (byModel.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
-        byModel.forEach { MeteredUsageRow(it, maxModelTokens, showCost = true) }
+        PagedRows(byModel) { MeteredUsageRow(it, maxModelTokens, showCost = true) }
 
         if (byConversation.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
@@ -129,7 +129,7 @@ fun MeteredUsagePanel(
                 fontWeight = FontWeight.SemiBold,
             )
             val maxConvTokens = (byConversation.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
-            byConversation.forEach { ConversationUsageRow(it, maxConvTokens) }
+            PagedRows(byConversation) { ConversationUsageRow(it, maxConvTokens) }
         }
     }
 }
