@@ -79,6 +79,16 @@ class AcpAgentManager {
     /** Background health-check coroutine job */
     private var healthCheckJob: Job? = null
 
+    /** Per-agent connection coroutine jobs, tracked so stopMonitoring can cancel them */
+    private val agentJobs = mutableMapOf<String, Job>()
+
+    /** Generation token — incremented on each startMonitoring call.
+     *  Coroutines capture their generation at launch and exit if it doesn't
+     *  match the current value, preventing old-generation retries from
+     *  resuming after a stop/restart cycle. */
+    @Volatile
+    private var generation = 0L
+
     @Volatile
     private var monitoring = false
 
@@ -92,6 +102,7 @@ class AcpAgentManager {
      */
     fun startMonitoring(agentConfigs: List<AcpAgentConfig>) {
         if (monitoring) stopMonitoring()
+        generation++
         monitoring = true
 
         // Store configs for retries and health checks
@@ -105,11 +116,13 @@ class AcpAgentManager {
             AcpAgentInfo(id = config.id, name = config.name, status = AcpAgentStatus.CONNECTING)
         }
 
+        val currentGen = generation
         for (config in agentConfigs) {
-            scope.launch { connectAgent(config) }
+            val job = scope.launch { connectAgent(config, currentGen) }
+            synchronized(agentJobs) { agentJobs[config.id] = job }
         }
 
-        startHealthCheck()
+        startHealthCheck(currentGen)
     }
 
     /**
@@ -119,6 +132,12 @@ class AcpAgentManager {
         monitoring = false
         healthCheckJob?.cancel()
         healthCheckJob = null
+        // Cancel all per-agent connection coroutines to prevent
+        // in-flight spawns from writing to connections after clear.
+        synchronized(agentJobs) {
+            for ((_, job) in agentJobs) job.cancel()
+            agentJobs.clear()
+        }
         synchronized(connections) {
             for ((_, conn) in connections) conn.close()
             connections.clear()
@@ -134,15 +153,17 @@ class AcpAgentManager {
      * Connect to an agent with automatic retry on failure.
      *
      * Uses exponential backoff: 10s → 30s → 60s → 120s (max).
-     * Retries indefinitely while [monitoring] is true. Each agent has its
-     * own coroutine, so failures are isolated.
+     * Retries indefinitely while [monitoring] is true AND the generation
+     * token matches. Each agent has its own coroutine, so failures are
+     * isolated. Old-generation coroutines (from a previous startMonitoring
+     * call) exit when they detect a generation mismatch.
      *
      * The periodic health check ([startHealthCheck]) acts as a safety net
      * in case a retry coroutine is cancelled or missed.
      */
-    private suspend fun connectAgent(config: AcpAgentConfig) {
+    private suspend fun connectAgent(config: AcpAgentConfig, gen: Long) {
         var retryCount = 0
-        while (monitoring) {
+        while (monitoring && gen == generation) {
             try {
                 val connection = spawnAndInitialize(config)
                 synchronized(connections) { connections[config.id] = connection }
@@ -159,6 +180,7 @@ class AcpAgentManager {
                 retryingAgents.remove(config.id)
                 return // Success — exit retry loop
             } catch (e: Exception) {
+                if (gen != generation) return // Stale generation — exit
                 retryCount++
                 val delayMs = calculateRetryDelay(retryCount)
 
@@ -195,11 +217,11 @@ class AcpAgentManager {
      * active retry coroutine and attempt to reconnect them.
      * This acts as a safety net alongside the per-agent retry loop.
      */
-    private fun startHealthCheck() {
+    private fun startHealthCheck(gen: Long) {
         healthCheckJob = scope.launch {
-            while (monitoring) {
+            while (monitoring && gen == generation) {
                 delay(HEALTH_CHECK_INTERVAL_MS)
-                if (!monitoring) break
+                if (!monitoring || gen != generation) break
 
                 for (info in _agents.value) {
                     if (info.status == AcpAgentStatus.ERROR && info.id !in retryingAgents) {
@@ -208,7 +230,8 @@ class AcpAgentManager {
                             updateAgentInfo(info.id) {
                                 it.copy(status = AcpAgentStatus.CONNECTING, errorMessage = null)
                             }
-                            scope.launch { connectAgent(config) }
+                            val job = scope.launch { connectAgent(config, gen) }
+                            synchronized(agentJobs) { agentJobs[info.id] = job }
                         }
                     }
                 }
