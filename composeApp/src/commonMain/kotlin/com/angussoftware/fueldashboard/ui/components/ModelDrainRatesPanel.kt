@@ -35,6 +35,7 @@ fun ModelDrainRatesPanel(
     rates: List<ModelDrainRateDisplay>,
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
+    showHelp: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (rates.isEmpty()) return
@@ -47,7 +48,7 @@ fun ModelDrainRatesPanel(
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.width(4.dp))
-            HelpIcon("Measured fuel consumption attributed to each model based on when fuel dropped while that model was active")
+            if (showHelp) HelpIcon("Measured fuel consumption attributed to each model based on when fuel dropped while that model was active")
             Spacer(Modifier.weight(1f))
             ReorderControls(onMoveUp = onMoveUp, onMoveDown = onMoveDown)
         }

@@ -321,11 +321,12 @@ private fun DesktopLayout(
                                     byAgentModel7d = state.meteredByAgentModel7d,
                                     onMoveUp = up,
                                     onMoveDown = down,
+                                    showHelp = state.showHelp,
                                 )
                                 "drain" -> if (state.modelDrainRates.isNotEmpty()) {
-                                    ModelDrainRatesPanel(rates = state.modelDrainRates, onMoveUp = up, onMoveDown = down)
+                                    ModelDrainRatesPanel(rates = state.modelDrainRates, onMoveUp = up, onMoveDown = down, showHelp = state.showHelp)
                                 }
-                                "waste" -> WasteDetectionPanel(providers = state.wasteByProvider, onMoveUp = up, onMoveDown = down)
+                                "waste" -> WasteDetectionPanel(providers = state.wasteByProvider, onMoveUp = up, onMoveDown = down, showHelp = state.showHelp)
                             }
                         }
                     }
@@ -366,7 +367,7 @@ private fun DesktopLayout(
                         for ((key, moves) in sections) {
                             val (up, down) = moves
                             when (key) {
-                                "events" -> FuelEventHistoryPanel(events = state.fuelEvents, onMoveUp = up, onMoveDown = down)
+                                "events" -> FuelEventHistoryPanel(events = state.fuelEvents, onMoveUp = up, onMoveDown = down, showHelp = state.showHelp)
                             }
                         }
                     }

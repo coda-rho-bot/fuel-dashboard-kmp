@@ -166,11 +166,12 @@ fun MobileDashboard(
                                     byConversation7d = state.meteredByConversation7d,
                                     byAgentModel24h = state.meteredByAgentModel24h,
                                     byAgentModel7d = state.meteredByAgentModel7d,
+                                    showHelp = state.showHelp,
                                 )
                                 "drain" -> if (state.modelDrainRates.isNotEmpty()) {
-                                    ModelDrainRatesPanel(rates = state.modelDrainRates)
+                                    ModelDrainRatesPanel(rates = state.modelDrainRates, showHelp = state.showHelp)
                                 }
-                                "waste" -> WasteDetectionPanel(providers = state.wasteByProvider)
+                                "waste" -> WasteDetectionPanel(providers = state.wasteByProvider, showHelp = state.showHelp)
                             }
                         }
                     }
@@ -194,7 +195,7 @@ fun MobileDashboard(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         // Fuel event timeline (drops, switches, recommendations)
-                        FuelEventHistoryPanel(events = state.fuelEvents)
+                        FuelEventHistoryPanel(events = state.fuelEvents, showHelp = state.showHelp)
                     }
                 }
             }

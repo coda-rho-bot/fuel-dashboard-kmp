@@ -34,6 +34,7 @@ fun WasteDetectionPanel(
     providers: List<FuelIntelligence.ProviderWaste>,
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
+    showHelp: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (providers.isEmpty()) return
@@ -46,7 +47,7 @@ fun WasteDetectionPanel(
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.width(4.dp))
-            HelpIcon(
+            if (showHelp) HelpIcon(
                 "Quota that expired unused when each window closed. A window that ends with fuel remaining wasted it — quota does not carry over. " +
                     "Window length follows each provider\u2019s own quota mechanics (z.ai 5h, Letta daily 24h, pools = refill period). " +
                     "High waste = capacity you paid for went unused.",

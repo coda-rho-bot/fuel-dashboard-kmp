@@ -48,6 +48,7 @@ fun MeteredUsagePanel(
     byAgentModel7d: List<AgentModelUsageDisplay> = emptyList(),
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
+    showHelp: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (bySource24h.isEmpty() && bySource7d.isEmpty() &&
@@ -69,7 +70,7 @@ fun MeteredUsagePanel(
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.width(4.dp))
-            HelpIcon("Exact token counts metered from usage sources (agent runs), not inferred from gauge drops")
+            if (showHelp) HelpIcon("Exact token counts metered from usage sources (agent runs), not inferred from gauge drops")
             Spacer(Modifier.weight(1f))
             ReorderControls(onMoveUp = onMoveUp, onMoveDown = onMoveDown)
             FilterChip(
@@ -105,7 +106,7 @@ fun MeteredUsagePanel(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.width(4.dp))
-                HelpIcon("Cost-accurate breakdown: each agent's tokens split by the model that ran them (models have different credit multipliers)")
+                if (showHelp) HelpIcon("Cost-accurate breakdown: each agent's tokens split by the model that ran them (models have different credit multipliers)")
             }
             val maxAgentModelTokens = (byAgentModel.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
             PagedRows(byAgentModel) { AgentModelUsageRow(it, maxAgentModelTokens) }

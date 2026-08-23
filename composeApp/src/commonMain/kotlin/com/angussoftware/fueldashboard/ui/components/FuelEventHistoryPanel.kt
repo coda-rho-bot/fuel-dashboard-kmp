@@ -33,6 +33,7 @@ fun FuelEventHistoryPanel(
     events: List<FuelIntelligence.FuelEvent>,
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
+    showHelp: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (events.isEmpty()) return
@@ -45,7 +46,7 @@ fun FuelEventHistoryPanel(
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.width(4.dp))
-            HelpIcon("Significant fuel events: gauge drops, agent model switches, and recommendation changes — deduplicated, newest first")
+            if (showHelp) HelpIcon("Significant fuel events: gauge drops, agent model switches, and recommendation changes — deduplicated, newest first")
             Spacer(Modifier.weight(1f))
             ReorderControls(onMoveUp = onMoveUp, onMoveDown = onMoveDown)
         }

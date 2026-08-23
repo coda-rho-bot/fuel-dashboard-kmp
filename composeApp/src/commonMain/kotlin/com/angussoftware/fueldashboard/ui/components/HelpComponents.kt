@@ -76,7 +76,6 @@ fun HelpIcon(
         contentDescription = text,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier
-            .size(16.dp)
             .clickable { isVisible = !isVisible },
     )
 

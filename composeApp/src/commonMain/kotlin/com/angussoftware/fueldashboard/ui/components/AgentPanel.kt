@@ -602,22 +602,20 @@ private fun AgentCard(
 
                 // Re-order controls — move agent up/down in the user-ordered list
                 if (onMoveUp != null) {
-                    IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onMoveUp) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowUp,
                             contentDescription = "Move up",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
                 if (onMoveDown != null) {
-                    IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onMoveDown) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "Move down",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
@@ -626,12 +624,11 @@ private fun AgentCard(
 
                 Spacer(Modifier.width(4.dp))
 
-                IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = { showDeleteConfirm = true }) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Remove agent",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
                     )
                 }
             }

@@ -100,6 +100,7 @@ import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.theming.compose.ui.settings.ThemeSettingsPanel
 import com.angussoftware.fueldashboard.ui.rememberQrScanner
 import com.angussoftware.fueldashboard.ui.supportsQrScanning
+import com.angussoftware.fueldashboard.util.isDesktopPlatform
 import com.angussoftware.theming.compose.ui.theme.ColorTheme
 import com.angussoftware.theming.compose.ui.theme.ThemeMode
 
@@ -175,9 +176,12 @@ fun SettingsPanel(
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             // --- Usage ingestion sources (pull-side metering) ---
-            UsageSourcesSection(status = state.usageIngestion)
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+            // Desktop-only: the ingestion manager runs in the embedded server.
+            // On mobile, there's no ingestion manager, so hide this section.
+            if (isDesktopPlatform) {
+                UsageSourcesSection(status = state.usageIngestion)
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+            }
 
             // --- Theme settings ---
             // When the theme icon is in the app bar (showThemeIcon=true), the full
@@ -1001,21 +1005,19 @@ private fun ProviderConfigRow(
                 }
                 // Re-order controls — move provider up/down in the user-ordered list
                 if (onMoveUp != null) {
-                    IconButton(onClick = onMoveUp, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = onMoveUp) {
                         Icon(
                             Icons.Default.KeyboardArrowUp,
                             contentDescription = "Move up",
-                            modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
                 if (onMoveDown != null) {
-                    IconButton(onClick = onMoveDown, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = onMoveDown) {
                         Icon(
                             Icons.Default.KeyboardArrowDown,
                             contentDescription = "Move down",
-                            modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -1029,12 +1031,11 @@ private fun ProviderConfigRow(
                     )
                 }
                 var showRemoveConfirm by remember { mutableStateOf(false) }
-                IconButton(onClick = { showRemoveConfirm = true }, modifier = Modifier.size(24.dp)) {
+                IconButton(onClick = { showRemoveConfirm = true }) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Remove",
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp),
                     )
                 }
                 if (showRemoveConfirm) {
@@ -1059,12 +1060,11 @@ private fun ProviderConfigRow(
                         },
                     )
                 }
-                IconButton(onClick = { isEditing = !isEditing }, modifier = Modifier.size(24.dp)) {
+                IconButton(onClick = { isEditing = !isEditing }) {
                     Icon(
                         imageVector = Icons.Default.Tune,
                         contentDescription = "Edit",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
