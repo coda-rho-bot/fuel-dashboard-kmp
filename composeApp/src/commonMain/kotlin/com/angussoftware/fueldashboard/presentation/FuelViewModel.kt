@@ -330,6 +330,40 @@ class FuelViewModel {
      */
     private val refreshMutex = kotlinx.coroutines.sync.Mutex()
 
+    // ── Agent merge: three independent sources, single merged output ─────
+    // Each source updates its own list and calls mergeAcpAgents() which
+    // combines all three (dedup by id/name) and writes to state.acpAgents.
+    // This replaces the old pattern where each writer replaced acpAgents
+    // wholesale, causing agents to flicker out for up to 5s.
+    private val acpDiscoveredAgents = mutableListOf<AcpAgentDisplay>()
+    private val registeredAgents = mutableListOf<AcpAgentDisplay>()
+    private val orchestratorAgents = mutableListOf<AcpAgentDisplay>()
+
+    private fun mergeAcpAgents() {
+        val merged = mutableListOf<AcpAgentDisplay>()
+        // ACP-discovered agents first (they have the richest data)
+        merged.addAll(acpDiscoveredAgents)
+        // Add orchestrator agents not already present
+        for (agent in orchestratorAgents) {
+            if (merged.none { it.id == agent.id || it.name.equals(agent.name, ignoreCase = true) }) {
+                merged.add(agent)
+            }
+        }
+        // Add registered (MCP/HTTP) agents not already present
+        for (agent in registeredAgents) {
+            if (merged.none { it.id == agent.id || it.name.equals(agent.name, ignoreCase = true) }) {
+                merged.add(agent)
+            }
+        }
+        // Also preserve any config-only (synced) agents from agentSettings
+        for (agent in _state.value.acpAgents) {
+            if (agent.status == "synced" && merged.none { it.id == agent.id }) {
+                merged.add(agent)
+            }
+        }
+        _state.update { it.copy(acpAgents = merged) }
+    }
+
     /** Tracks last recommendation to avoid duplicate logging. */
     private var _lastRecommendation: String = ""
 
@@ -393,9 +427,12 @@ class FuelViewModel {
             )
         }
         if (configOnly.isNotEmpty()) {
-            _state.update { it.copy(
-                acpAgents = it.acpAgents + configOnly,
-            ) }
+            // Add config-only entries to state first, then merge all sources.
+            // mergeAcpAgents() preserves status="synced" entries.
+            _state.update { state ->
+                state.copy(acpAgents = state.acpAgents + configOnly)
+            }
+            mergeAcpAgents()
         }
     }
 
@@ -533,11 +570,23 @@ class FuelViewModel {
     var onGetProviderBurnRates: (() -> List<ProviderBurnRateDisplay>)? = null
 
     /**
-     * Push ACP agent display data into dashboard state. Called from main.kt
+     * Push ACP-discovered agent display data. Called from main.kt
      * when the AcpAgentManager StateFlow emits updates.
      */
     fun updateAcpAgents(agents: List<AcpAgentDisplay>) {
-        _state.update { it.copy(acpAgents = agents) }
+        acpDiscoveredAgents.clear()
+        acpDiscoveredAgents.addAll(agents)
+        mergeAcpAgents()
+    }
+
+    /**
+     * Push MCP/HTTP-registered agent display data. Called from main.kt
+     * poll loop every 5s.
+     */
+    fun updateRegisteredAgents(agents: List<AcpAgentDisplay>) {
+        registeredAgents.clear()
+        registeredAgents.addAll(agents)
+        mergeAcpAgents()
     }
 
     fun setServerUrl(url: String?) {
@@ -741,6 +790,10 @@ class FuelViewModel {
         onAgentSettingsChanged?.invoke(updated)
         // Also remove from MCP/HTTP registered agents
         onRemoveAgent?.invoke(agentId)
+        // Remove from all source lists so the next merge doesn't re-add it
+        acpDiscoveredAgents.removeAll { it.id == agentId }
+        registeredAgents.removeAll { it.id == agentId }
+        orchestratorAgents.removeAll { it.id == agentId }
         // Remove from the displayed agent list
         _state.update { state ->
             state.copy(
@@ -1160,7 +1213,8 @@ class FuelViewModel {
         // (works on both desktop and mobile — desktop gets ACP agents via main.kt,
         // mobile gets orchestrator agents via ConnectedApiProviderAdapter)
         if (agents.agents.isNotEmpty()) {
-            val orchestratorAgents = agents.agents.map { agent ->
+            this.orchestratorAgents.clear()
+            this.orchestratorAgents.addAll(agents.agents.map { agent ->
                 AcpAgentDisplay(
                     id = agent.agentId,
                     name = agent.name,
@@ -1171,17 +1225,8 @@ class FuelViewModel {
                     status = "connected",
                     capabilities = emptyList(),
                 )
-            }
-            // Merge: keep existing ACP/MCP-registered agents, add orchestrator ones that aren't duplicates
-            val existing = _state.value.acpAgents.toMutableList()
-            for (agent in orchestratorAgents) {
-                if (existing.none { it.id == agent.id || it.name.equals(agent.name, ignoreCase = true) }) {
-                    existing.add(agent)
-                }
-            }
-            if (existing.size != _state.value.acpAgents.size) {
-                _state.update { it.copy(acpAgents = existing) }
-            }
+            })
+            mergeAcpAgents()
         }
     }
 

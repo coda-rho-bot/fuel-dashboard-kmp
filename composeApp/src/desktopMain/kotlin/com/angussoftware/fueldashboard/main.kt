@@ -161,7 +161,7 @@ fun main() = application {
                 }
             }
             if (merged != acpAgents) {
-                viewModel.updateAcpAgents(merged)
+                viewModel.updateRegisteredAgents(merged)
             }
             kotlinx.coroutines.delay(5_000)
         }
