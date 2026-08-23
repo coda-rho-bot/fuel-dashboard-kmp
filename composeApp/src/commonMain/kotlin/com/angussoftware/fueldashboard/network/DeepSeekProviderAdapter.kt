@@ -48,8 +48,9 @@ import com.angussoftware.fueldashboard.util.formatRoot
  * remaining prepaid credit. DeepSeek does not expose spend history or rate
  * limit headers via API — only the current balance.
  *
- * The [usedDollars] field in the report carries the remaining balance (not "used"
- * in the traditional sense), so the BudgetBar shows the available credit.
+ * The [limitDollars] field carries the total remaining balance (with
+ * [usedDollars] = 0), so BudgetBar shows "$0.00 / $X.XX" — representing
+ * available prepaid credit, not monthly spend.
  */
 class DeepSeekProviderAdapter(
     override val providerId: String,
@@ -159,11 +160,11 @@ class DeepSeekProviderAdapter(
             remainingPct = null,
             available = balance.isAvailable,
             windows = windows,
-            // Report the total balance as the available credit amount.
-            // BudgetBar will show "$X.XX used" — in DeepSeek's context this
-            // represents remaining credit, not spend.
-            usedDollars = balance.totalBalance,
-            limitDollars = null,
+            // Use the Junie pattern: limitDollars = total balance, usedDollars = 0.
+            // BudgetBar shows "$0.00 / $X.XX" — correctly represents remaining
+            // prepaid credit, not monthly spend.
+            usedDollars = 0.0,
+            limitDollars = balance.totalBalance,
             rawDisplay = rawDisplay,
         )
     }
