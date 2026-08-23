@@ -714,12 +714,12 @@ private fun ProvidersSection(
     if (showHelp) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
             Text(
-                text = "• Sync: copies ALL settings (providers + agents + themes) to another device",
+                text = "• Sync: copies settings (providers, connection, usage sources, themes, preferences) to another device — agents sync separately from the Agents page",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "• Import: reads ALL settings from another device",
+                text = "• Import: applies whatever the scanned code carries (settings or agents, labeled on confirm)",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -160,7 +160,7 @@ fun AgentPanel(
         }
         if (showHelp) {
             Text(
-                text = "Sync and Import transfer ALL settings (providers + agents + themes) between devices.",
+                text = "Sync and Import here transfer agent configurations only (full launcher details included) — settings sync separately from the Settings page.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
