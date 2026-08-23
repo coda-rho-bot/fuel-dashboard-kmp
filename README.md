@@ -76,7 +76,7 @@ Configure provider credentials and dashboard settings on first launch.
 ```
 composeApp/src/
 ├── commonMain/kotlin/.../fueldashboard/
-│   ├── model/         — API data classes + FuelSource interface
+│   ├── model/         — API data classes
 │   ├── network/       — Ktor HTTP client + provider adapters (z.ai, OpenAI, Anthropic, DeepSeek, Groq, Mistral, Letta Cloud, Junie, orchestrator)
 │   ├── presentation/  — ViewModel with StateFlow + polling
 │   ├── settings/      — ThemeController + fuel settings storage

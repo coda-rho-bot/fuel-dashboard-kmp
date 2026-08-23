@@ -63,7 +63,6 @@ actual fun DashboardTheme(
     // and ignore the darkTheme flag, so SYSTEM mode must pick the palette,
     // not just the flag.
     val colorTheme = ThemeController.colorThemeFor(darkTheme)
-    println("[DashboardTheme] mode=${ThemeController.themeMode} dark=$darkTheme palette=$colorTheme")
     AngusTheme(
         darkTheme = darkTheme,
         colorTheme = colorTheme,

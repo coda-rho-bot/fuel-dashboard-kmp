@@ -1,4 +1,8 @@
-# Fuel Management System — Full Stack Architecture
+# Fuel Management System — Full Stack Architecture (Historical)
+
+> **Note:** This document describes the retired Fastify/orchestrator topology (pre-Aug 6).
+> The orchestrator is now embedded directly in the desktop app. This file is preserved
+> as historical reference only. For current architecture, see `docs/` directory.
 
 *Last updated: August 4, 2026*
 

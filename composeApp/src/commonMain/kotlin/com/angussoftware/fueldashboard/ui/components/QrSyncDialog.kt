@@ -84,7 +84,7 @@ fun QrSyncDialog(
             ) {
                 if (capacity.tooLarge) {
                     Text(
-                        text = "Settings data is too large for a QR code (${capacity.byteLength} bytes, max ~2,953).",
+                        text = "Settings data is too large for a reliably scannable QR code (${capacity.byteLength} bytes, max ~667 for version 20).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )

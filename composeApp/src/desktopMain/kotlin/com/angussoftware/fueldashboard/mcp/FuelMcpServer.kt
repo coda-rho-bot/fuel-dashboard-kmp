@@ -106,7 +106,8 @@ internal class FuelMcpServer(
     fun createServer(): Server = Server(
         serverInfo = Implementation(
             name = "fuel-dashboard",
-            version = "2.0.0",
+            // Keep in sync with gradle.properties version
+            version = "0.1.0",
         ),
         options = ServerOptions(
             capabilities = ServerCapabilities(
