@@ -35,16 +35,16 @@ import kotlin.math.roundToInt
  *    - Auth header: `x-api-key: $ANTHROPIC_ADMIN_KEY` + `anthropic-version: 2023-06-01`
  *    - Amounts are in cents (e.g., `"123.45"` = $1.23). Daily granularity only.
  *
- * 2. **Rate-limit headers** (RATE_LIMIT): Headers on any inference API call.
- *    We make a lightweight `POST /v1/messages` call with `max_tokens=1` to capture:
- *    - `anthropic-ratelimit-requests-limit` / `anthropic-ratelimit-requests-remaining`
- *    - `anthropic-ratelimit-tokens-limit` / `anthropic-ratelimit-tokens-remaining`
- *
- *    These are per-minute windows that reset continuously.
+ * 2. **Rate-limit headers** (RATE_LIMIT): Anthropic includes rate-limit
+ *    headers on API responses. We capture them from a **free** `GET /v1/models`
+ *    call — never from inference endpoints. (Historical note: an earlier
+ *    version probed `POST /v1/messages` with max_tokens=1 every poll, which
+ *    made a billable inference call every 30 seconds — the exact harm a
+ *    quota monitor exists to prevent. Removed; polls must never spend money.)
  *
  * **Note on key types**: Anthropic uses separate keys for admin APIs and inference.
- * An admin key can access cost reports but may not be able to make inference calls,
- * and vice versa. The adapter tries both and shows whatever succeeds.
+ * An admin key can access cost reports but may not receive inference rate-limit
+ * headers, and vice versa. The adapter tries both and shows whatever succeeds.
  *
  * **Graceful degradation**: If the cost API fails (non-admin key, network error),
  * the adapter still reports rate-limit data. If rate-limit headers are absent,
@@ -69,7 +69,7 @@ class AnthropicProviderAdapter(
 
     companion object {
         private const val COST_REPORT_PATH = "/v1/organizations/cost_report"
-        private const val MESSAGES_PATH = "/v1/messages"
+        private const val MODELS_PATH = "/v1/models"
         private const val ANTHROPIC_VERSION = "2023-06-01"
 
         // Header names for rate limits
@@ -154,29 +154,20 @@ class AnthropicProviderAdapter(
     // -----------------------------------------------------------------------
 
     /**
-     * Fetches rate-limit data by making a lightweight POST /v1/messages call
-     * with max_tokens=1.
+     * Fetches rate-limit data from a **free** `GET /v1/models` call.
      *
-     * Anthropic includes rate-limit headers on inference responses. The minimal
-     * messages call is the cheapest way to capture them.
+     * Anthropic includes rate-limit headers on API responses. Polling must
+     * never spend money — no inference-endpoint probes — so we capture
+     * headers from the models list instead. If Anthropic doesn't return
+     * rate-limit headers there, rate-limit data is simply absent (graceful).
      *
      * Returns null if the call fails or headers are absent.
      */
     private suspend fun fetchRateLimits(): AnthropicRateLimitData? {
         return try {
-            val response: HttpResponse = client.post("$baseUrl$MESSAGES_PATH") {
+            val response: HttpResponse = client.get("$baseUrl$MODELS_PATH") {
                 header("x-api-key", apiKey)
                 header("anthropic-version", ANTHROPIC_VERSION)
-                contentType(ContentType.Application.Json)
-                setBody(
-                    """
-                    {
-                        "model": "claude-sonnet-4-20250514",
-                        "max_tokens": 1,
-                        "messages": [{"role": "user", "content": "."}]
-                    }
-                    """.trimIndent(),
-                )
             }
 
             val headers = response.headers
