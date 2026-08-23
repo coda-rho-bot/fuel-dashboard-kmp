@@ -206,6 +206,7 @@ fun ImportSettingsDialog(
 ) {
     val llmProviders = syncData.providers.filter { it.kind.category == ProviderCategory.LLM_PROVIDER }
     val fleetProviders = syncData.providers.filter { it.kind.category == ProviderCategory.AGENT_BACKEND }
+    val isAgentsOnly = syncData.scope == SettingsSyncData.SCOPE_AGENTS
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -216,67 +217,106 @@ fun ImportSettingsDialog(
                 tint = MaterialTheme.colorScheme.primary,
             )
         },
-        title = { Text("Import Settings?") },
+        title = { Text(if (isAgentsOnly) "Import Agents?" else "Import Settings?") },
         text = {
             Column {
                 Text(
-                    text = "This will replace your current settings with:",
+                    text = if (isAgentsOnly) {
+                        "This will replace your current agent configurations with:"
+                    } else {
+                        "This will replace your current settings with:"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(8.dp))
 
-                // Provider summary
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "${syncData.providers.size} provider${if (syncData.providers.size != 1) "s" else ""}" +
-                            if (llmProviders.isNotEmpty()) " (${llmProviders.size} LLM, ${fleetProviders.size} agent)" else "",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
+                if (isAgentsOnly) {
+                    // Agent summary — full launcher details ride this code
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "${syncData.agentSettings.agents.size} agent" +
+                                if (syncData.agentSettings.agents.size != 1) "s" else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    syncData.agentSettings.agents.take(5).forEach { agent ->
+                        Text(
+                            text = "  - ${agent.name}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 22.dp, top = 2.dp),
+                        )
+                    }
+                    if (syncData.agentSettings.agents.size > 5) {
+                        Text(
+                            text = "  ...and ${syncData.agentSettings.agents.size - 5} more",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 22.dp),
+                        )
+                    }
+                } else {
+                    // Provider summary
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "${syncData.providers.size} provider${if (syncData.providers.size != 1) "s" else ""}" +
+                                if (llmProviders.isNotEmpty()) " (${llmProviders.size} LLM, ${fleetProviders.size} agent)" else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
 
-                // List provider names
-                syncData.providers.take(5).forEach { provider ->
-                    Text(
-                        text = "  - ${provider.resolvedDisplayName()}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 22.dp, top = 2.dp),
-                    )
-                }
-                if (syncData.providers.size > 5) {
-                    Text(
-                        text = "  ...and ${syncData.providers.size - 5} more",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 22.dp),
-                    )
-                }
+                    // List provider names
+                    syncData.providers.take(5).forEach { provider ->
+                        Text(
+                            text = "  - ${provider.resolvedDisplayName()}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 22.dp, top = 2.dp),
+                        )
+                    }
+                    if (syncData.providers.size > 5) {
+                        Text(
+                            text = "  ...and ${syncData.providers.size - 5} more",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 22.dp),
+                        )
+                    }
 
-                Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(6.dp))
 
-                // Theme summary
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "Theme: ${syncData.themeMode.lowercase()}" +
-                            " (light: ${syncData.lightColorTheme}, dark: ${syncData.darkColorTheme})",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                    )
+                    // Theme summary
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Theme: ${syncData.themeMode.lowercase()}" +
+                                " (light: ${syncData.lightColorTheme}, dark: ${syncData.darkColorTheme})",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -298,7 +338,11 @@ fun ImportSettingsDialog(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "This will replace all current settings, including API keys.",
+                        text = if (isAgentsOnly) {
+                            "This will replace all current agent configurations."
+                        } else {
+                            "This will replace all current settings, including API keys."
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )

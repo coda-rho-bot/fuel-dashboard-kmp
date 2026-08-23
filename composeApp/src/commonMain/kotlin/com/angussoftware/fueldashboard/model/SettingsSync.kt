@@ -20,6 +20,14 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class SettingsSyncData(
     val version: Int = CURRENT_VERSION,
+    /**
+     * What this payload carries — routes the import so a scoped payload
+     * (QR split by domain) only applies its own fields:
+     * - [SCOPE_FULL]: everything (text code, server import, legacy QR)
+     * - [SCOPE_SETTINGS]: everything EXCEPT agent configs
+     * - [SCOPE_AGENTS]: ONLY agent configs (full launcher fidelity)
+     */
+    val scope: String = SCOPE_FULL,
     val providers: List<ProviderConfig>,
     val themeMode: String,
     val lightColorTheme: String,
@@ -46,6 +54,15 @@ data class SettingsSyncData(
 ) {
     companion object {
         const val CURRENT_VERSION = 5
+
+        /** Everything — text code and server-side import payloads. */
+        const val SCOPE_FULL = "full"
+
+        /** Settings-only QR — providers, connection, usage sources, prefs. */
+        const val SCOPE_SETTINGS = "settings"
+
+        /** Agents-only QR — agent configs at FULL launcher fidelity. */
+        const val SCOPE_AGENTS = "agents"
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -84,8 +101,14 @@ data class SettingsSyncData(
             junieBalance = junieBalance,
             junieLicense = junieLicense,
             junieLastChecked = junieLastChecked,
-            usageSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage(),
-            intelSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadIntel(),
+            // Sync section orders ONLY when the user actually reordered —
+            // empty lists mean "receiver keeps its own" and cost zero QR bytes.
+            usageSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage()
+                .takeIf { it != com.angussoftware.fueldashboard.settings.SectionOrder.USAGE_KEYS }
+                ?: emptyList(),
+            intelSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadIntel()
+                .takeIf { it != com.angussoftware.fueldashboard.settings.SectionOrder.INTEL_KEYS }
+                ?: emptyList(),
             usageSources = UsageSourcesStore.load()
                 .takeIf { it != UsageSourcesSettings() },
             eventDropThresholdPct = loadStringSetting(FuelSettingsKeys.EVENT_DROP_THRESHOLD, "").toDoubleOrNull(),
@@ -109,11 +132,16 @@ data class SettingsSyncData(
          */
         @OptIn(ExperimentalEncodingApi::class)
         fun fromQrData(qrData: String): SettingsSyncData? {
-            // Try compressed decode first
-            val compressed = runCatching {
+            // Current format: gzip + Base45 (QR-native alphabet — alphanumeric
+            // mode packs 5.5 bits/char vs byte mode's 8)
+            Base45.decode(qrData)?.let { bytes ->
+                runCatching { fromJson(decompress(bytes)) }.getOrNull()?.let { return it }
+            }
+            // Legacy: gzip + Base64 (senders before Base45)
+            val legacy = runCatching {
                 fromJson(decompress(Base64.decode(qrData)))
             }.getOrNull()
-            if (compressed != null) return compressed
+            if (legacy != null) return legacy
 
             // Fallback: raw JSON (backwards compatibility)
             return fromJson(qrData)
@@ -151,15 +179,33 @@ data class SettingsSyncData(
      * The copy-paste text code ([toCode]) keeps full fidelity, since bytes
      * are free there.
      */
-    fun slimmedForQr(): SettingsSyncData = copy(
-        agentSettings = AgentSettings(
-            agents = agentSettings.agents.map { config ->
-                config.copy(command = "", args = "", env = emptyMap())
-            },
-        ),
-        // Small preference fields stay out of the QR to respect the reliably-
-        // scannable version bound (≤20) — the receiver keeps its own values.
-        // The text code ([toCode]) carries them at full fidelity.
+    /**
+     * Settings-domain payload for the settings QR code: everything except
+     * agent configs. Small enough to carry the preference fields un-slimmed
+     * (agents were the bulk of the old combined payload).
+     */
+    fun forSettingsQr(): SettingsSyncData = copy(
+        scope = SCOPE_SETTINGS,
+        agentSettings = AgentSettings(),
+    )
+
+    /**
+     * Agents-domain payload for the agents QR code: ONLY agent configs,
+     * with FULL launcher fidelity (command/args/env ride this code — useful
+     * desktop→desktop, gracefully ignored by phones). Connection and
+     * settings fields are nulled so an agents scan never touches them.
+     */
+    fun forAgentsQr(): SettingsSyncData = copy(
+        scope = SCOPE_AGENTS,
+        providers = emptyList(),
+        serverUrl = null,
+        serverApiKey = null,
+        junieBalance = null,
+        junieLicense = null,
+        junieLastChecked = null,
+        usageSectionOrder = emptyList(),
+        intelSectionOrder = emptyList(),
+        usageSources = null,
         eventDropThresholdPct = null,
         showHelp = null,
         showThemeIcon = null,
@@ -167,14 +213,37 @@ data class SettingsSyncData(
         feedbackRepo = null,
     )
 
+    fun slimmedForQr(): SettingsSyncData = when (scope) {
+        // Agents QR ships full launcher fidelity on purpose.
+        SCOPE_AGENTS -> this
+        // Settings QR has no agents; scoped payloads stay un-slimmed.
+        SCOPE_SETTINGS -> this
+        // Legacy combined QR (if anyone generates one): strip launcher fields
+        // AND the small prefs to respect the reliably-scannable bound (≤20).
+        else -> copy(
+            agentSettings = AgentSettings(
+                agents = agentSettings.agents.map { config ->
+                    config.copy(command = "", args = "", env = emptyMap())
+                },
+            ),
+            eventDropThresholdPct = null,
+            showHelp = null,
+            showThemeIcon = null,
+            feedbackUrl = null,
+            feedbackRepo = null,
+        )
+    }
+
     /**
-     * Compressed + base64-encoded data for QR codes.
-     * Reduces QR density by ~50% for better scannability.
+     * Compressed + Base45-encoded data for QR codes.
+     *
+     * Base45's alphabet fits QR alphanumeric mode (5.5 bits/char vs byte
+     * mode's 8) — ~23% fewer modules than base64 for the same payload.
+     * Decoders fall back to base64/raw for older senders.
      */
-    @OptIn(ExperimentalEncodingApi::class)
     fun toQrData(): String {
         val encoded = qrJson.encodeToString(serializer(), slimmedForQr())
-        return Base64.encode(compress(encoded))
+        return Base45.encode(compress(encoded))
     }
 
     /**

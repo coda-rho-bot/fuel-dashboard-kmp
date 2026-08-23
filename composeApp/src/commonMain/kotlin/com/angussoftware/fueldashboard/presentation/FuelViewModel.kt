@@ -702,107 +702,116 @@ class FuelViewModel {
      * Replaces all current providers, agent configurations, and theme with the imported data.
      */
     fun importSyncedSettings(syncData: com.angussoftware.fueldashboard.model.SettingsSyncData) {
+        val isAgentsOnly = syncData.scope == com.angussoftware.fueldashboard.model.SettingsSyncData.SCOPE_AGENTS
+        val isSettingsOnly = syncData.scope == com.angussoftware.fueldashboard.model.SettingsSyncData.SCOPE_SETTINGS
+
         // Section orders (Usage/Intel tabs) — empty lists keep the receiver's own.
-        if (syncData.usageSectionOrder.isNotEmpty()) {
+        if (!isAgentsOnly && syncData.usageSectionOrder.isNotEmpty()) {
             com.angussoftware.fueldashboard.settings.SectionOrder.save(
                 com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_USAGE,
                 syncData.usageSectionOrder,
             )
         }
-        if (syncData.intelSectionOrder.isNotEmpty()) {
+        if (!isAgentsOnly && syncData.intelSectionOrder.isNotEmpty()) {
             com.angussoftware.fueldashboard.settings.SectionOrder.save(
                 com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_INTEL,
                 syncData.intelSectionOrder,
             )
         }
         // Merge: take synced providers AND add/update a Remote Dashboard provider with the server API key
-        val providers = syncData.providers.toMutableList()
-        syncData.serverUrl?.let { url ->
-            val key = syncData.serverApiKey.orEmpty()
-            // Remove any existing CONNECTED_API and add fresh one
-            providers.removeAll { it.kind == com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API }
-            providers.add(
-                com.angussoftware.fueldashboard.model.ProviderConfig(
-                    id = "synced-orchestrator",
-                    kind = com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API,
-                    apiKey = key,
-                    displayName = "Remote Dashboard",
-                    serverUrl = url,
-                ),
-            )
-        }
-        updateSettings(com.angussoftware.fueldashboard.model.MultiProviderSettings(providers = providers))
-
-        AgentSettingsStore.save(syncData.agentSettings)
-        _state.value = _state.value.copy(agentSettings = syncData.agentSettings)
-        onAgentSettingsChanged?.invoke(syncData.agentSettings)
-
-        // Populate agent display list from synced configs (for mobile — no live ACP available)
-        if (_state.value.acpAgents.isEmpty() && syncData.agentSettings.agents.isNotEmpty()) {
-            _state.value = _state.value.copy(
-                acpAgents = syncData.agentSettings.agents.map { config ->
-                    AcpAgentDisplay(
-                        id = config.id,
-                        name = config.name,
-                        currentModel = "unknown",
-                        availableModels = emptyList(),
-                        currentMode = null,
-                        availableModes = emptyList(),
-                        status = "synced",
-                        capabilities = emptyList(),
-                        lastSeen = null,
-                    )
-                },
-            )
+        if (!isAgentsOnly) {
+            val providers = syncData.providers.toMutableList()
+            syncData.serverUrl?.let { url ->
+                val key = syncData.serverApiKey.orEmpty()
+                // Remove any existing CONNECTED_API and add fresh one
+                providers.removeAll { it.kind == com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API }
+                providers.add(
+                    com.angussoftware.fueldashboard.model.ProviderConfig(
+                        id = "synced-orchestrator",
+                        kind = com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API,
+                        apiKey = key,
+                        displayName = "Remote Dashboard",
+                        serverUrl = url,
+                    ),
+                )
+            }
+            updateSettings(com.angussoftware.fueldashboard.model.MultiProviderSettings(providers = providers))
         }
 
-        // Apply theme settings
-        val themeController = com.angussoftware.fueldashboard.settings.ThemeController
+        if (!isSettingsOnly) {
+            AgentSettingsStore.save(syncData.agentSettings)
+            _state.value = _state.value.copy(agentSettings = syncData.agentSettings)
+            onAgentSettingsChanged?.invoke(syncData.agentSettings)
 
-        // Apply Junie balance data (synced from desktop)
-        syncData.junieBalance?.let { balance ->
-            saveStringSetting(FuelSettingsKeys.JUNIE_BALANCE, balance.toString())
-        }
-        syncData.junieLicense?.let { license ->
-            saveStringSetting(FuelSettingsKeys.JUNIE_LICENSE, license)
-        }
-        syncData.junieLastChecked?.let { checked ->
-            saveStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, checked.toString())
-        }
-
-        runCatching {
-            val mode = com.angussoftware.theming.compose.ui.theme.ThemeMode.valueOf(syncData.themeMode)
-            themeController.updateThemeMode(mode)
-        }
-        runCatching {
-            val light = com.angussoftware.theming.compose.ui.theme.ColorTheme.valueOf(syncData.lightColorTheme)
-            themeController.updateLightColorTheme(light)
-        }
-        runCatching {
-            val dark = com.angussoftware.theming.compose.ui.theme.ColorTheme.valueOf(syncData.darkColorTheme)
-            themeController.updateDarkColorTheme(dark)
+            // Populate agent display list from synced configs (for mobile — no live ACP available)
+            if (_state.value.acpAgents.isEmpty() && syncData.agentSettings.agents.isNotEmpty()) {
+                _state.value = _state.value.copy(
+                    acpAgents = syncData.agentSettings.agents.map { config ->
+                        AcpAgentDisplay(
+                            id = config.id,
+                            name = config.name,
+                            currentModel = "unknown",
+                            availableModels = emptyList(),
+                            currentMode = null,
+                            availableModes = emptyList(),
+                            status = "synced",
+                            capabilities = emptyList(),
+                            lastSeen = null,
+                        )
+                    },
+                )
+            }
         }
 
-        // Usage ingestion sources (Letta server config) — takes effect on the
-        // next ingestion poll (manager re-reads the store each cycle).
-        syncData.usageSources?.let { sources ->
-            com.angussoftware.fueldashboard.settings.UsageSourcesStore.save(sources)
-        }
+        if (!isAgentsOnly) {
+            // Apply theme settings
+            val themeController = com.angussoftware.fueldashboard.settings.ThemeController
 
-        // Intelligence drop threshold
-        syncData.eventDropThresholdPct?.let { threshold ->
-            saveStringSetting(FuelSettingsKeys.EVENT_DROP_THRESHOLD, threshold.toString())
-        }
+            // Apply Junie balance data (synced from desktop)
+            syncData.junieBalance?.let { balance ->
+                saveStringSetting(FuelSettingsKeys.JUNIE_BALANCE, balance.toString())
+            }
+            syncData.junieLicense?.let { license ->
+                saveStringSetting(FuelSettingsKeys.JUNIE_LICENSE, license)
+            }
+            syncData.junieLastChecked?.let { checked ->
+                saveStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, checked.toString())
+            }
 
-        // Preferences — null keeps the receiver's own
-        syncData.showHelp?.let { help -> setShowHelp(help) }
-        syncData.showThemeIcon?.let { showIcon ->
-            saveStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, showIcon.toString())
-        }
+            runCatching {
+                val mode = com.angussoftware.theming.compose.ui.theme.ThemeMode.valueOf(syncData.themeMode)
+                themeController.updateThemeMode(mode)
+            }
+            runCatching {
+                val light = com.angussoftware.theming.compose.ui.theme.ColorTheme.valueOf(syncData.lightColorTheme)
+                themeController.updateLightColorTheme(light)
+            }
+            runCatching {
+                val dark = com.angussoftware.theming.compose.ui.theme.ColorTheme.valueOf(syncData.darkColorTheme)
+                themeController.updateDarkColorTheme(dark)
+            }
 
-        // Custom feedback endpoints
-        syncData.feedbackUrl?.let { url -> saveStringSetting(FuelSettingsKeys.FEEDBACK_URL, url) }
-        syncData.feedbackRepo?.let { repo -> saveStringSetting(FuelSettingsKeys.FEEDBACK_REPO, repo) }
+            // Usage ingestion sources (Letta server config) — takes effect on the
+            // next ingestion poll (manager re-reads the store each cycle).
+            syncData.usageSources?.let { sources ->
+                com.angussoftware.fueldashboard.settings.UsageSourcesStore.save(sources)
+            }
+
+            // Intelligence drop threshold
+            syncData.eventDropThresholdPct?.let { threshold ->
+                saveStringSetting(FuelSettingsKeys.EVENT_DROP_THRESHOLD, threshold.toString())
+            }
+
+            // Preferences — null keeps the receiver's own
+            syncData.showHelp?.let { help -> setShowHelp(help) }
+            syncData.showThemeIcon?.let { showIcon ->
+                saveStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, showIcon.toString())
+            }
+
+            // Custom feedback endpoints
+            syncData.feedbackUrl?.let { url -> saveStringSetting(FuelSettingsKeys.FEEDBACK_URL, url) }
+            syncData.feedbackRepo?.let { repo -> saveStringSetting(FuelSettingsKeys.FEEDBACK_REPO, repo) }
+        }
 
         // Remote Dashboard provider is already added above in the providers list
     }

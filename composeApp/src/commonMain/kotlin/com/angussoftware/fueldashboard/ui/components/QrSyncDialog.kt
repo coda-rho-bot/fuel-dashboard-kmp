@@ -55,6 +55,14 @@ fun QrSyncDialog(
     val json = syncData.toQrData()
     val capacity = estimateQrCapacity(json)
     val clipboardManager = LocalClipboardManager.current
+    val (title, subtitle) = when (syncData.scope) {
+        SettingsSyncData.SCOPE_AGENTS ->
+            "Sync Agents" to "Scan with your phone to sync agent configurations (full launcher details included)"
+        SettingsSyncData.SCOPE_SETTINGS ->
+            "Sync Settings" to "Scan with your phone to sync providers, connection, and preferences (agents sync separately)"
+        else ->
+            "Sync Settings" to "Scan with your phone to sync everything"
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -66,7 +74,7 @@ fun QrSyncDialog(
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Sync Settings")
+                Text(title)
             }
         },
         text = {
@@ -89,7 +97,7 @@ fun QrSyncDialog(
                     Spacer(Modifier.height(8.dp))
 
                     Text(
-                        text = "Scan with your phone to sync settings",
+                        text = subtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

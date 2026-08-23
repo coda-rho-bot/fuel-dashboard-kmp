@@ -241,7 +241,7 @@ fun AgentPanel(
 
     if (showQrSyncDialog) {
         QrSyncDialog(
-            syncData = syncData,
+            syncData = syncData.forAgentsQr(),
             onDismiss = { showQrSyncDialog = false },
         )
     }

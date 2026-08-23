@@ -80,6 +80,46 @@ class SettingsSyncDataTest {
     }
 
     @Test
+    fun scopedQrPayloadsRoundTripWithTheirDomains() {
+        val full = SettingsSyncData(
+            providers = listOf(ProviderConfig(id = "zai", kind = ProviderKind.ZAI, apiKey = "k")),
+            themeMode = "SYSTEM",
+            lightColorTheme = "Default",
+            darkColorTheme = "Default",
+            serverUrl = "https://fuel.example.com",
+            serverApiKey = "fd-key",
+            agentSettings = AgentSettings(
+                agents = listOf(
+                    AgentConfig(id = "a1", name = "Coda", command = "letta-acp", args = "--yolo"),
+                ),
+            ),
+            eventDropThresholdPct = 3.0,
+            showHelp = true,
+        )
+
+        // Settings QR: keeps settings + prefs, drops agents.
+        val settings = full.forSettingsQr()
+        assertEquals(emptyList(), settings.agentSettings.agents)
+        assertEquals(3.0, settings.eventDropThresholdPct)
+        assertEquals(true, settings.showHelp)
+        val restoredSettings = SettingsSyncData.fromQrData(settings.toQrData())
+        assertEquals(SettingsSyncData.SCOPE_SETTINGS, restoredSettings?.scope)
+        assertEquals(emptyList(), restoredSettings?.agentSettings?.agents)
+        assertEquals(3.0, restoredSettings?.eventDropThresholdPct)
+
+        // Agents QR: keeps full agent configs, nulls everything else.
+        val agents = full.forAgentsQr()
+        assertEquals("letta-acp", agents.agentSettings.agents.single().command)
+        assertEquals(emptyList(), agents.providers)
+        assertEquals(null, agents.serverUrl)
+        assertEquals(null, agents.eventDropThresholdPct)
+        val restoredAgents = SettingsSyncData.fromQrData(agents.toQrData())
+        assertEquals(SettingsSyncData.SCOPE_AGENTS, restoredAgents?.scope)
+        assertEquals("letta-acp", restoredAgents?.agentSettings?.agents?.single()?.command)
+        assertEquals(emptyList(), restoredAgents?.providers)
+    }
+
+    @Test
     fun unsetNewFieldsDecodeAsNullFromLegacyV4Payload() {
         // A v4-era payload has none of the v5 fields — they must decode null,
         // leaving the receiver's own values untouched.
@@ -186,9 +226,50 @@ class SettingsSyncDataTest {
     }
 
     @Test
-    fun harryScaleConfigStaysReliablyScannable() {
-        // 5 fleet agents with full launcher env + 4 providers with realistic
-        // API keys — the Aug 22 "QR no detection" regression payload class.
+    fun settingsQrStaysReliablyScannable() {
+        // The settings QR carries everything EXCEPT agents: providers with
+        // realistic keys, connection, usage sources, section orders, prefs.
+        val providers = listOf(
+            ProviderConfig(id = "openai", kind = ProviderKind.OPENAI, apiKey = "sk-proj-9aXbQ2mZ7hT4kLpR8wYcV1nD6fJ0sG3eH5uI2oP7qA4rB8tC1xW6yE9zK3mN5vL", displayName = "OpenAI"),
+            ProviderConfig(id = "anthropic", kind = ProviderKind.ANTHROPIC, apiKey = "sk-ant-api03-Kj8Hg2Lp9Qw7Er4Ty1Ui6Op3As5Df0Gh8Jk2Lz9Xc4Vb7Nm1Qw6Er3Ty5Ui8", displayName = "Anthropic"),
+            ProviderConfig(id = "zai", kind = ProviderKind.ZAI, apiKey = "zai-3f7b9c1d2e4a6b8c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c"),
+            ProviderConfig(id = "groq", kind = ProviderKind.GROQ, apiKey = "gsk_AbCdEf12GhIjKl34MnOpQr56StUvWx78YzAbCd90EfGhIj12KlMnOp34QrStUv"),
+        )
+        val syncData = SettingsSyncData(
+            providers = providers,
+            themeMode = "SYSTEM",
+            lightColorTheme = "Angus",
+            darkColorTheme = "AngusDark",
+            serverUrl = "https://fuel.angussoftware.dev",
+            serverApiKey = "fd-1234567890abcdef1234567890abcdef",
+            // Worst case: user actually reordered Usage (Intel at default is
+            // dropped entirely by from() — non-default orders are what ship).
+            usageSectionOrder = listOf("waste", "metered", "drain"),
+            usageSources = com.angussoftware.fueldashboard.usage.UsageSourcesSettings(
+                letta = com.angussoftware.fueldashboard.usage.LettaSourceConfig(
+                    enabled = true,
+                    baseUrl = "https://api.letta.com",
+                    apiKey = "sk-live-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
+                ),
+            ),
+            eventDropThresholdPct = 2.5,
+            showHelp = false,
+            showThemeIcon = true,
+            feedbackUrl = "https://git.example.com",
+            feedbackRepo = "acme/custom-repo",
+        ).forSettingsQr()
+
+        val qrData = syncData.toQrData()
+        val version = minimumInformationDensityFor(qrData)
+
+        // Lesson #84: versions ≤ 20 scan reliably off a screen. Hard bound.
+        assertTrue(version <= 20, "Settings QR version $version exceeds the reliably-scannable bound (20); payload=${qrData.length} chars")
+    }
+
+    @Test
+    fun agentsQrCarriesFullLauncherFidelityAndStaysScannable() {
+        // The agents QR carries ONLY agents — at FULL launcher fidelity
+        // (command/args/env ride this code, unlike the legacy combined QR).
         val agents = (1..5).map { i ->
             AgentConfig(
                 id = "agent-$i",
@@ -203,43 +284,23 @@ class SettingsSyncDataTest {
                 ),
             )
         }
-        val providers = listOf(
-            ProviderConfig(id = "openai", kind = ProviderKind.OPENAI, apiKey = "sk-proj-9aXbQ2mZ7hT4kLpR8wYcV1nD6fJ0sG3eH5uI2oP7qA4rB8tC1xW6yE9zK3mN5vL", displayName = "OpenAI"),
-            ProviderConfig(id = "anthropic", kind = ProviderKind.ANTHROPIC, apiKey = "sk-ant-api03-Kj8Hg2Lp9Qw7Er4Ty1Ui6Op3As5Df0Gh8Jk2Lz9Xc4Vb7Nm1Qw6Er3Ty5Ui8", displayName = "Anthropic"),
-            ProviderConfig(id = "zai", kind = ProviderKind.ZAI, apiKey = "zai-3f7b9c1d2e4a6b8c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c"),
-            ProviderConfig(id = "groq", kind = ProviderKind.GROQ, apiKey = "gsk_AbCdEf12GhIjKl34MnOpQr56StUvWx78YzAbCd90EfGhIj12KlMnOp34QrStUv"),
-        )
         val syncData = SettingsSyncData(
-            providers = providers,
+            providers = emptyList(),
             themeMode = "SYSTEM",
             lightColorTheme = "Angus",
             darkColorTheme = "AngusDark",
-            serverUrl = "https://fuel.angussoftware.dev",
-            serverApiKey = "fd-1234567890abcdef1234567890abcdef",
             agentSettings = AgentSettings(agents = agents),
-            usageSectionOrder = listOf("metered", "drain", "waste"),
-            intelSectionOrder = listOf("events"),
-            // v5 additions at realistic custom values — the QR must still fit.
-            usageSources = com.angussoftware.fueldashboard.usage.UsageSourcesSettings(
-                letta = com.angussoftware.fueldashboard.usage.LettaSourceConfig(
-                    enabled = true,
-                    baseUrl = "https://api.letta.com",
-                    apiKey = "sk-live-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
-                ),
-            ),
-            eventDropThresholdPct = 2.5,
-            showHelp = false,
-            showThemeIcon = true,
-            feedbackUrl = "https://git.example.com",
-            feedbackRepo = "acme/custom-repo",
+        ).forAgentsQr()
+
+        // Scoped payloads are not slimmed — launcher fields survive the QR.
+        val restored = SettingsSyncData.fromQrData(syncData.toQrData())
+        assertEquals(
+            "/home/rhomancer/.nvm/versions/node/v22.22.3/bin/letta-acp",
+            restored?.agentSettings?.agents?.first()?.command,
         )
 
-        val qrData = syncData.toQrData()
-        val version = minimumInformationDensityFor(qrData)
-
-        // Lesson #84: versions ≤ 20 scan reliably off a screen; 21-30 are
-        // marginal (the Aug 22 failure was version 24). Hard bound at 20.
-        assertTrue(version <= 20, "QR version $version exceeds the reliably-scannable bound (20); payload=${qrData.length} chars")
+        val version = minimumInformationDensityFor(syncData.toQrData())
+        assertTrue(version <= 20, "Agents QR version $version exceeds the reliably-scannable bound (20)")
     }
 }
 

@@ -783,7 +783,7 @@ private fun ProvidersSection(
                 junieBalance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull(),
                 junieLicense = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null },
                 junieLastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull(),
-            ),
+            ).forSettingsQr(),
             onDismiss = { showQrSyncDialog = false },
         )
     }
