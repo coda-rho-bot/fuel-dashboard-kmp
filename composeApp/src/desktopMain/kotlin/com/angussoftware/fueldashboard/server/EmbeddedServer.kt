@@ -322,14 +322,25 @@ class EmbeddedServer(
                 if (!call.requireApiKey()) return@get
                 val settings = FuelSettingsStore.loadMultiProvider()
                 val agentSettings = AgentSettingsStore.load()
-                val syncData = SettingsSyncData(
-                    providers = settings.providers,
-                    themeMode = "SYSTEM",
-                    lightColorTheme = "DEFAULT",
-                    darkColorTheme = "DEFAULT",
+                // Canonical builder: real theme, junie, section orders,
+                // usage sources, prefs. Hand-building this (the old way)
+                // hardcoded theme defaults — importing such a code silently
+                // reset the receiver's theme.
+                val syncData = SettingsSyncData.from(
+                    settings = settings,
+                    agentSettings = agentSettings,
+                    themeController = com.angussoftware.fueldashboard.settings.ThemeController,
                     serverUrl = serverUrl,
                     serverApiKey = apiKey,
-                    agentSettings = agentSettings,
+                    junieBalance = com.angussoftware.fueldashboard.settings.loadStringSetting(
+                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.JUNIE_BALANCE, "",
+                    ).toDoubleOrNull(),
+                    junieLicense = com.angussoftware.fueldashboard.settings.loadStringSetting(
+                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.JUNIE_LICENSE, "",
+                    ).ifBlank { null },
+                    junieLastChecked = com.angussoftware.fueldashboard.settings.loadStringSetting(
+                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.JUNIE_LAST_CHECKED, "",
+                    ).toLongOrNull(),
                 )
                 call.respondText(
                     text = """{"sync_code":"${syncData.toCode()}","server_url":"${serverUrl ?: ""}"}""",

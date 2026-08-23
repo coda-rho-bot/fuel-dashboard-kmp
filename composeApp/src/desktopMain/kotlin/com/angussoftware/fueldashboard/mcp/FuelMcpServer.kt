@@ -504,15 +504,24 @@ internal class FuelMcpServer(
             val apiKey = serverApiKeyProvider()
             val url = serverUrlProvider()
 
-            // Build SettingsSyncData and encode as base64 text code
-            val syncData = SettingsSyncData(
-                providers = settings.providers,
-                themeMode = "SYSTEM",
-                lightColorTheme = "DEFAULT",
-                darkColorTheme = "DEFAULT",
+            // Canonical builder: real theme, junie, section orders, usage
+            // sources, prefs — hand-building hardcoded theme defaults that
+            // silently reset the receiver's theme on import.
+            val syncData = SettingsSyncData.from(
+                settings = settings,
+                agentSettings = agentSettings,
+                themeController = com.angussoftware.fueldashboard.settings.ThemeController,
                 serverUrl = url,
                 serverApiKey = apiKey,
-                agentSettings = agentSettings,
+                junieBalance = com.angussoftware.fueldashboard.settings.loadStringSetting(
+                    com.angussoftware.fueldashboard.settings.FuelSettingsKeys.JUNIE_BALANCE, "",
+                ).toDoubleOrNull(),
+                junieLicense = com.angussoftware.fueldashboard.settings.loadStringSetting(
+                    com.angussoftware.fueldashboard.settings.FuelSettingsKeys.JUNIE_LICENSE, "",
+                ).ifBlank { null },
+                junieLastChecked = com.angussoftware.fueldashboard.settings.loadStringSetting(
+                    com.angussoftware.fueldashboard.settings.FuelSettingsKeys.JUNIE_LAST_CHECKED, "",
+                ).toLongOrNull(),
             )
             val syncCode = syncData.toCode()
 
