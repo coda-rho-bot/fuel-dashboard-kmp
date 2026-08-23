@@ -342,7 +342,7 @@ class MistralProviderAdapter(
     // Report Building
     // -----------------------------------------------------------------------
 
-    private fun buildReport(
+    internal fun buildReport(
         usage: UsageData?,
         spendLimit: SpendLimitData?,
         rateLimit: MistralRateLimitData?,
@@ -479,20 +479,20 @@ class MistralProviderAdapter(
 // Internal data classes
 // -----------------------------------------------------------------------
 
-private data class UsageData(
+internal data class UsageData(
     val totalCost: Double,
     val currency: String?,
     val startDate: String?,
     val endDate: String?,
 )
 
-private data class SpendLimitData(
+internal data class SpendLimitData(
     val monthlyLimitReached: Boolean,
     val currency: String?,
     val lastPaymentFailure: Boolean,
 )
 
-private data class MistralRateLimitData(
+internal data class MistralRateLimitData(
     val requestsPerSecond: Int?,
     val maxTokensPerMinute: Int?,
 )

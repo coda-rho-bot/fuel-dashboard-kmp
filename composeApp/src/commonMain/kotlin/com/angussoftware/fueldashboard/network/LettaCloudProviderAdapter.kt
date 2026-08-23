@@ -119,7 +119,7 @@ class LettaCloudProviderAdapter(
         }
     }
 
-    private data class BillingData(
+    internal data class BillingData(
         val percentUsed: Double?,
         val used: Int?,
         val limit: Int?,
@@ -136,7 +136,7 @@ class LettaCloudProviderAdapter(
      * - Only lettaTier is parsed (basic/standard/premium have zero limits on Pro)
      * - Available = true even when exhausted (pay-as-you-go credits or BYOK may still serve)
      */
-    private fun buildReport(
+    internal fun buildReport(
         quotaResponse: LettaQuotaResponse,
         billing: BillingData?,
     ): ProviderReport {

@@ -124,7 +124,7 @@ class GroqProviderAdapter(
     // Report Building
     // -----------------------------------------------------------------------
 
-    private fun buildReport(limits: GroqRateLimitData?): ProviderReport {
+    internal fun buildReport(limits: GroqRateLimitData?): ProviderReport {
         if (limits == null) {
             return ProviderReport(
                 providerId = providerId,
@@ -236,7 +236,7 @@ class GroqProviderAdapter(
 // Internal data classes
 // -----------------------------------------------------------------------
 
-private data class GroqRateLimitData(
+internal data class GroqRateLimitData(
     val limitRequests: Int?,
     val remainingRequests: Int?,
     val resetRequests: String?,

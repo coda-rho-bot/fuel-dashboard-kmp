@@ -114,7 +114,7 @@ class DeepSeekProviderAdapter(
     // Report Building
     // -----------------------------------------------------------------------
 
-    private fun buildReport(balance: BalanceData?): ProviderReport {
+    internal fun buildReport(balance: BalanceData?): ProviderReport {
         if (balance == null) {
             return ProviderReport(
                 providerId = providerId,
@@ -176,7 +176,7 @@ class DeepSeekProviderAdapter(
 // Internal data classes
 // -----------------------------------------------------------------------
 
-private data class BalanceData(
+internal data class BalanceData(
     val isAvailable: Boolean,
     val currency: String,
     val totalBalance: Double,

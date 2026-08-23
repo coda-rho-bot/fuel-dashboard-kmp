@@ -185,7 +185,7 @@ class OpenAIProviderAdapter(
     // Report Building
     // -----------------------------------------------------------------------
 
-    private fun buildReport(spend: Double?, limits: RateLimitData?): ProviderReport {
+    internal fun buildReport(spend: Double?, limits: RateLimitData?): ProviderReport {
         val windows = mutableListOf<ReportWindow>()
 
         // Budget window (SPEND_BUDGET)
@@ -362,7 +362,7 @@ class OpenAIProviderAdapter(
 // Internal data classes
 // -----------------------------------------------------------------------
 
-private data class RateLimitData(
+internal data class RateLimitData(
     val limitRequests: Int?,
     val remainingRequests: Int?,
     val resetRequests: String?,

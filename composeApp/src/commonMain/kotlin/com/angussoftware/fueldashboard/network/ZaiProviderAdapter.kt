@@ -66,7 +66,7 @@ class ZaiProviderAdapter(
      * The z.ai API tracks usage as "percentage used" — we convert to "percentage remaining"
      * for the dashboard's fuel-bar UI.
      */
-    private fun mapToProviderReport(response: ZaiQuotaResponse): ProviderReport {
+    internal fun mapToProviderReport(response: ZaiQuotaResponse): ProviderReport {
         val limits = response.data.limits
         val tokensLimit = limits.firstOrNull { it.type == "TOKENS_LIMIT" }
         val sessionLimit = limits.firstOrNull { it.type == "SESSION_LIMIT" }

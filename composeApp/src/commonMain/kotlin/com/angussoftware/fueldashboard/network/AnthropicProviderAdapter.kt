@@ -203,7 +203,7 @@ class AnthropicProviderAdapter(
     // Report Building
     // -----------------------------------------------------------------------
 
-    private fun buildReport(spend: Double?, limits: AnthropicRateLimitData?): ProviderReport {
+    internal fun buildReport(spend: Double?, limits: AnthropicRateLimitData?): ProviderReport {
         val windows = mutableListOf<ReportWindow>()
 
         // Budget window (SPEND_BUDGET)
@@ -352,7 +352,7 @@ class AnthropicProviderAdapter(
 // Internal data classes
 // -----------------------------------------------------------------------
 
-private data class AnthropicRateLimitData(
+internal data class AnthropicRateLimitData(
     val limitRequests: Int?,
     val remainingRequests: Int?,
     val resetRequests: String?,
