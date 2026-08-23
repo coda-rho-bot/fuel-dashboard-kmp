@@ -66,7 +66,6 @@ actual fun DashboardTheme(
     println("[DashboardTheme] mode=${ThemeController.themeMode} dark=$darkTheme palette=$colorTheme")
     AngusTheme(
         darkTheme = darkTheme,
-        dynamicColor = false,
         colorTheme = colorTheme,
         content = content,
     )
