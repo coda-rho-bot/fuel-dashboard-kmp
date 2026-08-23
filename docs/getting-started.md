@@ -56,11 +56,14 @@ The `junie-auth` wrapper reports automatically for JSON-mode tasks. An MCP tool 
 
 ## Mobile app
 
-The Android app is the same dashboard (Fuel / Usage / Agents / Intel / Settings tabs).
+The Android app is the same dashboard (Fuel / Usage / Agents / Intel tabs; settings lives behind the app-bar gear icon).
 
-**Pairing via QR:** Desktop → Agents tab → QR icon → scan with the phone app. The QR carries the server URL **and API key** — the phone connects directly to your desktop's embedded server (LAN or via `fuel.angussoftware.dev`).
+**Pairing via QR (two scans):**
 
-**Settings sync:** the same QR round-trips your provider configuration, themes, and agent list between devices.
+1. **Settings QR** — Desktop → Settings → Providers → Sync. This QR carries the server URL **and API key**; scanning it connects the phone to your desktop's embedded server (LAN or tunnel).
+2. **Agents QR** — Desktop → Agents tab → Sync. This QR copies the agent list (full launcher configs) to the phone.
+
+Each QR is labeled with what it carries; the import confirmation shows exactly what will change. Text codes (copy/paste) carry the same scoped payloads, and the server `GET /sync` endpoint emits a full-fidelity code.
 
 ## Where things live
 

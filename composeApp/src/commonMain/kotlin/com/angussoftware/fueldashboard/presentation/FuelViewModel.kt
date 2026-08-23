@@ -697,9 +697,12 @@ class FuelViewModel {
     }
 
     /**
-     * Imports synced settings from a QR code scan.
+     * Imports synced settings from a QR code scan, text code, or server sync.
      *
-     * Replaces all current providers, agent configurations, and theme with the imported data.
+     * Scope-routed: full payloads replace providers, agents, theme, and all
+     * preferences; settings-scope payloads apply everything EXCEPT agent
+     * configs; agents-scope payloads apply ONLY agent configs. Legacy
+     * payloads without a scope field behave as full.
      */
     fun importSyncedSettings(syncData: com.angussoftware.fueldashboard.model.SettingsSyncData) {
         val isAgentsOnly = syncData.scope == com.angussoftware.fueldashboard.model.SettingsSyncData.SCOPE_AGENTS

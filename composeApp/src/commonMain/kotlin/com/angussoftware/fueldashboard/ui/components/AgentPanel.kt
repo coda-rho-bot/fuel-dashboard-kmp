@@ -282,43 +282,50 @@ private fun McpSetupGuide() {
         )
         GuideText("1. The dashboard MCP server runs at:")
         CodeExample("Desktop: http://localhost:8322/mcp\nLAN: http://[your-IP]:8322/mcp")
-        GuideText("2. Add the MCP server to Letta Code settings.json mcpServers:")
+        GuideText(
+            "2. Every request (including MCP) needs the Embedded Server API key — " +
+                "find it in Settings → Providers → Embedded Server API Key.",
+        )
+        GuideText("3. Add the MCP server to Letta Code settings.json mcpServers (with the auth header):")
         CodeExample(
             """
             {
               "mcpServers": {
                 "fuel-dashboard": {
-                  "url": "http://localhost:8322/mcp"
+                  "url": "http://localhost:8322/mcp",
+                  "headers": { "Authorization": "Bearer YOUR-API-KEY" }
                 }
               }
             }
             """.trimIndent(),
         )
-        GuideText("3. For Claude Code, add the same configuration to .mcp.json or settings:")
+        GuideText("4. For Claude Code, add the same configuration (url + headers) to .mcp.json or settings:")
         CodeExample(
             """
             {
               "mcpServers": {
                 "fuel-dashboard": {
-                  "url": "http://localhost:8322/mcp"
+                  "url": "http://localhost:8322/mcp",
+                  "headers": { "Authorization": "Bearer YOUR-API-KEY" }
                 }
               }
             }
             """.trimIndent(),
         )
-        GuideText("4. For other agents, any MCP-compatible client can connect to the same URL.")
+        GuideText("5. For other agents, any MCP-compatible client can connect to the same URL with the same header.")
         GuideText(
-            "5. When an agent connects, it calls the register_agent tool with its name and model, then appears in the dashboard.",
+            "6. When an agent connects, it calls the register_agent tool with its name and model, then appears in the dashboard.",
         )
         GuideText(
-            "Available MCP tools for agents:\n" +
+            "Core MCP tools for agents (partial list — 15 total):\n" +
                 "• register_agent (register name, model, framework)\n" +
                 "• update_model (report model changes)\n" +
                 "• update_status (report idle/thinking/error status)\n" +
                 "• add_provider (add an LLM provider to monitor)\n" +
                 "• remove_provider (remove a provider by ID or name)\n" +
                 "• list_providers (see configured providers)\n" +
-                "• add_orchestrator (connect to a remote dashboard)",
+                "• add_orchestrator (connect to a remote dashboard)\n" +
+                "• get_dashboard / get_usage / report_usage (read + report usage data)",
         )
         GuideText(
             "Available MCP resources for agents:\n" +
@@ -372,7 +379,9 @@ private fun MobileSyncGuide() {
         GuideText("4. The phone polls the desktop every 30 seconds for agent data.")
         GuideText("5. Agents appear in the Agents tab on mobile.")
         GuideText(
-            "Or: use the Sync button on your desktop's Agents tab to scan a QR code that includes the remote dashboard URL.",
+            "Or: scan the settings QR (Settings → Providers → Sync on the desktop) on your phone — " +
+                "it carries the dashboard URL and API key for pairing, then scan the agents QR " +
+                "(Agents tab → Sync) to copy the agent list.",
         )
     }
 }

@@ -171,15 +171,6 @@ data class SettingsSyncData(
         json.encodeToString(serializer(), this)
 
     /**
-     * Slimmed copy for QR transport: agent launcher fields (command paths,
-     * localhost socket URLs, env maps) are desktop-local and worthless on the
-     * receiving phone — mobile only renders agent id/name — but they dominate
-     * the payload and push the QR into marginally-scannable versions (21+).
-     *
-     * The copy-paste text code ([toCode]) keeps full fidelity, since bytes
-     * are free there.
-     */
-    /**
      * Settings-domain payload for the settings QR code: everything except
      * agent configs. Small enough to carry the preference fields un-slimmed
      * (agents were the bulk of the old combined payload).
@@ -213,6 +204,13 @@ data class SettingsSyncData(
         feedbackRepo = null,
     )
 
+    /**
+     * QR-transport slimming, scope-aware: agents QR keeps full launcher
+     * fidelity by design; settings QR has nothing to slim; legacy full-scope
+     * QRs strip agent launcher fields AND small prefs to respect the
+     * reliably-scannable bound (version ≤ 20). Text codes ([toCode]) are
+     * never slimmed.
+     */
     fun slimmedForQr(): SettingsSyncData = when (scope) {
         // Agents QR ships full launcher fidelity on purpose.
         SCOPE_AGENTS -> this

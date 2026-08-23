@@ -11,7 +11,7 @@ The dashboard supports 9 provider types simultaneously, each with its own adapte
 
 ### MCP Server
 
-The dashboard exposes an MCP server on port 8321, allowing external AI agents to manage providers, register themselves, and query fuel state.
+The dashboard exposes an MCP server on port 8322, allowing external AI agents to manage providers, register themselves, and query fuel state.
 
 ### ACP Agent Discovery
 
@@ -48,8 +48,8 @@ The app ships with 17 color themes.
 ## Tech Stack
 
 - **Compose Multiplatform** 1.9.0 — shared UI
-- **Ktor Client** 3.4.3 — HTTP polling
-- **Angus-Software-Theming** 0.10.4 — 17 community color schemes
+- **Ktor Client** 3.5.2 — HTTP polling
+- **Angus-Software-Theming** 0.13.0 — 17 community color schemes
 - **angus-gradle-tools** 0.3.0 — Gradle convention plugins, coverage tooling
 - **Kotlin** 2.3.21
 
@@ -64,7 +64,7 @@ Configure provider credentials and dashboard settings on first launch.
 ## Building
 
 ```bash
-# Desktop distribution (DEB/RPM/DMG)
+# Desktop distribution (DEB/RPM)
 ./gradlew :composeApp:packageDistributionForCurrentOS
 
 # Android APK
