@@ -43,4 +43,13 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Ensure polling is active when the UI is visible — idempotent if
+        // the notification service already started it. This covers the case
+        // where the user stopped the notification (which stops polling) but
+        // then opens the app: polling restarts with the UI.
+        FuelViewModel.shared.startPolling()
+    }
 }

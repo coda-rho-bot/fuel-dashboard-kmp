@@ -63,6 +63,12 @@ class FuelStatusService : Service() {
     }
 
     override fun onDestroy() {
+        // Stop the shared ViewModel's polling loop — scope.cancel() only
+        // cancels the service's state-collector coroutine, not the polling
+        // job which lives on the ViewModel's own scope. Without this, the
+        // 30s poll loop + HTTP adapters keep running invisibly after the
+        // notification is dismissed.
+        FuelViewModel.shared.stopPolling()
         scope.cancel()
         super.onDestroy()
     }
