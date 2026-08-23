@@ -13,7 +13,6 @@ import com.angussoftware.fueldashboard.model.AlertsResponse
 import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FuelResponse
-import com.angussoftware.fueldashboard.model.FuelSnapshot
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderAdapter
 import com.angussoftware.fueldashboard.model.ProviderConfig
@@ -37,8 +36,6 @@ import com.angussoftware.fueldashboard.usage.IngestionStatus
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.settings.saveStringSetting
-import com.angussoftware.fueldashboard.storage.BurnRateCalculator
-import com.angussoftware.fueldashboard.storage.FuelHistoryStore
 import com.angussoftware.fueldashboard.ui.components.AcpAgentDisplay
 import com.angussoftware.fueldashboard.util.epochMillis
 import kotlinx.coroutines.CoroutineScope
@@ -1020,8 +1017,12 @@ class FuelViewModel {
             onLogProviderSnapshots?.invoke(providerSnapshots)
         }
 
-        // Also log legacy single-provider snapshot (for backward compat with drain attribution)
-        val primaryReport = providerSnapshots.firstOrNull()
+        // Pick the primary provider deterministically: first configured
+        // provider in settings order (not HashMap iteration order).
+        val primaryProviderId = _state.value.settings.providers
+            .firstOrNull { it.isConfigured }?.id
+        val primaryReport = primaryProviderId?.let { providerSnapshots.find { s -> s.providerId == it } }
+            ?: providerSnapshots.firstOrNull()
         val tokensPct = primaryReport?.remainingPct
         val resetAt = primaryReport?.resetAt
         onLogFuelSnapshot?.invoke(
@@ -1067,22 +1068,14 @@ class FuelViewModel {
             )
         }
 
-        // Update burn rate history from provider reports
-        for ((providerId, report) in reports) {
-            if (report.type == ProviderType.WINDOW_CREDIT && report.remainingPct != null) {
-                val usedPct = 100 - report.remainingPct
-                val snapshot = FuelSnapshot(
-                    timestampMs = epochMillis(),
-                    tokensUsedPct = usedPct,
-                )
-                FuelHistoryStore.add(snapshot)
-            }
-        }
-
-        // Compute burn rate from history
-        val history = FuelHistoryStore.load()
-        val dataPoints = history.size
-        val burnRate = BurnRateCalculator.compute(history)
+        // Derive burn rate and data-point count from the primary provider's
+        // per-provider history (correctly keyed by providerId). The old path
+        // wrote ALL WINDOW_CREDIT providers into a single legacy FuelHistoryStore,
+        // mixing series from different providers → garbage OLS burn rate.
+        val primaryBurnRate = providerBurnRates.find { it.providerId == primaryProviderId }
+            ?: providerBurnRates.firstOrNull()
+        val dataPoints = primaryBurnRate?.history?.size ?: 0
+        val burnRate = primaryBurnRate?.burnRatePerHr
 
         // Connected-mode data parity (mobile): when a Remote Dashboard is
         // configured, fetch its /dashboard snapshot and populate the metered /
