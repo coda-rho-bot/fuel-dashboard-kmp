@@ -3,6 +3,9 @@ package com.angussoftware.fueldashboard.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,8 +43,6 @@ import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.usage.IngestionStatus
 import com.angussoftware.fueldashboard.usage.LettaSourceConfig
-import java.text.SimpleDateFormat
-import java.util.Date
 
 /**
  * Usage Sources settings section — configures pull-side ingestion connectors.
@@ -199,7 +200,9 @@ fun UsageSourcesSection(
                     modifier = Modifier.padding(end = 6.dp).height(16.dp).width(16.dp),
                 )
                 val lastPoll = status.lastPollAt?.let {
-                    SimpleDateFormat("HH:mm:ss").format(Date(it))
+                    val local = Instant.fromEpochMilliseconds(it)
+                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                    "%02d:%02d:%02d".format(local.hour, local.minute, local.second)
                 } ?: "never"
                 Text(
                     text = buildString {

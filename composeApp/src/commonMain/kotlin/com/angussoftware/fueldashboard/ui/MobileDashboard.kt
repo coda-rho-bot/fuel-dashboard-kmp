@@ -106,7 +106,11 @@ fun MobileDashboard(
                     state = state,
                     onGoToSettings = onShowSettings,
                     onRemoveAgent = { agentId ->
-                        viewModel.onRemoveAgent?.invoke(agentId)
+                        // The real removal path: persists the updated agent
+                        // settings and clears the display entry. (Invoking
+                        // onRemoveAgent directly was a no-op on platforms
+                        // where the registry callback is unset — e.g. Android.)
+                        viewModel.removeAgent(agentId)
                     },
                     onAddAgent = viewModel::addAgent,
                     syncData = SettingsSyncData.from(
