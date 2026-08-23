@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay
 import com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay
@@ -150,6 +151,9 @@ private fun MeteredUsageRow(
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = buildString {
@@ -211,7 +215,9 @@ private fun ConversationUsageRow(
                 text = usage.title ?: shortConvId(usage.conversationId),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = buildString {
@@ -261,6 +267,9 @@ private fun AgentModelUsageRow(
                 text = "${usage.agentName} · ${usage.model}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = buildString {

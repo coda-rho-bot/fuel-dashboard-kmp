@@ -48,4 +48,7 @@ internal object FuelSettingsKeys {
     // Section order persistence (Usage/Intel tabs) — JSON array of section keys
     const val SECTION_ORDER_USAGE = "sectionOrderUsage"
     const val SECTION_ORDER_INTEL = "sectionOrderIntel"
+    // Theme icon visibility in top app bar (when on, theme settings accessed via
+    // app bar icon; when off, theme settings appear in the settings panel)
+    const val SHOW_THEME_ICON = "showThemeIcon"
 }

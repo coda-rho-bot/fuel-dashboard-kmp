@@ -108,6 +108,8 @@ fun SettingsPanel(
     themeController: ThemeController,
     settings: MultiProviderSettings,
     viewModel: FuelViewModel,
+    showThemeIcon: Boolean = true,
+    onShowThemeIconChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state = viewModel.state.collectAsState().value
@@ -177,8 +179,14 @@ fun SettingsPanel(
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
-            // --- Theme settings (shared library panel) ---
-            ThemeSettingsPanel(themeController.settings)
+            // --- Theme settings ---
+            // When the theme icon is in the app bar (showThemeIcon=true), the full
+            // theme panel is hidden here — users access it via the palette icon.
+            // When the icon is hidden (showThemeIcon=false), the panel is shown inline.
+            ThemeIconToggle(showThemeIcon = showThemeIcon, onShowThemeIconChange = onShowThemeIconChange)
+            if (!showThemeIcon) {
+                ThemeSettingsPanel(themeController.settings)
+            }
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
@@ -194,6 +202,44 @@ fun SettingsPanel(
 
             DocumentationFooter()
         }
+    }
+}
+
+/**
+ * Toggle for whether the theme icon appears in the top app bar.
+ * When on, theme settings are accessed via the palette icon in the app bar.
+ * When off, theme settings appear inline in the settings panel.
+ */
+@Composable
+private fun ThemeIconToggle(
+    showThemeIcon: Boolean,
+    onShowThemeIconChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Show theme icon in top bar",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (showThemeIcon) {
+                    "Theme settings are accessed via the palette icon in the top bar"
+                } else {
+                    "Theme settings appear here instead of the top bar icon"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = showThemeIcon,
+            onCheckedChange = onShowThemeIconChange,
+        )
     }
 }
 

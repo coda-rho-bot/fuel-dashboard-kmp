@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.presentation.FuelIntelligence
 import kotlinx.datetime.Instant
@@ -61,6 +62,9 @@ fun WasteDetectionPanel(
                     text = pw.providerName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -91,6 +95,9 @@ private fun DailyWasteRow(day: FuelIntelligence.DailyWaste, windowMs: Long) {
             text = formatDate(day.dayStart),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Column(horizontalAlignment = Alignment.End) {
             Row(verticalAlignment = Alignment.CenterVertically) {

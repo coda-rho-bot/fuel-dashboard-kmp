@@ -66,7 +66,6 @@ import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
 import com.angussoftware.fueldashboard.ui.components.FuelStatusCard
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
-import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -77,7 +76,6 @@ private enum class MobileTab(val label: String) {
     USAGE("Usage"),
     AGENTS("Agents"),
     INTEL("Intel"),
-    SETTINGS("Settings"),
 }
 
 @Composable
@@ -85,6 +83,7 @@ fun MobileDashboard(
     state: DashboardState,
     themeController: ThemeController,
     viewModel: FuelViewModel,
+    onShowSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableIntStateOf(MobileTab.FUEL.ordinal) }
@@ -105,7 +104,7 @@ fun MobileDashboard(
             MobileTab.AGENTS -> {
                 AgentsTabContent(
                     state = state,
-                    onGoToSettings = { selectedTab = MobileTab.SETTINGS.ordinal },
+                    onGoToSettings = onShowSettings,
                     onRemoveAgent = { agentId ->
                         viewModel.onRemoveAgent?.invoke(agentId)
                     },
@@ -184,22 +183,6 @@ fun MobileDashboard(
                 }
             }
 
-            MobileTab.SETTINGS -> {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    SettingsPanel(
-                        themeController = themeController,
-                        settings = state.settings,
-                        viewModel = viewModel,
-                    )
-                }
-            }
         }
 
         // Bottom navigation bar
@@ -215,7 +198,6 @@ fun MobileDashboard(
                                 MobileTab.USAGE -> Icons.Default.DataUsage
                                 MobileTab.AGENTS -> Icons.Default.Person
                                 MobileTab.INTEL -> Icons.Default.History
-                                MobileTab.SETTINGS -> Icons.Default.Settings
                             },
                             contentDescription = tab.label,
                         )
@@ -374,7 +356,7 @@ private fun MobileEmptyState(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "No providers configured. Add a provider in Settings to start monitoring fuel levels. \u2192",
+                text = "No providers configured. Tap the settings icon above to add a provider and start monitoring fuel levels.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

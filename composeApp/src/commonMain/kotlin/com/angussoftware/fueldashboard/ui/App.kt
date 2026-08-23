@@ -20,14 +20,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.NavigationRail
@@ -64,6 +67,7 @@ import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.SectionOrder
 import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.settings.loadStringSetting
+import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
@@ -80,6 +84,7 @@ import com.angussoftware.fueldashboard.ui.components.ModelDrainRatesPanel
 import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
+import com.angussoftware.theming.compose.ui.settings.ThemeSettingsPanel
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -93,6 +98,20 @@ fun FuelDashboardApp(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // Settings overlay — when true, content area shows SettingsPanel instead of tabs
+    var showSettings by remember { mutableStateOf(false) }
+    // Theme icon visibility in app bar (persisted, default true)
+    var showThemeIcon by remember {
+        mutableStateOf(loadStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, "true").toBoolean())
+    }
+    // Theme popup anchored to the palette icon
+    var showThemePopup by remember { mutableStateOf(false) }
+
+    fun toggleThemeIcon(value: Boolean) {
+        showThemeIcon = value
+        saveStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, value.toString())
+    }
+
     LaunchedEffect(Unit) {
         viewModel.startPolling()
     }
@@ -105,7 +124,7 @@ fun FuelDashboardApp(
                 TopAppBar(
                     title = {
                         Text(
-                            "Fuel Dashboard",
+                            if (showSettings) "Settings" else "Fuel Dashboard",
                             style = if (isCompact) {
                                 MaterialTheme.typography.titleSmall
                             } else {
@@ -118,6 +137,25 @@ fun FuelDashboardApp(
                         IconButton(onClick = { viewModel.refreshNow() }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                         }
+                        // Theme icon — quick access to theming panel
+                        if (showThemeIcon) {
+                            IconButton(onClick = { showThemePopup = true }) {
+                                Icon(Icons.Default.Palette, contentDescription = "Theme")
+                            }
+                            DropdownMenu(
+                                expanded = showThemePopup,
+                                onDismissRequest = { showThemePopup = false },
+                            ) {
+                                ThemeSettingsPanel(themeController.settings)
+                            }
+                        }
+                        // Settings / Close toggle
+                        IconButton(onClick = { showSettings = !showSettings }) {
+                            Icon(
+                                if (showSettings) Icons.Default.Close else Icons.Default.Settings,
+                                contentDescription = if (showSettings) "Close settings" else "Settings",
+                            )
+                        }
                     },
                 )
             },
@@ -127,11 +165,28 @@ fun FuelDashboardApp(
                 .fillMaxSize()
                 .padding(top = padding.calculateTopPadding())
 
-            if (isCompact) {
+            if (showSettings) {
+                // Settings overlay — full content area, scrollable
+                Column(
+                    modifier = contentModifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    SettingsPanel(
+                        themeController = themeController,
+                        settings = state.settings,
+                        viewModel = viewModel,
+                        showThemeIcon = showThemeIcon,
+                        onShowThemeIconChange = ::toggleThemeIcon,
+                    )
+                }
+            } else if (isCompact) {
                 MobileDashboard(
                     state = state,
                     themeController = themeController,
                     viewModel = viewModel,
+                    onShowSettings = { showSettings = true },
                     modifier = contentModifier,
                 )
             } else {
@@ -139,6 +194,7 @@ fun FuelDashboardApp(
                     state = state,
                     themeController = themeController,
                     viewModel = viewModel,
+                    onShowSettings = { showSettings = true },
                     modifier = contentModifier,
                 )
             }
@@ -155,7 +211,6 @@ private enum class DesktopTab(val label: String) {
     USAGE("Usage"),
     INTEL("Intel"),
     AGENTS("Agents"),
-    SETTINGS("Settings"),
 }
 
 @Composable
@@ -163,6 +218,7 @@ private fun DesktopLayout(
     state: DashboardState,
     themeController: ThemeController,
     viewModel: FuelViewModel,
+    onShowSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableStateOf(DesktopTab.OVERVIEW) }
@@ -186,7 +242,6 @@ private fun DesktopLayout(
                                 DesktopTab.USAGE -> Icons.Default.DataUsage
                                 DesktopTab.INTEL -> Icons.Default.History
                                 DesktopTab.AGENTS -> Icons.Default.Person
-                                DesktopTab.SETTINGS -> Icons.Default.Settings
                             },
                             contentDescription = tab.label,
                         )
@@ -323,23 +378,6 @@ private fun DesktopLayout(
                         usageByAgentModel24h = state.meteredByAgentModel24h,
                         usageByConversation24h = state.meteredByConversation24h,
                         onMoveAgent = { agentId, offset -> viewModel.moveAgent(agentId, offset) },
-                    )
-                }
-            }
-
-            DesktopTab.SETTINGS -> {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    SettingsPanel(
-                        themeController = themeController,
-                        settings = state.settings,
-                        viewModel = viewModel,
                     )
                 }
             }
@@ -487,7 +525,8 @@ internal fun FuelColumnContent(
                     )
                 }
 
-                // Usage / Intelligence / Agents / Settings live in their own tabs.
+                // Usage / Intelligence / Agents live in their own tabs.
+                // Settings is accessed via the app bar settings icon.
             }
         }
     }
@@ -511,7 +550,7 @@ private fun EmptyState(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "No providers configured. Add a provider in Settings to start monitoring fuel levels. \u2192",
+                text = "No providers configured. Tap the settings icon above to add a provider and start monitoring fuel levels.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
