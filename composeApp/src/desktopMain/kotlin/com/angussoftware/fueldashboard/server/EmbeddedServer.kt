@@ -295,11 +295,13 @@ class EmbeddedServer(
                 val req = call.receive<UpdateAgentStateRequest>()
                 val existing = registeredAgents[id]
                     ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("agent not found: $id"))
-                registeredAgents[id] = existing.copy(
+                val updated = existing.copy(
                     model = req.model ?: existing.model,
                     status = req.status ?: existing.status,
                     capabilities = req.capabilities ?: existing.capabilities,
                 )
+                registeredAgents[id] = updated
+                agentRegistry?.upsert(id, updated.name, updated.model, updated.framework, updated.command, updated.status)
                 call.respond(StateUpdateResponse("updated"))
             }
 

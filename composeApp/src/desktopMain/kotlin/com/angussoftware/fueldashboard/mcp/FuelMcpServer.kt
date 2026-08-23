@@ -234,7 +234,9 @@ internal class FuelMcpServer(
             } else {
                 val existing = registeredAgents[agentId]
                 if (existing != null) {
-                    registeredAgents[agentId] = existing.copy(model = model)
+                    val updated = existing.copy(model = model)
+                    registeredAgents[agentId] = updated
+                    agentRegistry?.upsert(agentId, updated.name, updated.model, updated.framework, updated.command, updated.status)
                     println("[MCP] Agent $agentId model updated to: $model")
                     CallToolResult(content = listOf(TextContent(text = """{"status":"updated","agentId":"$agentId","model":"$model"}""")))
                 } else {
@@ -282,7 +284,9 @@ internal class FuelMcpServer(
             } else {
                 val existing = registeredAgents[agentId]
                 if (existing != null) {
-                    registeredAgents[agentId] = existing.copy(status = status)
+                    val updated = existing.copy(status = status)
+                    registeredAgents[agentId] = updated
+                    agentRegistry?.upsert(agentId, updated.name, updated.model, updated.framework, updated.command, updated.status)
                     println("[MCP] Agent $agentId status updated to: $status")
                     CallToolResult(content = listOf(TextContent(text = """{"status":"updated","agentId":"$agentId","agentStatus":"$status"}""")))
                 } else {
