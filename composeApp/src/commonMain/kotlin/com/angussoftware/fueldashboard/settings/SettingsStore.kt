@@ -51,4 +51,7 @@ internal object FuelSettingsKeys {
     // Theme icon visibility in top app bar (when on, theme settings accessed via
     // app bar icon; when off, theme settings appear in the settings panel)
     const val SHOW_THEME_ICON = "showThemeIcon"
+    /** Optional external/tunnel URL for QR sync. If set and reachable, used
+     *  instead of the LAN URL so mobile can pair over the internet. */
+    const val TUNNEL_URL = "tunnelUrl"
 }

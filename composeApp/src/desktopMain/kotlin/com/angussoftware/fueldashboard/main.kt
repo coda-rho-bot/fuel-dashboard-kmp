@@ -111,20 +111,36 @@ fun main() = application {
     }
 
     // ── Set server URL for QR sync ────────────────────────────────────────
-    val serverUrl = remember {
-        try {
-            val conn = java.net.URL("https://fuel.angussoftware.dev").openConnection() as java.net.HttpURLConnection
-            conn.connectTimeout = 2000
-            conn.requestMethod = "GET"
-            conn.responseCode // triggers connection
-            conn.disconnect()
-            "https://fuel.angussoftware.dev"
-        } catch (e: Exception) {
-            com.angussoftware.fueldashboard.server.getLanUrl()
+    // Default to the LAN URL immediately (instant — just enumerates network
+    // interfaces). If the user has configured a tunnel URL in settings, probe
+    // it in a background coroutine and switch to it if reachable. The probe
+    // never blocks the UI thread.
+    val lanUrl = com.angussoftware.fueldashboard.server.getLanUrl()
+    val tunnelUrl = com.angussoftware.fueldashboard.settings.loadStringSetting(
+        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.TUNNEL_URL,
+        "",
+    )
+    viewModel.setServerUrl(lanUrl)
+    embeddedServer.serverUrl = lanUrl
+
+    if (tunnelUrl.isNotBlank()) {
+        serverScope.launch {
+            val reachable = try {
+                val conn = java.net.URL(tunnelUrl).openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 2000
+                conn.requestMethod = "GET"
+                conn.responseCode
+                conn.disconnect()
+                true
+            } catch (e: Exception) {
+                false
+            }
+            if (reachable) {
+                viewModel.setServerUrl(tunnelUrl)
+                embeddedServer.serverUrl = tunnelUrl
+            }
         }
     }
-    viewModel.setServerUrl(serverUrl)
-    embeddedServer.serverUrl = serverUrl
 
     // ── Poll MCP/HTTP-registered agents → push to ViewModel ───────────────
     // Agents registered via MCP (POST /agents/register) or HTTP are stored
