@@ -35,10 +35,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -73,7 +70,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import com.angussoftware.fueldashboard.util.formatRoot
 
-private enum class MobileTab(val label: String) {
+internal enum class MobileTab(val label: String) {
     FUEL("Fuel"),
     USAGE("Usage"),
     AGENTS("Agents"),
@@ -87,8 +84,9 @@ fun MobileDashboard(
     viewModel: FuelViewModel,
     onShowSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
+    selectedTab: Int = MobileTab.FUEL.ordinal,
+    onTabChange: (Int) -> Unit = {},
 ) {
-    var selectedTab by remember { mutableIntStateOf(MobileTab.FUEL.ordinal) }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Content area — fills space above the nav bar
@@ -208,7 +206,7 @@ fun MobileDashboard(
             MobileTab.entries.forEach { tab ->
                 NavigationBarItem(
                     selected = selectedTab == tab.ordinal,
-                    onClick = { selectedTab = tab.ordinal },
+                    onClick = { onTabChange(tab.ordinal) },
                     icon = {
                         Icon(
                             imageVector = when (tab) {

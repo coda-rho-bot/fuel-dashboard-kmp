@@ -113,7 +113,13 @@ fun QrSyncDialog(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Security warning
+                // Security warning — branched by scope
+                val warningText = when (syncData.scope) {
+                    SettingsSyncData.SCOPE_AGENTS ->
+                        "This QR code contains agent launcher commands and arguments. Only scan on devices you trust."
+                    else ->
+                        "This QR code contains your API keys. Only scan on devices you trust."
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -130,7 +136,7 @@ fun QrSyncDialog(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "This QR code contains your API keys. Only scan on devices you trust.",
+                        text = warningText,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )

@@ -15,6 +15,7 @@ import com.angussoftware.fueldashboard.model.FuelStatusModel
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.loadStringSetting
+import com.angussoftware.fueldashboard.settings.saveStringSetting
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +42,7 @@ class FuelStatusService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            saveStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_ENABLED, "false")
             stopSelf()
             return START_NOT_STICKY
         }

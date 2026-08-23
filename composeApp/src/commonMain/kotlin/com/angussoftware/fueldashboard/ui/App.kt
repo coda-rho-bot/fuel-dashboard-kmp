@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,7 +67,6 @@ import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.SectionOrder
 import com.angussoftware.fueldashboard.settings.ThemeController
-import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.settings.saveStringSetting
 import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
@@ -100,19 +100,17 @@ fun FuelDashboardApp(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // Tab state — hoisted above the settings overlay so it survives the toggle.
+    // Without hoisting, selectedTab lives in remember{} inside DesktopLayout/MobileDashboard,
+    // which resets to default when the composable leaves and re-enters composition
+    // during the showSettings toggle.
+    var desktopTab by remember { mutableStateOf(DesktopTab.OVERVIEW) }
+    var mobileTab by remember { mutableIntStateOf(MobileTab.FUEL.ordinal) }
+
     // Settings overlay — when true, content area shows SettingsPanel instead of tabs
     var showSettings by remember { mutableStateOf(false) }
-    // Theme icon visibility in app bar (persisted, default true)
-    var showThemeIcon by remember {
-        mutableStateOf(loadStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, "true").toBoolean())
-    }
     // Theme popup anchored to the palette icon
     var showThemePopup by remember { mutableStateOf(false) }
-
-    fun toggleThemeIcon(value: Boolean) {
-        showThemeIcon = value
-        saveStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, value.toString())
-    }
 
     LaunchedEffect(Unit) {
         viewModel.startPolling()
@@ -140,7 +138,7 @@ fun FuelDashboardApp(
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                         }
                         // Theme icon — quick access to theming panel
-                        if (showThemeIcon) {
+                        if (state.showThemeIcon) {
                             IconButton(onClick = { showThemePopup = true }) {
                                 Icon(Icons.Default.Palette, contentDescription = "Theme")
                             }
@@ -179,8 +177,8 @@ fun FuelDashboardApp(
                         themeController = themeController,
                         settings = state.settings,
                         viewModel = viewModel,
-                        showThemeIcon = showThemeIcon,
-                        onShowThemeIconChange = ::toggleThemeIcon,
+                        showThemeIcon = state.showThemeIcon,
+                        onShowThemeIconChange = { value -> viewModel.setShowThemeIcon(value) },
                     )
                 }
             } else if (isCompact) {
@@ -190,6 +188,8 @@ fun FuelDashboardApp(
                     viewModel = viewModel,
                     onShowSettings = { showSettings = true },
                     modifier = contentModifier,
+                    selectedTab = mobileTab,
+                    onTabChange = { mobileTab = it },
                 )
             } else {
                 DesktopLayout(
@@ -198,6 +198,8 @@ fun FuelDashboardApp(
                     viewModel = viewModel,
                     onShowSettings = { showSettings = true },
                     modifier = contentModifier,
+                    selectedTab = desktopTab,
+                    onTabChange = { desktopTab = it },
                 )
             }
         }
@@ -208,7 +210,7 @@ fun FuelDashboardApp(
 // Desktop Layout — NavigationRail with unified tabs (mirrors mobile)
 // ---------------------------------------------------------------------------
 
-private enum class DesktopTab(val label: String) {
+internal enum class DesktopTab(val label: String) {
     OVERVIEW("Overview"),
     USAGE("Usage"),
     INTEL("Intel"),
@@ -222,8 +224,9 @@ private fun DesktopLayout(
     viewModel: FuelViewModel,
     onShowSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
+    selectedTab: DesktopTab = DesktopTab.OVERVIEW,
+    onTabChange: (DesktopTab) -> Unit = {},
 ) {
-    var selectedTab by remember { mutableStateOf(DesktopTab.OVERVIEW) }
 
     Row(modifier = modifier.fillMaxSize()) {
         NavigationRail(
@@ -236,7 +239,7 @@ private fun DesktopLayout(
             DesktopTab.entries.forEach { tab ->
                 NavigationRailItem(
                     selected = selectedTab == tab,
-                    onClick = { selectedTab = tab },
+                    onClick = { onTabChange(tab) },
                     icon = {
                         Icon(
                             imageVector = when (tab) {

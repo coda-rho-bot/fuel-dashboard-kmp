@@ -227,6 +227,7 @@ data class DashboardState(
     val junieLicense: String? = null,
     val junieLastChecked: Long? = null,
     val showHelp: Boolean = true,
+    val showThemeIcon: Boolean = true,
     val checkingProviderIds: Set<String> = emptySet(),
     val fuelProjection: FuelProjection? = null,
     val modelDrainRates: List<ModelDrainRateDisplay> = emptyList(),
@@ -340,6 +341,7 @@ class FuelViewModel {
         DashboardState(
             isLoading = false,
             showHelp = loadStringSetting(FuelSettingsKeys.SHOW_HELP, "true").toBoolean(),
+            showThemeIcon = loadStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, "true").toBoolean(),
         ),
     )
     val state: StateFlow<DashboardState> = _state.asStateFlow()
@@ -533,6 +535,11 @@ class FuelViewModel {
     fun setShowHelp(showHelp: Boolean) {
         saveStringSetting(FuelSettingsKeys.SHOW_HELP, showHelp.toString())
         _state.value = _state.value.copy(showHelp = showHelp)
+    }
+
+    fun setShowThemeIcon(showThemeIcon: Boolean) {
+        saveStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, showThemeIcon.toString())
+        _state.value = _state.value.copy(showThemeIcon = showThemeIcon)
     }
 
     /** Runs Junie's chargeable balance command only after an explicit desktop user action. */
@@ -825,9 +832,7 @@ class FuelViewModel {
 
             // Preferences — null keeps the receiver's own
             syncData.showHelp?.let { help -> setShowHelp(help) }
-            syncData.showThemeIcon?.let { showIcon ->
-                saveStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, showIcon.toString())
-            }
+            syncData.showThemeIcon?.let { showIcon -> setShowThemeIcon(showIcon) }
 
             // Custom feedback endpoints
             syncData.feedbackUrl?.let { url -> saveStringSetting(FuelSettingsKeys.FEEDBACK_URL, url) }

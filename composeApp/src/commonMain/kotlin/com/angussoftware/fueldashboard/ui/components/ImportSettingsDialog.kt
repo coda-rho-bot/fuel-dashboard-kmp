@@ -57,6 +57,7 @@ fun ImportEntryDialog(
     onScanQr: () -> Unit,
     onImportCode: (SettingsSyncData) -> Unit,
     onDismiss: () -> Unit,
+    title: String = "Import Settings",
 ) {
     var codeText by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -70,7 +71,7 @@ fun ImportEntryDialog(
                 tint = MaterialTheme.colorScheme.primary,
             )
         },
-        title = { Text("Import Settings") },
+        title = { Text(title) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),

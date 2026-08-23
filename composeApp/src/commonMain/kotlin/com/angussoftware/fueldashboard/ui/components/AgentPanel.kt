@@ -252,6 +252,7 @@ fun AgentPanel(
             onScanQr = { qrScanner.launch() },
             onImportCode = { parsed -> scannedSyncData = parsed },
             onDismiss = { showImportEntryDialog = false },
+            title = "Import Agents",
         )
     }
 
@@ -380,8 +381,10 @@ private fun MobileSyncGuide() {
         GuideText("5. Agents appear in the Agents tab on mobile.")
         GuideText(
             "Or: scan the settings QR (Settings → Providers → Sync on the desktop) on your phone — " +
-                "it carries the dashboard URL and API key for pairing, then scan the agents QR " +
-                "(Agents tab → Sync) to copy the agent list.",
+                "it carries the dashboard URL and API key for pairing. Then scan the agents QR " +
+                "(Agents tab → Sync) to copy the agent list. " +
+                "The agents QR does not include the dashboard URL — " +
+                "scan the settings QR first to establish the connection.",
         )
     }
 }
