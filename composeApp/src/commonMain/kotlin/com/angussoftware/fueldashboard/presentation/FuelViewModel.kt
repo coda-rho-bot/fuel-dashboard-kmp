@@ -783,6 +783,27 @@ class FuelViewModel {
             themeController.updateDarkColorTheme(dark)
         }
 
+        // Usage ingestion sources (Letta server config) — takes effect on the
+        // next ingestion poll (manager re-reads the store each cycle).
+        syncData.usageSources?.let { sources ->
+            com.angussoftware.fueldashboard.settings.UsageSourcesStore.save(sources)
+        }
+
+        // Intelligence drop threshold
+        syncData.eventDropThresholdPct?.let { threshold ->
+            saveStringSetting(FuelSettingsKeys.EVENT_DROP_THRESHOLD, threshold.toString())
+        }
+
+        // Preferences — null keeps the receiver's own
+        syncData.showHelp?.let { help -> setShowHelp(help) }
+        syncData.showThemeIcon?.let { showIcon ->
+            saveStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, showIcon.toString())
+        }
+
+        // Custom feedback endpoints
+        syncData.feedbackUrl?.let { url -> saveStringSetting(FuelSettingsKeys.FEEDBACK_URL, url) }
+        syncData.feedbackRepo?.let { repo -> saveStringSetting(FuelSettingsKeys.FEEDBACK_REPO, repo) }
+
         // Remote Dashboard provider is already added above in the providers list
     }
 

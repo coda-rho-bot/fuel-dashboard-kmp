@@ -1,6 +1,10 @@
 package com.angussoftware.fueldashboard.model
 
+import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
 import com.angussoftware.fueldashboard.settings.ThemeController
+import com.angussoftware.fueldashboard.settings.UsageSourcesStore
+import com.angussoftware.fueldashboard.settings.loadStringSetting
+import com.angussoftware.fueldashboard.usage.UsageSourcesSettings
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.Serializable
@@ -29,9 +33,19 @@ data class SettingsSyncData(
     // Section ordering (Usage/Intel tabs). Empty = receiver keeps its own.
     val usageSectionOrder: List<String> = emptyList(),
     val intelSectionOrder: List<String> = emptyList(),
+    // Usage ingestion sources (Letta server config). Null = unset/default —
+    // dropped from the QR payload by the compact encoder.
+    val usageSources: com.angussoftware.fueldashboard.usage.UsageSourcesSettings? = null,
+    // Preferences — null = receiver keeps its own.
+    val eventDropThresholdPct: Double? = null,
+    val showHelp: Boolean? = null,
+    val showThemeIcon: Boolean? = null,
+    // Custom feedback endpoints — null when at baked defaults.
+    val feedbackUrl: String? = null,
+    val feedbackRepo: String? = null,
 ) {
     companion object {
-        const val CURRENT_VERSION = 4
+        const val CURRENT_VERSION = 5
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -72,6 +86,13 @@ data class SettingsSyncData(
             junieLastChecked = junieLastChecked,
             usageSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage(),
             intelSectionOrder = com.angussoftware.fueldashboard.settings.SectionOrder.loadIntel(),
+            usageSources = UsageSourcesStore.load()
+                .takeIf { it != UsageSourcesSettings() },
+            eventDropThresholdPct = loadStringSetting(FuelSettingsKeys.EVENT_DROP_THRESHOLD, "").toDoubleOrNull(),
+            showHelp = loadStringSetting(FuelSettingsKeys.SHOW_HELP, "").ifBlank { null }?.toBoolean(),
+            showThemeIcon = loadStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, "").ifBlank { null }?.toBoolean(),
+            feedbackUrl = loadStringSetting(FuelSettingsKeys.FEEDBACK_URL, "").takeIf { it.isNotBlank() },
+            feedbackRepo = loadStringSetting(FuelSettingsKeys.FEEDBACK_REPO, "").takeIf { it.isNotBlank() },
         )
 
         /**
@@ -136,6 +157,14 @@ data class SettingsSyncData(
                 config.copy(command = "", args = "", env = emptyMap())
             },
         ),
+        // Small preference fields stay out of the QR to respect the reliably-
+        // scannable version bound (≤20) — the receiver keeps its own values.
+        // The text code ([toCode]) carries them at full fidelity.
+        eventDropThresholdPct = null,
+        showHelp = null,
+        showThemeIcon = null,
+        feedbackUrl = null,
+        feedbackRepo = null,
     )
 
     /**

@@ -76,6 +76,7 @@ fun main() = application {
             usageRepository = usageRepo,
             dashboardStateProvider = { viewModel.state.value },
             onProvidersChanged = { viewModel.reloadSettings() },
+            onImportSettings = { syncData -> viewModel.importSyncedSettings(syncData) },
         )
     }
 

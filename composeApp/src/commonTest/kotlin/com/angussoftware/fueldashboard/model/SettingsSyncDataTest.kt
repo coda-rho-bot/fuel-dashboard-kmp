@@ -48,6 +48,54 @@ class SettingsSyncDataTest {
     }
 
     @Test
+    fun syncRoundTripPreservesUsageSourcesAndPreferences() {
+        val syncData = SettingsSyncData(
+            providers = emptyList(),
+            themeMode = "SYSTEM",
+            lightColorTheme = "Default",
+            darkColorTheme = "Default",
+            usageSources = com.angussoftware.fueldashboard.usage.UsageSourcesSettings(
+                letta = com.angussoftware.fueldashboard.usage.LettaSourceConfig(
+                    enabled = true,
+                    baseUrl = "https://api.letta.com",
+                    apiKey = "sk-live-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
+                ),
+            ),
+            eventDropThresholdPct = 2.5,
+            showHelp = false,
+            showThemeIcon = false,
+            feedbackUrl = "https://git.example.com",
+            feedbackRepo = "acme/custom-repo",
+        )
+
+        val restored = SettingsSyncData.fromJson(syncData.toJson())
+
+        assertEquals(true, restored?.usageSources?.letta?.enabled)
+        assertEquals("sk-live-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz", restored?.usageSources?.letta?.apiKey)
+        assertEquals(2.5, restored?.eventDropThresholdPct)
+        assertEquals(false, restored?.showHelp)
+        assertEquals(false, restored?.showThemeIcon)
+        assertEquals("https://git.example.com", restored?.feedbackUrl)
+        assertEquals("acme/custom-repo", restored?.feedbackRepo)
+    }
+
+    @Test
+    fun unsetNewFieldsDecodeAsNullFromLegacyV4Payload() {
+        // A v4-era payload has none of the v5 fields — they must decode null,
+        // leaving the receiver's own values untouched.
+        val restored = SettingsSyncData.fromJson(
+            """{"version":4,"providers":[],"themeMode":"SYSTEM","lightColorTheme":"Default","darkColorTheme":"Default"}""",
+        )
+
+        assertEquals(null, restored?.usageSources)
+        assertEquals(null, restored?.eventDropThresholdPct)
+        assertEquals(null, restored?.showHelp)
+        assertEquals(null, restored?.showThemeIcon)
+        assertEquals(null, restored?.feedbackUrl)
+        assertEquals(null, restored?.feedbackRepo)
+    }
+
+    @Test
     fun providerOrderRoundTripsThroughSync() {
         // Provider list order IS the user's display order — it must survive
         // serialization unchanged (no sorting on either side).
@@ -171,6 +219,19 @@ class SettingsSyncDataTest {
             agentSettings = AgentSettings(agents = agents),
             usageSectionOrder = listOf("metered", "drain", "waste"),
             intelSectionOrder = listOf("events"),
+            // v5 additions at realistic custom values — the QR must still fit.
+            usageSources = com.angussoftware.fueldashboard.usage.UsageSourcesSettings(
+                letta = com.angussoftware.fueldashboard.usage.LettaSourceConfig(
+                    enabled = true,
+                    baseUrl = "https://api.letta.com",
+                    apiKey = "sk-live-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
+                ),
+            ),
+            eventDropThresholdPct = 2.5,
+            showHelp = false,
+            showThemeIcon = true,
+            feedbackUrl = "https://git.example.com",
+            feedbackRepo = "acme/custom-repo",
         )
 
         val qrData = syncData.toQrData()

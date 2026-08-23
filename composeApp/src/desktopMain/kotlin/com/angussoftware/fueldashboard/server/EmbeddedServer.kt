@@ -68,6 +68,7 @@ class EmbeddedServer(
     private val port: Int = DEFAULT_PORT,
     private val host: String = DEFAULT_HOST,
     private val onProvidersChanged: () -> Unit = {},
+    private val onImportSettings: ((SettingsSyncData) -> Unit)? = null,
     private val dashboardStateProvider: () -> com.angussoftware.fueldashboard.presentation.DashboardState? = { null },
 ) {
     companion object {
@@ -352,28 +353,36 @@ class EmbeddedServer(
                     return@post
                 }
 
-                // Apply providers + add Remote Dashboard
-                val providers = syncData.providers.toMutableList()
-                syncData.serverUrl?.let { url ->
-                    providers.removeAll { it.kind == com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API }
-                    providers.add(
-                        com.angussoftware.fueldashboard.model.ProviderConfig(
-                            id = "synced-orchestrator",
-                            kind = com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API,
-                            apiKey = syncData.serverApiKey.orEmpty(),
-                            displayName = "Remote Dashboard",
-                            serverUrl = url,
-                        ),
+                // Full import path when wired (providers, agents, theme, junie,
+                // section orders, usage sources, preferences) — one code path
+                // with the app's importSyncedSettings. Falls back to the legacy
+                // partial apply when no callback is provided.
+                if (onImportSettings != null) {
+                    onImportSettings.invoke(syncData)
+                } else {
+                    // Apply providers + add Remote Dashboard
+                    val providers = syncData.providers.toMutableList()
+                    syncData.serverUrl?.let { url ->
+                        providers.removeAll { it.kind == com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API }
+                        providers.add(
+                            com.angussoftware.fueldashboard.model.ProviderConfig(
+                                id = "synced-orchestrator",
+                                kind = com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API,
+                                apiKey = syncData.serverApiKey.orEmpty(),
+                                displayName = "Remote Dashboard",
+                                serverUrl = url,
+                            ),
+                        )
+                    }
+                    FuelSettingsStore.saveMultiProvider(
+                        com.angussoftware.fueldashboard.model.MultiProviderSettings(providers = providers),
                     )
+                    AgentSettingsStore.save(syncData.agentSettings)
+                    syncData.serverApiKey?.takeIf { it.isNotBlank() }?.let { key ->
+                        ServerApiKeyStore.save(key)
+                    }
+                    onProvidersChanged()
                 }
-                FuelSettingsStore.saveMultiProvider(
-                    com.angussoftware.fueldashboard.model.MultiProviderSettings(providers = providers),
-                )
-                AgentSettingsStore.save(syncData.agentSettings)
-                syncData.serverApiKey?.takeIf { it.isNotBlank() }?.let { key ->
-                    ServerApiKeyStore.save(key)
-                }
-                onProvidersChanged()
 
                 call.respondText(
                     text = kotlinx.serialization.json.buildJsonObject {
