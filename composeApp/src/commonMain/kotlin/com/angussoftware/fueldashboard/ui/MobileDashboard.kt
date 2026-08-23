@@ -55,6 +55,7 @@ import com.angussoftware.fueldashboard.settings.ThemeController
 import com.angussoftware.fueldashboard.ui.components.AgentPanel
 import com.angussoftware.fueldashboard.ui.components.AlertsPanel
 import com.angussoftware.fueldashboard.ui.components.BudgetBar
+import com.angussoftware.fueldashboard.ui.components.EmptyTabState
 import com.angussoftware.fueldashboard.ui.components.MeteredUsagePanel
 import com.angussoftware.fueldashboard.ui.components.FuelEventHistoryPanel
 import com.angussoftware.fueldashboard.ui.components.WasteDetectionPanel
@@ -129,60 +130,72 @@ fun MobileDashboard(
             }
 
             MobileTab.USAGE -> {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    // Sections in the user's synced order (reordered on desktop;
-                    // order syncs across devices via SettingsSyncData)
-                    for (key in remember { com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage() }) {
-                        when (key) {
-                            "metered" -> MeteredUsagePanel(
-                                bySource24h = state.meteredBySource24h,
-                                byModel24h = state.meteredByModel24h,
-                                bySource7d = state.meteredBySource7d,
-                                byModel7d = state.meteredByModel7d,
-                                byConversation24h = state.meteredByConversation24h,
-                                byConversation7d = state.meteredByConversation7d,
-                                byAgentModel24h = state.meteredByAgentModel24h,
-                                byAgentModel7d = state.meteredByAgentModel7d,
-                            )
-                            "drain" -> if (state.modelDrainRates.isNotEmpty()) {
-                                ModelDrainRatesPanel(rates = state.modelDrainRates)
+                val hasUsageData = state.meteredBySource24h.isNotEmpty() ||
+                    state.meteredBySource7d.isNotEmpty() ||
+                    state.meteredByConversation24h.isNotEmpty() ||
+                    state.meteredByConversation7d.isNotEmpty() ||
+                    state.meteredByAgentModel24h.isNotEmpty() ||
+                    state.meteredByAgentModel7d.isNotEmpty() ||
+                    state.modelDrainRates.isNotEmpty() ||
+                    state.wasteByProvider.isNotEmpty()
+                if (!hasUsageData) {
+                    EmptyTabState(
+                        title = "Collecting data…",
+                        message = "Usage metrics appear here once the dashboard has polled your providers a few times.",
+                        hint = "Add providers in Settings and wait a few minutes for the first poll cycle.",
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        // Sections in the user's synced order (reordered on desktop;
+                        // order syncs across devices via SettingsSyncData)
+                        for (key in remember { com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage() }) {
+                            when (key) {
+                                "metered" -> MeteredUsagePanel(
+                                    bySource24h = state.meteredBySource24h,
+                                    byModel24h = state.meteredByModel24h,
+                                    bySource7d = state.meteredBySource7d,
+                                    byModel7d = state.meteredByModel7d,
+                                    byConversation24h = state.meteredByConversation24h,
+                                    byConversation7d = state.meteredByConversation7d,
+                                    byAgentModel24h = state.meteredByAgentModel24h,
+                                    byAgentModel7d = state.meteredByAgentModel7d,
+                                )
+                                "drain" -> if (state.modelDrainRates.isNotEmpty()) {
+                                    ModelDrainRatesPanel(rates = state.modelDrainRates)
+                                }
+                                "waste" -> WasteDetectionPanel(providers = state.wasteByProvider)
                             }
-                            "waste" -> WasteDetectionPanel(providers = state.wasteByProvider)
                         }
                     }
                 }
             }
 
             MobileTab.INTEL -> {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    // Fuel event timeline (drops, switches, recommendations)
-                    FuelEventHistoryPanel(events = state.fuelEvents)
-
-                    if (state.fuelEvents.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "Collecting data...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                if (state.fuelEvents.isEmpty()) {
+                    EmptyTabState(
+                        title = "Collecting data…",
+                        message = "Fuel events — gauge drops, model switches, and recommendation changes — appear here once the dashboard has been running for a few minutes.",
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        // Fuel event timeline (drops, switches, recommendations)
+                        FuelEventHistoryPanel(events = state.fuelEvents)
                     }
                 }
             }

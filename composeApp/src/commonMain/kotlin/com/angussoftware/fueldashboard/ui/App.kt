@@ -75,6 +75,7 @@ import com.angussoftware.fueldashboard.ui.components.FuelEventHistoryPanel
 import com.angussoftware.fueldashboard.ui.components.WasteDetectionPanel
 import com.angussoftware.fueldashboard.ui.components.FuelBar
 import com.angussoftware.fueldashboard.ui.components.formatLastUpdated
+import com.angussoftware.fueldashboard.ui.components.EmptyTabState
 import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
@@ -263,81 +264,106 @@ private fun DesktopLayout(
 
             DesktopTab.USAGE -> {
                 // User-ordered sections (Settings → reorder via the arrows on each panel)
-                var usageOrder by remember { mutableStateOf(SectionOrder.loadUsage()) }
-                fun moveUsage(key: String, offset: Int) {
-                    usageOrder = SectionOrder.move(
-                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_USAGE,
-                        SectionOrder.USAGE_KEYS,
-                        key,
-                        offset,
+                val hasUsageData = state.meteredBySource24h.isNotEmpty() ||
+                    state.meteredBySource7d.isNotEmpty() ||
+                    state.meteredByConversation24h.isNotEmpty() ||
+                    state.meteredByConversation7d.isNotEmpty() ||
+                    state.meteredByAgentModel24h.isNotEmpty() ||
+                    state.meteredByAgentModel7d.isNotEmpty() ||
+                    state.modelDrainRates.isNotEmpty() ||
+                    state.wasteByProvider.isNotEmpty()
+                if (!hasUsageData) {
+                    EmptyTabState(
+                        title = "Collecting data…",
+                        message = "Usage metrics appear here once the dashboard has polled your providers a few times.",
+                        hint = "Add providers in Settings and wait a few minutes for the first poll cycle.",
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    val sections = usageOrder.mapIndexed { i, key ->
-                        key to (
-                            (if (i > 0) ({ moveUsage(key, -1) }) else null) to
-                                (if (i < usageOrder.size - 1) ({ moveUsage(key, +1) }) else null)
-                            )
-                    }.toMap()
-                    for ((key, moves) in sections) {
-                        val (up, down) = moves
-                        when (key) {
-                            "metered" -> MeteredUsagePanel(
-                                bySource24h = state.meteredBySource24h,
-                                byModel24h = state.meteredByModel24h,
-                                bySource7d = state.meteredBySource7d,
-                                byModel7d = state.meteredByModel7d,
-                                byConversation24h = state.meteredByConversation24h,
-                                byConversation7d = state.meteredByConversation7d,
-                                byAgentModel24h = state.meteredByAgentModel24h,
-                                byAgentModel7d = state.meteredByAgentModel7d,
-                                onMoveUp = up,
-                                onMoveDown = down,
-                            )
-                            "drain" -> if (state.modelDrainRates.isNotEmpty()) {
-                                ModelDrainRatesPanel(rates = state.modelDrainRates, onMoveUp = up, onMoveDown = down)
+                } else {
+                    var usageOrder by remember { mutableStateOf(SectionOrder.loadUsage()) }
+                    fun moveUsage(key: String, offset: Int) {
+                        usageOrder = SectionOrder.move(
+                            com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_USAGE,
+                            SectionOrder.USAGE_KEYS,
+                            key,
+                            offset,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        val sections = usageOrder.mapIndexed { i, key ->
+                            key to (
+                                (if (i > 0) ({ moveUsage(key, -1) }) else null) to
+                                    (if (i < usageOrder.size - 1) ({ moveUsage(key, +1) }) else null)
+                                )
+                        }.toMap()
+                        for ((key, moves) in sections) {
+                            val (up, down) = moves
+                            when (key) {
+                                "metered" -> MeteredUsagePanel(
+                                    bySource24h = state.meteredBySource24h,
+                                    byModel24h = state.meteredByModel24h,
+                                    bySource7d = state.meteredBySource7d,
+                                    byModel7d = state.meteredByModel7d,
+                                    byConversation24h = state.meteredByConversation24h,
+                                    byConversation7d = state.meteredByConversation7d,
+                                    byAgentModel24h = state.meteredByAgentModel24h,
+                                    byAgentModel7d = state.meteredByAgentModel7d,
+                                    onMoveUp = up,
+                                    onMoveDown = down,
+                                )
+                                "drain" -> if (state.modelDrainRates.isNotEmpty()) {
+                                    ModelDrainRatesPanel(rates = state.modelDrainRates, onMoveUp = up, onMoveDown = down)
+                                }
+                                "waste" -> WasteDetectionPanel(providers = state.wasteByProvider, onMoveUp = up, onMoveDown = down)
                             }
-                            "waste" -> WasteDetectionPanel(providers = state.wasteByProvider, onMoveUp = up, onMoveDown = down)
                         }
                     }
                 }
             }
 
             DesktopTab.INTEL -> {
-                var intelOrder by remember { mutableStateOf(SectionOrder.loadIntel()) }
-                fun moveIntel(key: String, offset: Int) {
-                    intelOrder = SectionOrder.move(
-                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_INTEL,
-                        SectionOrder.INTEL_KEYS,
-                        key,
-                        offset,
+                if (state.fuelEvents.isEmpty()) {
+                    EmptyTabState(
+                        title = "Collecting data…",
+                        message = "Fuel events — gauge drops, model switches, and recommendation changes — appear here once the dashboard has been running for a few minutes.",
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    val sections = intelOrder.mapIndexed { i, key ->
-                        key to (
-                            (if (i > 0) ({ moveIntel(key, -1) }) else null) to
-                                (if (i < intelOrder.size - 1) ({ moveIntel(key, +1) }) else null)
-                            )
-                    }.toMap()
-                    for ((key, moves) in sections) {
-                        val (up, down) = moves
-                        when (key) {
-                            "events" -> FuelEventHistoryPanel(events = state.fuelEvents, onMoveUp = up, onMoveDown = down)
+                } else {
+                    var intelOrder by remember { mutableStateOf(SectionOrder.loadIntel()) }
+                    fun moveIntel(key: String, offset: Int) {
+                        intelOrder = SectionOrder.move(
+                            com.angussoftware.fueldashboard.settings.FuelSettingsKeys.SECTION_ORDER_INTEL,
+                            SectionOrder.INTEL_KEYS,
+                            key,
+                            offset,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        val sections = intelOrder.mapIndexed { i, key ->
+                            key to (
+                                (if (i > 0) ({ moveIntel(key, -1) }) else null) to
+                                    (if (i < intelOrder.size - 1) ({ moveIntel(key, +1) }) else null)
+                                )
+                        }.toMap()
+                        for ((key, moves) in sections) {
+                            val (up, down) = moves
+                            when (key) {
+                                "events" -> FuelEventHistoryPanel(events = state.fuelEvents, onMoveUp = up, onMoveDown = down)
+                            }
                         }
                     }
                 }
