@@ -43,6 +43,10 @@ private fun extractBundledScript(): File {
 internal actual val canCheckJunieBalance: Boolean =
     isBinaryInPath("python3") && hasJunieCli()
 
+/** Desktop can install the CLI — keep the actionable install hint. */
+internal actual val junieCheckUnavailableHint: String =
+    "Balance checking requires the junie-credits helper script. Install Junie CLI to use this provider."
+
 /**
  * Checks if the Junie CLI (junie or junie-auth) is available.
  */

@@ -85,3 +85,10 @@ internal expect suspend fun runJunieCredits(): String
 
 /** Whether this platform can run the junie-credits balance command (checks PATH for the helper script). */
 internal expect val canCheckJunieBalance: Boolean
+
+/**
+ * Hint shown when balance checking is unavailable on this platform.
+ * Desktop: CLI may genuinely be missing — instruct installing it.
+ * Mobile: the CLI can never run on this device — point at the desktop app.
+ */
+internal expect val junieCheckUnavailableHint: String

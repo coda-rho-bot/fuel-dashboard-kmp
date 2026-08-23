@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.model.ProviderReport
+import com.angussoftware.fueldashboard.network.junieCheckUnavailableHint
 import com.angussoftware.fueldashboard.util.epochMillis
 
 fun formatJunieLastChecked(lastChecked: Long?, now: Long = epochMillis()): String {
@@ -101,7 +102,7 @@ fun JunieProviderBalance(
             } else {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Balance checking requires the junie-credits helper script. Install Junie CLI to use this provider.",
+                    text = junieCheckUnavailableHint,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
