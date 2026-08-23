@@ -24,6 +24,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.roundToInt
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Polls the Mistral AI Admin API for spend, spend-limit, and rate-limit status.
@@ -337,8 +338,8 @@ class MistralProviderAdapter(
 
         val rawDisplay = buildString {
             if (spend != null && spend > 0) {
-                append("$%.2f".format(spend))
-                if (monthlyBudgetUsd != null) append(" / $%.2f".format(monthlyBudgetUsd))
+                append(formatRoot("$%.2f", spend))
+                if (monthlyBudgetUsd != null) append(formatRoot(" / $%.2f", monthlyBudgetUsd))
                 append(" MTD")
             }
             if (spendLimit?.monthlyLimitReached == true) {

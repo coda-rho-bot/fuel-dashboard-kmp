@@ -2,6 +2,7 @@ package com.angussoftware.fueldashboard.engine
 
 import kotlin.math.max
 import kotlin.math.min
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Model complexity tier — maps to fuel allocation levels.
@@ -267,9 +268,9 @@ private fun buildReason(
         parts.add("${tier.name.lowercase()} (task floor)")
     }
     if (utilization != null) {
-        parts.add("ratio ${"%.2f".format(utilization)}")
+        parts.add("ratio ${formatRoot("%.2f", utilization)}")
     }
-    parts.add("${"%.0f".format(assessment.remaining)}% remaining")
+    parts.add("${formatRoot("%.0f", assessment.remaining)}% remaining")
     return parts.joinToString(", ")
 }
 

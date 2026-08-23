@@ -71,6 +71,7 @@ import com.angussoftware.fueldashboard.ui.components.CountdownText
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.angussoftware.fueldashboard.util.formatRoot
 
 private enum class MobileTab(val label: String) {
     FUEL("Fuel"),
@@ -401,7 +402,7 @@ private fun MobileStatusRow(
         val text = if (burnRate == null || dataPoints < 3) {
             "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)"
         } else {
-            "Burn rate: ${"%.1f".format(burnRate)}% / hour ($dataPoints samples)"
+            "Burn rate: ${formatRoot("%.1f", burnRate)}% / hour ($dataPoints samples)"
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

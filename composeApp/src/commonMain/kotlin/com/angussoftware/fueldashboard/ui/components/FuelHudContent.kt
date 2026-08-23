@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.model.FuelStatusModel
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Compact status content for the desktop HUD mini-window (and reusable for
@@ -76,7 +77,7 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
                 Text(
                     text = when {
                         credit.creditsTotal != null -> "${credit.creditsTotal} cr"
-                        credit.junieBalance != null -> "$${"%.2f".format(credit.junieBalance)}"
+                        credit.junieBalance != null -> "$${formatRoot("%.2f", credit.junieBalance)}"
                         else -> "—"
                     },
                     style = MaterialTheme.typography.labelSmall,

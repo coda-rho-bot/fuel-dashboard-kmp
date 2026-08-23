@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.network.junieCheckUnavailableHint
 import com.angussoftware.fueldashboard.util.epochMillis
+import com.angussoftware.fueldashboard.util.formatRoot
 
 fun formatJunieLastChecked(lastChecked: Long?, now: Long = epochMillis()): String {
     if (lastChecked == null) return "Never"
@@ -55,7 +56,7 @@ fun JunieProviderBalance(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = report?.limitDollars?.let { "${'$'}${"%.2f".format(it)}" } ?: "Not checked yet",
+                text = report?.limitDollars?.let { "${'$'}${formatRoot("%.2f", it)}" } ?: "Not checked yet",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,

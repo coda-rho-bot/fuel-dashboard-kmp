@@ -29,6 +29,7 @@ import com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay
 import com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay
 import com.angussoftware.fueldashboard.presentation.AgentModelUsageDisplay
 import kotlin.math.roundToInt
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Metered token usage — exact numbers reported by usage sources (e.g. the
@@ -188,8 +189,8 @@ private fun MeteredUsageRow(
 }
 
 private fun formatTokens(tokens: Long): String = when {
-    tokens >= 1_000_000 -> "%.1fM".format(tokens / 1_000_000.0)
-    tokens >= 1_000 -> "%.1fK".format(tokens / 1_000.0)
+    tokens >= 1_000_000 -> formatRoot("%.1fM", tokens / 1_000_000.0)
+    tokens >= 1_000 -> formatRoot("%.1fK", tokens / 1_000.0)
     else -> tokens.toString()
 }
 

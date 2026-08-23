@@ -22,6 +22,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.roundToInt
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Polls the OpenAI platform for billing spend and rate-limit status.
@@ -252,8 +253,8 @@ class OpenAIProviderAdapter(
 
         val rawDisplay = buildString {
             if (spend != null) {
-                append("$%.2f".format(spend))
-                if (monthlyBudgetUsd != null) append(" / $%.2f".format(monthlyBudgetUsd))
+                append(formatRoot("$%.2f", spend))
+                if (monthlyBudgetUsd != null) append(formatRoot(" / $%.2f", monthlyBudgetUsd))
                 append(" MTD")
             }
             if (limits != null) {

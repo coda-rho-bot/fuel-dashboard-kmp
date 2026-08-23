@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.presentation.ModelDrainRateDisplay
 import kotlin.math.roundToInt
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Displays per-model fuel consumption data measured from real gauge drops.
@@ -100,7 +101,7 @@ private fun ModelDrainRow(
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            text = "~${String.format("%.1f", rate.avgDrainPerHr)}% / hr · ${rate.sampleCount} samples",
+            text = "~${formatRoot("%.1f", rate.avgDrainPerHr)}% / hr · ${rate.sampleCount} samples",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

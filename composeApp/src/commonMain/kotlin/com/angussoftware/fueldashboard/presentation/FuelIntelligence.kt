@@ -3,6 +3,7 @@ package com.angussoftware.fueldashboard.presentation
 import com.angussoftware.fueldashboard.database.FuelSnapshotRecord
 import kotlinx.datetime.toLocalDateTime
 import com.angussoftware.fueldashboard.database.UsageRecord
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Pure computations for the Fuel Intelligence tab (roadmap Phase 4).
@@ -327,7 +328,7 @@ object FuelIntelligence {
                         timestamp = burstEnd,
                         type = FuelEventType.FUEL_DROP,
                         description = buildString {
-                            append("Fuel dropped ${"%.1f".format(burstTotal)}%")
+                            append("Fuel dropped ${formatRoot("%.1f", burstTotal)}%")
                             append(" · $burstAgents active agent${if (burstAgents == 1) "" else "s"}")
                             if (models.isNotEmpty()) append(" · $models")
                         },

@@ -90,6 +90,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
+import com.angussoftware.fueldashboard.util.formatRoot
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -602,7 +603,7 @@ private fun BurnRateStatus(
         val text = if (burnRate == null || dataPoints < 3) {
             "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)"
         } else {
-            "Burn rate: ${"%.1f".format(burnRate)}% / hour ($dataPoints samples)"
+            "Burn rate: ${formatRoot("%.1f", burnRate)}% / hour ($dataPoints samples)"
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

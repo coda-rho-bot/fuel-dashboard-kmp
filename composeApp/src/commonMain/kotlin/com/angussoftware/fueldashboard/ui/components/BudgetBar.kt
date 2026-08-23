@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Budget bar for SPEND_BUDGET providers (OpenAI, Anthropic).
@@ -77,9 +78,9 @@ fun BudgetBar(
             }
             Text(
                 text = if (limitDollars != null && limitDollars > 0) {
-                    "$%.2f / $%.2f".format(usedDollars, limitDollars)
+                    formatRoot("$%.2f / $%.2f", usedDollars, limitDollars)
                 } else {
-                    "$%.2f used".format(usedDollars)
+                    formatRoot("$%.2f used", usedDollars)
                 },
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 fontWeight = FontWeight.Medium,
@@ -282,8 +283,8 @@ private fun rateLimitColor(pct: Int): Color {
  */
 private fun formatCompact(n: Int): String {
     return when {
-        n >= 1_000_000 -> "${"%.1f".format(n / 1_000_000.0)}M"
-        n >= 1_000 -> "${"%.1f".format(n / 1_000.0)}k"
+        n >= 1_000_000 -> "${formatRoot("%.1f", n / 1_000_000.0)}M"
+        n >= 1_000 -> "${formatRoot("%.1f", n / 1_000.0)}k"
         else -> n.toString()
     }
 }

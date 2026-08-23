@@ -4,6 +4,7 @@ import com.angussoftware.fueldashboard.util.epochMillis
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.angussoftware.fueldashboard.util.formatRoot
 
 fun formatCountdown(resetsAtEpochMs: Long, nowMs: Long = epochMillis()): String {
     val diff = resetsAtEpochMs - nowMs
@@ -41,11 +42,11 @@ fun formatLastUpdated(epochMs: Long): String {
 fun formatTokensCompact(tokens: Long): String = when {
     tokens >= 1_000_000 -> {
         val m = tokens / 1_000_000.0
-        if (m >= 100) "${m.toInt()}M" else "%.1fM".format(m)
+        if (m >= 100) "${m.toInt()}M" else formatRoot("%.1fM", m)
     }
     tokens >= 1_000 -> {
         val k = tokens / 1_000.0
-        if (k >= 100) "${k.toInt()}K" else "%.1fK".format(k)
+        if (k >= 100) "${k.toInt()}K" else formatRoot("%.1fK", k)
     }
     else -> tokens.toString()
 }

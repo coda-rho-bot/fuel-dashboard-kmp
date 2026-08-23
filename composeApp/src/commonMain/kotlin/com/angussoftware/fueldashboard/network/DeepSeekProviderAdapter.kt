@@ -18,6 +18,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Polls the DeepSeek API for prepaid credit balance.
@@ -140,11 +141,11 @@ class DeepSeekProviderAdapter(
         )
 
         val rawDisplay = buildString {
-            append("$%.2f".format(balance.totalBalance))
+            append(formatRoot("$%.2f", balance.totalBalance))
             append(" ${balance.currency}")
             if (balance.grantedBalance > 0.0 || balance.toppedUpBalance > 0.0) {
-                append(" (granted: $%.2f".format(balance.grantedBalance))
-                append(", topped up: $%.2f)".format(balance.toppedUpBalance))
+                append(formatRoot(" (granted: $%.2f", balance.grantedBalance))
+                append(formatRoot(", topped up: $%.2f)", balance.toppedUpBalance))
             }
             if (!balance.isAvailable) {
                 append(" | INSUFFICIENT BALANCE")

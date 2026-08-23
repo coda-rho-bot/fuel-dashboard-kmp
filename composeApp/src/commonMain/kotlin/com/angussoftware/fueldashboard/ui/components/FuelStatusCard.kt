@@ -27,6 +27,7 @@ import com.angussoftware.fueldashboard.presentation.ProviderBurnRateDisplay
 import com.angussoftware.fueldashboard.presentation.QuotaType
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Type-aware fuel status card.
@@ -420,7 +421,7 @@ private fun FuelSparkline(
 }
 
 private fun formatRate(rate: Double): String =
-    if (abs(rate - rate.roundToInt()) < 0.05) rate.roundToInt().toString() else "%.1f".format(rate)
+    if (abs(rate - rate.roundToInt()) < 0.05) rate.roundToInt().toString() else formatRoot("%.1f", rate)
 
 private fun formatHours(hours: Double): String = when {
     hours < 1 -> "${(hours * 60).roundToInt()} min"

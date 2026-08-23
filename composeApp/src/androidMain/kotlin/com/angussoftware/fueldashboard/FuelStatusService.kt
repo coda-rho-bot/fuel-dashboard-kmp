@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Foreground service: persistent, expandable notification with quota
@@ -126,7 +127,7 @@ class FuelStatusService : Service() {
                     append("  ·  ${it.name} ${it.creditsTotal} cr")
                 }
                 model.creditLines.firstOrNull { it.junieBalance != null }?.let {
-                    append("  ·  ${it.name} $${"%.2f".format(it.junieBalance!!)}")
+                    append("  ·  ${it.name} $${formatRoot("%.2f", it.junieBalance!!)}")
                 }
             }.ifEmpty { getString(R.string.loading_status) }
         }
@@ -181,7 +182,7 @@ class FuelStatusService : Service() {
             val creditsText = model.creditLines.mapNotNull { c ->
                 when {
                     c.creditsTotal != null -> "${c.name}: ${c.creditsTotal} cr"
-                    c.junieBalance != null -> "${c.name}: $${"%.2f".format(c.junieBalance)}"
+                    c.junieBalance != null -> "${c.name}: $${formatRoot("%.2f", c.junieBalance)}"
                     else -> null
                 }
             }.joinToString("  ·  ")
