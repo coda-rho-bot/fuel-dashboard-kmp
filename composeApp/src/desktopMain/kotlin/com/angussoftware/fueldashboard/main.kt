@@ -571,8 +571,8 @@ fun main() = application {
             resizable = true,
         ) {
             // Persist position between runs + enable dragging (undecorated
-            // windows have no title bar to grab). Compose Desktop 1.9.0 has
-            // no WindowDraggableArea, so we use AWT mouse listeners.
+            // windows have no title bar to grab). Using AWT mouse listeners
+            // for window dragging.
             DisposableEffect(window) {
                 // Position persistence
                 val compListener = object : java.awt.event.ComponentAdapter() {
