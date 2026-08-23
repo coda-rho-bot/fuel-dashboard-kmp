@@ -47,6 +47,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -334,7 +335,7 @@ class FuelViewModel {
 
     /** Live usage-ingestion status pushed from the desktop ingestion manager. */
     fun updateUsageIngestion(status: IngestionStatus) {
-        _state.value = _state.value.copy(usageIngestion = status)
+        _state.update { it.copy(usageIngestion = status) }
     }
 
     private val _state = MutableStateFlow(
@@ -350,14 +351,14 @@ class FuelViewModel {
         val settings = FuelSettingsStore.loadMultiProvider()
         val agents = AgentSettingsStore.load()
         val serverKey = ServerApiKeyStore.load()
-        _state.value = _state.value.copy(
+        _state.update { it.copy(
             settings = settings,
             agentSettings = agents,
             serverApiKey = serverKey.ifBlank { null },
             junieBalance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull(),
             junieLicense = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null },
             junieLastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull(),
-        )
+        ) }
         // Materialize config-only agent display entries from stored settings
         // so synced agents survive a restart (mobile has no live ACP to
         // re-discover them).
@@ -392,9 +393,9 @@ class FuelViewModel {
             )
         }
         if (configOnly.isNotEmpty()) {
-            _state.value = _state.value.copy(
-                acpAgents = _state.value.acpAgents + configOnly,
-            )
+            _state.update { it.copy(
+                acpAgents = it.acpAgents + configOnly,
+            ) }
         }
     }
 
@@ -412,7 +413,18 @@ class FuelViewModel {
             val interval = pollIntervalMs()
             delay(interval)
             while (true) {
-                refresh()
+                try {
+                    refresh()
+                } catch (e: Exception) {
+                    // Don't let one failed refresh kill the poll loop.
+                    // Log the error and continue after the interval.
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            providerErrors = it.providerErrors + ("global" to (e.message ?: "Poll error")),
+                        )
+                    }
+                }
                 delay(interval)
             }
         }
@@ -525,21 +537,21 @@ class FuelViewModel {
      * when the AcpAgentManager StateFlow emits updates.
      */
     fun updateAcpAgents(agents: List<AcpAgentDisplay>) {
-        _state.value = _state.value.copy(acpAgents = agents)
+        _state.update { it.copy(acpAgents = agents) }
     }
 
     fun setServerUrl(url: String?) {
-        _state.value = _state.value.copy(serverUrl = url)
+        _state.update { it.copy(serverUrl = url) }
     }
 
     fun setShowHelp(showHelp: Boolean) {
         saveStringSetting(FuelSettingsKeys.SHOW_HELP, showHelp.toString())
-        _state.value = _state.value.copy(showHelp = showHelp)
+        _state.update { it.copy(showHelp = showHelp) }
     }
 
     fun setShowThemeIcon(showThemeIcon: Boolean) {
         saveStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, showThemeIcon.toString())
-        _state.value = _state.value.copy(showThemeIcon = showThemeIcon)
+        _state.update { it.copy(showThemeIcon = showThemeIcon) }
     }
 
     /** Runs Junie's chargeable balance command only after an explicit desktop user action. */
@@ -547,24 +559,24 @@ class FuelViewModel {
         val adapter = adapters[providerId] as? JunieProviderAdapter ?: return
         if (providerId in _state.value.checkingProviderIds) return
 
-        _state.value = _state.value.copy(
-            checkingProviderIds = _state.value.checkingProviderIds + providerId,
-        )
+        _state.update { it.copy(
+            checkingProviderIds = it.checkingProviderIds + providerId,
+        ) }
         scope.launch {
             runCatching { adapter.checkBalance() }
                 .onSuccess { report ->
-                    _state.value = _state.value.copy(
-                        providerReports = _state.value.providerReports + (providerId to report),
-                        providerErrors = _state.value.providerErrors - providerId,
-                        checkingProviderIds = _state.value.checkingProviderIds - providerId,
+                    _state.update { it.copy(
+                        providerReports = it.providerReports + (providerId to report),
+                        providerErrors = it.providerErrors - providerId,
+                        checkingProviderIds = it.checkingProviderIds - providerId,
                         lastUpdated = epochMillis(),
-                    )
+                    ) }
                 }
                 .onFailure { error ->
-                    _state.value = _state.value.copy(
-                        providerErrors = _state.value.providerErrors + (providerId to (error.message ?: "Junie balance check failed")),
-                        checkingProviderIds = _state.value.checkingProviderIds - providerId,
-                    )
+                    _state.update { it.copy(
+                        providerErrors = it.providerErrors + (providerId to (error.message ?: "Junie balance check failed")),
+                        checkingProviderIds = it.checkingProviderIds - providerId,
+                    ) }
                 }
         }
     }
@@ -591,7 +603,7 @@ class FuelViewModel {
         stopPolling()
         closeAdapters()
 
-        _state.value = _state.value.copy(
+        _state.update { it.copy(
             settings = newSettings,
             isLoading = true,
             providerReports = emptyMap(),
@@ -603,7 +615,7 @@ class FuelViewModel {
             burnRate = null,
             dataPointCount = 0,
             checkingProviderIds = emptySet(),
-        )
+        ) }
 
         if (newSettings.hasAnyConfig) {
             activateAdapters(newSettings)
@@ -668,7 +680,7 @@ class FuelViewModel {
         providers.add(target, item)
         val newSettings = _state.value.settings.copy(providers = providers)
         FuelSettingsStore.saveMultiProvider(newSettings)
-        _state.value = _state.value.copy(settings = newSettings)
+        _state.update { it.copy(settings = newSettings) }
     }
 
     // --- Agent settings ---
@@ -688,7 +700,7 @@ class FuelViewModel {
             agents = _state.value.agentSettings.agents + newConfig,
         )
         AgentSettingsStore.save(updated)
-        _state.value = _state.value.copy(agentSettings = updated)
+        _state.update { it.copy(agentSettings = updated) }
         onAgentSettingsChanged?.invoke(updated)
     }
 
@@ -709,7 +721,7 @@ class FuelViewModel {
         agents.add(target, item)
         val updated = _state.value.agentSettings.copy(agents = agents)
         AgentSettingsStore.save(updated)
-        _state.value = _state.value.copy(agentSettings = updated)
+        _state.update { it.copy(agentSettings = updated) }
         onAgentSettingsChanged?.invoke(updated)
         // Reorder the display list to match (MCP/HTTP-registered agents not
         // in settings keep their relative order at the end)
@@ -717,7 +729,7 @@ class FuelViewModel {
         val agentIds = agents.map { it.id }.toSet()
         val reordered = agents.mapNotNull { displayById[it.id] }
         val extras = _state.value.acpAgents.filter { it.id !in agentIds }
-        _state.value = _state.value.copy(acpAgents = reordered + extras)
+        _state.update { it.copy(acpAgents = reordered + extras) }
     }
 
     fun removeAgent(agentId: String) {        // Remove from ACP agent settings
@@ -725,14 +737,16 @@ class FuelViewModel {
             agents = _state.value.agentSettings.agents.filterNot { it.id == agentId },
         )
         AgentSettingsStore.save(updated)
-        _state.value = _state.value.copy(agentSettings = updated)
+        _state.update { it.copy(agentSettings = updated) }
         onAgentSettingsChanged?.invoke(updated)
         // Also remove from MCP/HTTP registered agents
         onRemoveAgent?.invoke(agentId)
         // Remove from the displayed agent list
-        _state.value = _state.value.copy(
-            acpAgents = _state.value.acpAgents.filterNot { it.id == agentId },
-        )
+        _state.update { state ->
+            state.copy(
+                acpAgents = state.acpAgents.filterNot { a -> a.id == agentId },
+            )
+        }
     }
 
     /**
@@ -782,7 +796,7 @@ class FuelViewModel {
 
         if (!isSettingsOnly) {
             AgentSettingsStore.save(syncData.agentSettings)
-            _state.value = _state.value.copy(agentSettings = syncData.agentSettings)
+            _state.update { it.copy(agentSettings = syncData.agentSettings) }
             onAgentSettingsChanged?.invoke(syncData.agentSettings)
 
             // Re-materialize config-only agent display entries so synced
@@ -939,21 +953,24 @@ class FuelViewModel {
     private fun pollIntervalMs(): Long = 30_000L
 
     private suspend fun refresh() = refreshMutex.withLock {
-        if (adapters.isEmpty()) {
-            _state.value = _state.value.copy(
-                isLoading = false,
-                providerErrors = mapOf("global" to "No providers configured"),
-            )
+        // Snapshot adapters to avoid ConcurrentModificationException if
+        // applySettings mutates the map during iteration.
+        val adapterSnapshot = adapters.toList()
+        if (adapterSnapshot.isEmpty()) {
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    providerErrors = mapOf("global" to "No providers configured"),
+                )
+            }
             return
         }
 
         // Poll all provider adapters in parallel
-        val reportResults = adapters.values.map { adapter ->
+        val reportResults = adapterSnapshot.map { (providerId, adapter) ->
             scope.async {
-                val providerId = adapter.providerId
                 try {
-                    val report = adapter.poll()
-                    providerId to Result.success(report)
+                    providerId to Result.success(adapter.poll())
                 } catch (e: Exception) {
                     providerId to Result.failure(e)
                 }
@@ -976,7 +993,7 @@ class FuelViewModel {
         var alerts = AlertsResponse()
 
         for ((providerId, _) in reports) {
-            val adapter = adapters[providerId]
+            val adapter = adapterSnapshot.find { it.first == providerId }?.second
             if (adapter is ConnectedApiProviderAdapter) {
                 fuel = adapter.lastFuel
                 decisions = adapter.lastDecisions
@@ -1111,7 +1128,7 @@ class FuelViewModel {
         val remoteMetered = remoteSnapshot?.metered
         val remoteIntelligence = remoteSnapshot?.intelligence
 
-        _state.value = _state.value.copy(
+        _state.update { it.copy(
             providerReports = reports,
             providerErrors = errors,
             fuel = fuel,
@@ -1137,7 +1154,7 @@ class FuelViewModel {
             wasteByProvider = intelligence?.wasteByProvider ?: remoteIntelligence?.wasteByProvider ?: emptyList(),
             fuelEvents = intelligence?.fuelEvents ?: remoteIntelligence?.fuelEvents ?: emptyList(),
             fuelAdvice = intelligence?.advice ?: remoteIntelligence?.advice,
-        )
+        ) }
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel
         // (works on both desktop and mobile — desktop gets ACP agents via main.kt,
@@ -1163,7 +1180,7 @@ class FuelViewModel {
                 }
             }
             if (existing.size != _state.value.acpAgents.size) {
-                _state.value = _state.value.copy(acpAgents = existing)
+                _state.update { it.copy(acpAgents = existing) }
             }
         }
     }
