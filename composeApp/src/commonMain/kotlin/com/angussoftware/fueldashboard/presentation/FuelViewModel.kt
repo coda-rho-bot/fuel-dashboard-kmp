@@ -356,8 +356,43 @@ class FuelViewModel {
             junieLicense = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null },
             junieLastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull(),
         )
+        // Materialize config-only agent display entries from stored settings
+        // so synced agents survive a restart (mobile has no live ACP to
+        // re-discover them).
+        materializeConfigAgents()
         if (settings.hasAnyConfig) {
             activateAdapters(settings)
+        }
+    }
+
+    /**
+     * Derives display entries from stored [AgentSettings] and merges them
+     * with any existing live/remote agents in [acpAgents]. Config-only
+     * entries (status="synced") are added for any agent ID not already
+     * present in the live list. This is called at init and after every
+     * settings import so agents don't vanish on restart.
+     */
+    private fun materializeConfigAgents() {
+        val configAgents = _state.value.agentSettings.agents
+        if (configAgents.isEmpty()) return
+        val liveAgentIds = _state.value.acpAgents.map { it.id }.toSet()
+        val configOnly = configAgents.filter { it.id !in liveAgentIds }.map { config ->
+            AcpAgentDisplay(
+                id = config.id,
+                name = config.name,
+                currentModel = "unknown",
+                availableModels = emptyList(),
+                currentMode = null,
+                availableModes = emptyList(),
+                status = "synced",
+                capabilities = emptyList(),
+                lastSeen = null,
+            )
+        }
+        if (configOnly.isNotEmpty()) {
+            _state.value = _state.value.copy(
+                acpAgents = _state.value.acpAgents + configOnly,
+            )
         }
     }
 
@@ -743,24 +778,10 @@ class FuelViewModel {
             _state.value = _state.value.copy(agentSettings = syncData.agentSettings)
             onAgentSettingsChanged?.invoke(syncData.agentSettings)
 
-            // Populate agent display list from synced configs (for mobile — no live ACP available)
-            if (_state.value.acpAgents.isEmpty() && syncData.agentSettings.agents.isNotEmpty()) {
-                _state.value = _state.value.copy(
-                    acpAgents = syncData.agentSettings.agents.map { config ->
-                        AcpAgentDisplay(
-                            id = config.id,
-                            name = config.name,
-                            currentModel = "unknown",
-                            availableModels = emptyList(),
-                            currentMode = null,
-                            availableModes = emptyList(),
-                            status = "synced",
-                            capabilities = emptyList(),
-                            lastSeen = null,
-                        )
-                    },
-                )
-            }
+            // Re-materialize config-only agent display entries so synced
+            // agents appear immediately and survive restarts. This merges
+            // with any live/remote agents already in the list.
+            materializeConfigAgents()
         }
 
         if (!isAgentsOnly) {
