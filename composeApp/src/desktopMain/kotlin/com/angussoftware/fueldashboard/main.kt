@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.angussoftware.fueldashboard.model.FuelStatusModel
@@ -502,6 +503,7 @@ fun main() = application {
             exitApplication()
         },
         title = "Fuel Dashboard",
+        icon = appIcon(),
         state = windowState,
     ) {
         DisposableEffect(window) {
@@ -621,3 +623,13 @@ fun main() = application {
         }
     }
 }
+
+/** Window/taskbar icon — loaded once from bundled resources (icon.png). */
+private fun appIcon(): androidx.compose.ui.graphics.painter.Painter? = runCatching {
+    val bytes = Thread.currentThread().contextClassLoader
+        .getResourceAsStream("icon.png")?.use { it.readBytes() }
+    bytes?.let {
+        androidx.compose.ui.graphics.painter.BitmapPainter(
+            org.jetbrains.skia.Image.makeFromEncoded(it).toComposeImageBitmap(),        )
+    }
+}.getOrNull()
