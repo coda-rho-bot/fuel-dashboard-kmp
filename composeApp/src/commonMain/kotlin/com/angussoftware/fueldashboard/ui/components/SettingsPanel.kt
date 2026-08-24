@@ -153,6 +153,24 @@ fun SettingsPanel(
                 )
             }
 
+            // Advisor visibility — the Fuel Status advice section is
+            // opt-in; most users want the gauge, not the commentary.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = "Show Advisor",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                Switch(
+                    checked = state.showAdvisor,
+                    onCheckedChange = viewModel::setShowAdvisor,
+                )
+            }
+
             Spacer(Modifier.height(12.dp))
 
             // --- Providers section (core config — first) ---

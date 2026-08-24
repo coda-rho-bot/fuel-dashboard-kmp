@@ -49,6 +49,7 @@ fun FuelStatusCard(
     meteredByModel24h: List<com.angussoftware.fueldashboard.presentation.MeteredUsageDisplay> = emptyList(),
     meteredByConversation24h: List<com.angussoftware.fueldashboard.presentation.ConversationUsageDisplay> = emptyList(),
     advice: com.angussoftware.fueldashboard.presentation.FuelAdvisor.Advice? = null,
+    showAdvisor: Boolean = false, // advisor section is opt-in (Settings → Show Advisor)
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -126,12 +127,15 @@ fun FuelStatusCard(
             creditPools.forEach { br -> CreditPoolRow(br) }
         }
 
-        // Fuel advisor — regime-aware advice (v3)
-        Spacer(Modifier.height(12.dp))
-        AdvisorSection(
-            advice = advice,
-            showHelp = showHelp,
-        )
+        // Fuel advisor — regime-aware advice (v3); hidden by default,
+        // enabled in Settings → Show Advisor
+        if (showAdvisor) {
+            Spacer(Modifier.height(12.dp))
+            AdvisorSection(
+                advice = advice,
+                showHelp = showHelp,
+            )
+        }
 
         // Active models footer
         if (projection?.activeModels?.isNotEmpty() == true) {

@@ -519,6 +519,7 @@ internal fun FuelColumnContent(
                         meteredByModel24h = state.meteredByModel24h,
                         meteredByConversation24h = state.meteredByConversation24h,
                         advice = state.fuelAdvice,
+                    showAdvisor = state.showAdvisor,
                     )
                 }
 

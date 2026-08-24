@@ -48,6 +48,7 @@ data class SettingsSyncData(
     val eventDropThresholdPct: Double? = null,
     val showHelp: Boolean? = null,
     val showThemeIcon: Boolean? = null,
+    val showAdvisor: Boolean? = null,
     // Custom feedback endpoints — null when at baked defaults.
     val feedbackUrl: String? = null,
     val feedbackRepo: String? = null,
@@ -114,6 +115,7 @@ data class SettingsSyncData(
             eventDropThresholdPct = loadStringSetting(FuelSettingsKeys.EVENT_DROP_THRESHOLD, "").toDoubleOrNull(),
             showHelp = loadStringSetting(FuelSettingsKeys.SHOW_HELP, "").ifBlank { null }?.toBoolean(),
             showThemeIcon = loadStringSetting(FuelSettingsKeys.SHOW_THEME_ICON, "").ifBlank { null }?.toBoolean(),
+            showAdvisor = loadStringSetting(FuelSettingsKeys.SHOW_ADVISOR, "").ifBlank { null }?.toBoolean(),
             feedbackUrl = loadStringSetting(FuelSettingsKeys.FEEDBACK_URL, "").takeIf { it.isNotBlank() },
             feedbackRepo = loadStringSetting(FuelSettingsKeys.FEEDBACK_REPO, "").takeIf { it.isNotBlank() },
         )
@@ -206,6 +208,7 @@ data class SettingsSyncData(
         eventDropThresholdPct = null,
         showHelp = null,
         showThemeIcon = null,
+        showAdvisor = null,
         feedbackUrl = null,
         feedbackRepo = null,
     )
