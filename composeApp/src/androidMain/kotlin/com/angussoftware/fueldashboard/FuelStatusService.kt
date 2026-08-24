@@ -47,23 +47,42 @@ class FuelStatusService : Service() {
             return START_NOT_STICKY
         }
 
+        // Android 13+: no POST_NOTIFICATIONS → the foreground service would
+        // run with an invisible notification. Fail loudly-but-gracefully:
+        // persist the disabled state and stop.
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            saveStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_ENABLED, "false")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         createChannel()
 
         // Enter foreground immediately with a placeholder; real data replaces
         // it as soon as the state flow emits.
         startAsForeground(buildNotification(null))
 
-        scope.launch {
-            FuelViewModel.shared.let { vm ->
-                vm.startPolling()
-                vm.state.collect { state ->
-                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    nm.notify(NOTIFICATION_ID, buildNotification(FuelStatusModel.from(state)))
+        // Collect exactly once — onStartCommand can fire repeatedly (e.g.
+        // START_STICKY restarts, repeated startService calls) and each
+        // unguarded launch added a duplicate state collector.
+        if (!::collectorJob.isInitialized || !collectorJob.isActive) {
+            collectorJob = scope.launch {
+                FuelViewModel.shared.let { vm ->
+                    vm.startPolling()
+                    vm.state.collect { state ->
+                        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        nm.notify(NOTIFICATION_ID, buildNotification(FuelStatusModel.from(state)))
+                    }
                 }
             }
         }
         return START_STICKY
     }
+
+    private lateinit var collectorJob: kotlinx.coroutines.Job
 
     override fun onDestroy() {
         // Stop the shared ViewModel's polling loop — scope.cancel() only

@@ -267,11 +267,18 @@ fun main() = application {
     }
 
     // Wire ViewModel callbacks → FuelSnapshotRepository (log real fuel data to SQLite)
+    var lastSnapshotCleanup = 0L
     viewModel.onLogFuelSnapshot = { tokensPct, sessionPct, activeAgentCount, activeModels, resetAt ->
         serverScope.launch {
             fuelSnapshotRepo.insert(tokensPct, sessionPct, activeAgentCount, activeModels, resetAt)
-            // Cleanup old snapshots weekly (keep 7 days)
-            fuelSnapshotRepo.cleanup()
+            // Cleanup runs at most once a day (this callback fires every ~30s
+            // with each poll — cleanup() on every snapshot was a hidden
+            // full-table scan 2880×/day).
+            val now = System.currentTimeMillis()
+            if (now - lastSnapshotCleanup > 24 * 3_600_000L) {
+                lastSnapshotCleanup = now
+                fuelSnapshotRepo.cleanup()
+            }
         }
     }
 

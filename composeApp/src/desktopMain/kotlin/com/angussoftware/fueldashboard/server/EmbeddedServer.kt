@@ -557,11 +557,16 @@ class EmbeddedServer(
 }
 
 internal fun bearerAuthorizationError(expectedKey: String, authorizationHeader: String?): String? {
-    return if (authorizationHeader == "Bearer $expectedKey") {
-        null
-    } else {
-        "Unauthorized: provide Authorization: Bearer <API key>."
-    }
+    // Constant-time key comparison — a plain == on the full header leaks
+    // match progress via timing. MessageDigest.isEqual length-safe.
+    val prefix = "Bearer "
+    val ok = authorizationHeader != null &&
+        authorizationHeader.startsWith(prefix) &&
+        java.security.MessageDigest.isEqual(
+            authorizationHeader.substring(prefix.length).encodeToByteArray(),
+            expectedKey.encodeToByteArray(),
+        )
+    return if (ok) null else "Unauthorized: provide Authorization: Bearer <API key>."
 }
 
 /** Returns the LAN IP address for display in the UI. */
@@ -572,13 +577,13 @@ fun getLanUrl(): String {
             if (!iface.isUp || iface.isLoopback) continue
             for (addr in iface.inetAddresses) {
                 if (!addr.isLoopbackAddress && addr.isSiteLocalAddress) {
-                    return "http://${addr.hostAddress}:8322"
+                    return "http://${addr.hostAddress}:${EmbeddedServer.DEFAULT_PORT}"
                 }
             }
         }
-        "http://localhost:8322"
+        "http://localhost:${EmbeddedServer.DEFAULT_PORT}"
     } catch (e: Exception) {
-        "http://localhost:8322"
+        "http://localhost:${EmbeddedServer.DEFAULT_PORT}"
     }
 }
 

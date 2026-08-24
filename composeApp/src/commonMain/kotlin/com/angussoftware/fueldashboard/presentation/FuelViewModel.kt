@@ -256,52 +256,6 @@ data class DashboardState(
         get() = settings.providers.any { it.kind == ProviderKind.CONNECTED_API && it.isConfigured }
 }
 
-// TEMPORARY HEURISTIC: These model names are hardcoded and will drift as
-// providers update their model lineups. This should eventually be replaced
-// with dynamic model discovery from each provider's API.
-/**
- * Returns default model tiers for a provider kind — used by the decision engine
- * when no orchestrator is connected. This is a best-effort heuristic mapping
- * based on known provider model lineups.
- */
-private fun defaultModelsFor(kind: ProviderKind): List<FuelModel> = when (kind) {
-    ProviderKind.ZAI -> listOf(
-        FuelModel("glm-4.5", Complexity.TRIVIAL, bareName = "glm-4.5"),
-        FuelModel("glm-4.6", Complexity.LIGHT, bareName = "glm-4.6"),
-        FuelModel("glm-4.7", Complexity.MEDIUM, bareName = "glm-4.7"),
-        FuelModel("glm-5", Complexity.HEAVY, bareName = "glm-5"),
-        FuelModel("glm-5.1", Complexity.HEAVY, bareName = "glm-5.1"),
-    )
-    ProviderKind.LETTA_CLOUD -> listOf(
-        FuelModel("letta-lite", Complexity.LIGHT),
-        FuelModel("letta-standard", Complexity.MEDIUM),
-        FuelModel("letta-pro", Complexity.HEAVY),
-    )
-    ProviderKind.OPENAI -> listOf(
-        FuelModel("gpt-4o-mini", Complexity.LIGHT),
-        FuelModel("gpt-4o", Complexity.MEDIUM),
-        FuelModel("o1", Complexity.HEAVY),
-    )
-    ProviderKind.ANTHROPIC -> listOf(
-        FuelModel("claude-3-5-haiku", Complexity.LIGHT),
-        FuelModel("claude-3-5-sonnet", Complexity.MEDIUM),
-        FuelModel("claude-3-opus", Complexity.HEAVY),
-    )
-    ProviderKind.DEEPSEEK -> listOf(
-        FuelModel("deepseek-chat", Complexity.MEDIUM),
-        FuelModel("deepseek-reasoner", Complexity.HEAVY),
-    )
-    ProviderKind.GROQ -> listOf(
-        FuelModel("llama-3.1-8b", Complexity.LIGHT),
-        FuelModel("llama-3.1-70b", Complexity.MEDIUM),
-    )
-    ProviderKind.MISTRAL -> listOf(
-        FuelModel("mistral-small", Complexity.LIGHT),
-        FuelModel("mistral-large", Complexity.MEDIUM),
-    )
-    ProviderKind.JUNIE -> emptyList()
-    ProviderKind.CONNECTED_API -> emptyList()
-}
 
 class FuelViewModel {
 
@@ -452,6 +406,8 @@ class FuelViewModel {
             while (true) {
                 try {
                     refresh()
+                } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                    throw e // scope shutdown — never swallow cooperative cancellation
                 } catch (e: Exception) {
                     // Don't let one failed refresh kill the poll loop.
                     // Log the error and continue after the interval.
@@ -1024,6 +980,8 @@ class FuelViewModel {
             scope.async {
                 try {
                     providerId to Result.success(adapter.poll())
+                } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                    throw e // cancellation must propagate, not become a provider error
                 } catch (e: Exception) {
                     providerId to Result.failure(e)
                 }
@@ -1233,59 +1191,6 @@ class FuelViewModel {
     fun close() {
         stopPolling()
         closeAdapters()
-    }
-
-    // --- Standalone decision engine helpers ---
-
-    /**
-     * Builds a FuelConfig for the decision engine from current provider reports.
-     * Maps provider kinds to known model tiers (best-effort heuristic).
-     */
-    private fun buildFuelConfigFromReports(
-        reports: Map<String, ProviderReport>,
-        providerConfigs: List<ProviderConfig>,
-    ): FuelConfig {
-        val providers = reports.map { (id, report) ->
-            val config = providerConfigs.find { it.id == id }
-            val name = config?.resolvedDisplayName() ?: report.displayName
-            FuelProviderConfig(
-                name = name,
-                priority = when (config?.kind) {
-                    ProviderKind.ZAI -> 1
-                    ProviderKind.LETTA_CLOUD -> 2
-                    ProviderKind.OPENAI -> 3
-                    ProviderKind.ANTHROPIC -> 3
-                    ProviderKind.DEEPSEEK -> 4
-                    ProviderKind.GROQ -> 5
-                    ProviderKind.MISTRAL -> 5
-                    else -> 9
-                },
-                models = config?.kind?.let { kind ->
-                    defaultModelsFor(kind)
-                } ?: emptyList(),
-            )
-        }
-        return FuelConfig(providers = providers)
-    }
-
-    /**
-     * Maps provider states for the decision engine.
-     */
-    private fun buildProviderStates(
-        reports: Map<String, ProviderReport>,
-    ): Map<String, ProviderStateInfo> {
-        return reports.mapValues { (id, report) ->
-            ProviderStateInfo(
-                name = report.displayName,
-                remainingPct = report.remainingPct,
-                available = report.available,
-                resetsAt = if (report.resetsAt != null) {
-                    mapOf("main" to report.resetsAt)
-                } else {
-                    emptyMap()
-                },
-            )
-        }
     }
 
     /**

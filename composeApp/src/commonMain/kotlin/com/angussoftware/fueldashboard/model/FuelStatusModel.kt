@@ -12,20 +12,12 @@ import com.angussoftware.fueldashboard.util.epochMillis
  * same [DashboardState].
  */
 data class FuelStatusModel(
-    /** Most critical provider — the collapsed-notification headline. */
-    val headline: Headline?,
     /** One entry per report-bearing provider, in display order. */
     val quotaLines: List<QuotaLine>,
     /** Credit pools (Letta credits, Junie balance) when known. */
     val creditLines: List<CreditLine>,
     val lastUpdated: Long,
 ) {
-    data class Headline(
-        val name: String,
-        val remainingPct: Int?,
-        val resetsAt: Long?,
-    )
-
     data class QuotaLine(
         val name: String,
         val remainingPct: Int?,
@@ -55,7 +47,7 @@ data class FuelStatusModel(
         val junieBalance: Double? = null,
     )
 
-    val hasAnyData: Boolean get() = headline != null || creditLines.isNotEmpty()
+    val hasAnyData: Boolean get() = quotaLines.isNotEmpty() || creditLines.isNotEmpty()
 
     /**
      * Collapsed-notification body text: all quota providers joined with
@@ -111,13 +103,6 @@ data class FuelStatusModel(
                     )
                 }
 
-            // Headline: the lowest remaining percentage; providers without a
-            // percentage (credit pools) never headline — they're in creditLines.
-            val headline = reports
-                .filter { it.remainingPct != null }
-                .minByOrNull { it.remainingPct!! }
-                ?.let { Headline(it.displayName, it.remainingPct, it.resetsAt) }
-
             val creditLines = buildList {
                 reports.firstOrNull { it.creditsTotal != null }?.let { r ->
                     add(
@@ -134,7 +119,6 @@ data class FuelStatusModel(
             }
 
             return FuelStatusModel(
-                headline = headline,
                 quotaLines = quotaLines,
                 creditLines = creditLines,
                 lastUpdated = state.lastUpdated,

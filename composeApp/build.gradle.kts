@@ -89,16 +89,11 @@ kotlin {
             implementation(libs.kotlinx.datetime)
 
             implementation(libs.qrcode.kotlin)
-
-            implementation(libs.androidx.lifecycle.viewmodel)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
         }
 
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.ktor.client.cio)
-            implementation(libs.kotlinx.coroutines.swing)
 
             // SLF4J provider — routes ACP/Ktor/kotlin-logging output to log file
             implementation(libs.slf4j.simple)

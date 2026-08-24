@@ -593,35 +593,6 @@ private fun EmptyState(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Burn Rate Status
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun BurnRateStatus(
-    burnRate: Double?,
-    dataPoints: Int,
-    showHelp: Boolean,
-) {
-    Column {
-        val text = if (burnRate == null || dataPoints < 3) {
-            "\u26A7 Collecting data for burn rate... ($dataPoints/3 points)"
-        } else {
-            "Burn rate: ${formatRoot("%.1f", burnRate)}% / hour ($dataPoints samples)"
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (showHelp) {
-                Spacer(Modifier.width(4.dp))
-                HelpIcon("How fast you're consuming quota (per hour)")
-            }
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Provider Section (multi-provider)

@@ -33,11 +33,6 @@ class FuelStatusModelTest {
             ),
         )
         val model = FuelStatusModel.from(state)
-
-        assertNotNull(model.headline)
-        assertEquals("Letta", model.headline!!.name)
-        assertEquals(30, model.headline!!.remainingPct)
-        assertEquals(2000L, model.headline!!.resetsAt)
     }
 
     @Test
@@ -49,8 +44,6 @@ class FuelStatusModelTest {
             junieBalance = 38.50,
         )
         val model = FuelStatusModel.from(state)
-
-        assertNull(model.headline, "credit-only provider must not headline")
         // Letta credits + Junie balance = two credit lines
         assertEquals(2, model.creditLines.size)
         assertEquals(1234, model.creditLines[0].creditsTotal)
@@ -71,7 +64,6 @@ class FuelStatusModelTest {
     @Test
     fun emptyStateHasNoData() {
         val model = FuelStatusModel.from(DashboardState())
-        assertNull(model.headline)
         assertTrue(!model.hasAnyData)
         assertTrue(model.quotaLines.isEmpty())
     }
@@ -115,7 +107,6 @@ class FuelStatusModelTest {
 
         assertEquals(1, model.quotaLines.size)
         assertEquals("Alive", model.quotaLines[0].name)
-        assertEquals("Alive", model.headline!!.name)
     }
 
     @Test
@@ -169,9 +160,7 @@ class FuelStatusModelTest {
     private fun modelWith(
         quota: List<FuelStatusModel.QuotaLine> = emptyList(),
         credits: List<FuelStatusModel.CreditLine> = emptyList(),
-        headline: FuelStatusModel.Headline? = null,
     ) = FuelStatusModel(
-        headline = headline,
         quotaLines = quota,
         creditLines = credits,
         lastUpdated = 0L,
@@ -189,7 +178,6 @@ class FuelStatusModelTest {
                 FuelStatusModel.QuotaLine("z.ai", 58, resetsAt = null, available = true),
                 FuelStatusModel.QuotaLine("Letta", 75, resetsAt = null, available = true),
             ),
-            headline = FuelStatusModel.Headline("z.ai", 58, null),
         )
         val body = m.collapsedBodyText("Loading…")
         assertTrue(body.startsWith("z.ai 58%"), body)
@@ -200,9 +188,8 @@ class FuelStatusModelTest {
     fun collapsedBody_nullPctRendersDash_notZero() {
         val m = modelWith(
             quota = listOf(FuelStatusModel.QuotaLine("Unknown provider", null, resetsAt = null, available = true)),
-            headline = FuelStatusModel.Headline("Unknown provider", null, null),
         )
-        // hasAnyData requires headline != null; null pct renders as "—", never "0%"
+        // null pct renders as "—", never "0%"; any quota line counts as data
         assertEquals("Unknown provider —", m.collapsedBodyText("Loading…"))
     }
 
@@ -230,7 +217,6 @@ class FuelStatusModelTest {
                     available = true,
                 ),
             ),
-            headline = FuelStatusModel.Headline("z.ai", 40, now + (2 * 60 + 15) * 60_000),
         )
         val body = m.collapsedBodyText("Loading…")
         assertTrue(body.startsWith("z.ai 40% · 2h 1"), body) // 2h 15m ± minute boundary

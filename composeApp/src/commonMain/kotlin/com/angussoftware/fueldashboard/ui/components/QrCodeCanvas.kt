@@ -103,20 +103,28 @@ fun minimumInformationDensity(
 /**
  * Checks if the given data can fit in a QR code at LOW error correction, and reports
  * the smallest QR version that would be used.
+ *
+ * `tooLarge` gates on the reliably-scannable bound (version ≤ 20 — matches the
+ * dialog's guidance text), not the theoretical version-40 byte maximum: a
+ * version 21-40 code renders but is effectively unscannable on phones.
  */
 fun estimateQrCapacity(data: String): QrCapacityResult {
     val byteLength = data.toByteArray(Charsets.UTF_8).size
-    val maxBytes = 2953
+    // ~667 bytes at LOW error correction for version 20 (reliable bound)
+    val maxBytes = 667
     val processor = QRCodeProcessor(data, ErrorCorrectionLevel.LOW)
     val version = (1..QRCodeProcessor.MAXIMUM_INFO_DENSITY).firstOrNull { v ->
         runCatching { processor.encode(v) }.isSuccess
     }
-    return if (version == null) {
+    return if (version == null || version > RELIABLE_MAX_VERSION) {
         QrCapacityResult(tooLarge = true, byteLength = byteLength, maxBytes = maxBytes)
     } else {
         QrCapacityResult(tooLarge = false, byteLength = byteLength, version = version)
     }
 }
+
+/** Highest QR version considered reliably scannable by phone cameras. */
+const val RELIABLE_MAX_VERSION = 20
 
 data class QrCapacityResult(
     val tooLarge: Boolean,
