@@ -64,6 +64,7 @@ kotlin {
         }
     }
 
+    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
     sourceSets {
         val desktopMain by getting
         val desktopTest by getting
@@ -132,6 +133,7 @@ kotlin {
         }
 
         desktopTest.dependencies {
+            implementation(compose.uiTest)
             implementation(libs.ktor.server.test.host)
             implementation(libs.kotlinx.coroutines.test)
         }
@@ -197,3 +199,14 @@ sqldelight {
         }
     }
 }
+
+// Hermetic tests: the desktop SettingsStore actual backs onto
+// Preferences.userRoot() (filesystem under $user.home/.java/.userprefs on
+// Linux). Without isolation, tests constructing FuelViewModel would load the
+// dev machine's REAL provider configs (live API keys) and re-import flows
+// could start live polling. Redirect the test JVM's user.home into the build
+// tree so the prefs node starts empty.
+tasks.withType<Test>().configureEach {
+    systemProperty("user.home", layout.buildDirectory.dir("test-home").get().asFile.absolutePath)
+}
+

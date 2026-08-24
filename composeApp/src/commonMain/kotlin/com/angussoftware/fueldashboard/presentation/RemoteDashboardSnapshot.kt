@@ -28,13 +28,25 @@ internal object RemoteDashboardFetcher {
         return try {
             val client = FuelApiClient(normalize(adapterUrl), apiKey)
             val body = client.getDashboardSnapshot() ?: return null
+            parse(body)
+        } catch (_: Exception) {
+            null // non-fatal: mobile stays on whatever it had
+        }
+    }
+
+    /**
+     * Parses a `/dashboard` snapshot body into display types.
+     * Extracted for round-trip testing against [DashboardSnapshot.build].
+     */
+    internal fun parse(body: String): RemoteDashboardSnapshot? {
+        return try {
             val root = json.parseToJsonElement(body).jsonObject
             RemoteDashboardSnapshot(
                 metered = mapMetered(root),
                 intelligence = mapIntelligence(root),
             )
         } catch (_: Exception) {
-            null // non-fatal: mobile stays on whatever it had
+            null
         }
     }
 
