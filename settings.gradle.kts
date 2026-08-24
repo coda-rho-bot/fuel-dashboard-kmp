@@ -16,6 +16,15 @@ pluginManagement {
         val forgejoToken: String? = providers.gradleProperty("forgejo.token").orNull ?: System.getenv("FORGEJO_TOKEN")
 
         // Resolve Angus Gradle Tools plugin markers from Forgejo Maven Registry
+        // angus-bot namespace: where gradle-tools is published since the Aug 19
+        // repo transfer (rhomancer/maven never had 0.3.0 — fresh builds 404 there)
+        maven {
+            url = uri("https://git.angussoftware.dev/api/packages/angus-bot/maven")
+            credentials {
+                username = "rhomancer"
+                password = forgejoToken
+            }
+        }
         maven {
             url = uri("https://git.angussoftware.dev/api/packages/rhomancer/maven")
             credentials {
