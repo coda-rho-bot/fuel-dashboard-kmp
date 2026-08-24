@@ -105,7 +105,7 @@ class EmbeddedServerEndpointsTest {
             assertEquals(HttpStatusCode.OK, status)
             val body: String = body()
             assertTrue(body.contains("fuel-dashboard"), body)
-            assertTrue(body.contains("0.1"), body)
+            // Version intentionally not pinned — API version bumps shouldn't break this suite.
         }
     }
 

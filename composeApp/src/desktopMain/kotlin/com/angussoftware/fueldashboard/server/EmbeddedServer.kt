@@ -248,7 +248,7 @@ class EmbeddedServer(
 
         routing {
             get("/") {
-                call.respond(ServiceInfo("fuel-dashboard", "0.1", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /sync", "POST /sync", "GET /dashboard", "GET /v1/usage", "POST /v1/usage (universal usage ingestion)", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
+                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /sync", "POST /sync", "GET /dashboard", "GET /v1/usage", "POST /v1/usage (universal usage ingestion)", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
             }
 
             get("/fuel") {
