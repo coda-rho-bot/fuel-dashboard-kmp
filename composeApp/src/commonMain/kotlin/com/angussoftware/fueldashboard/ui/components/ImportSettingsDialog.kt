@@ -58,6 +58,7 @@ fun ImportEntryDialog(
     onImportCode: (SettingsSyncData) -> Unit,
     onDismiss: () -> Unit,
     title: String = "Import Settings",
+    subtitle: String? = null,
 ) {
     var codeText by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -76,6 +77,17 @@ fun ImportEntryDialog(
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
+                // What this import will actually land on the device — scoped
+                // payloads only apply their own domain, and users deserve to
+                // know before scanning.
+                subtitle?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
                 // --- Option 1: Scan QR (Android only) ---
                 if (canScanQr) {
                     Text(

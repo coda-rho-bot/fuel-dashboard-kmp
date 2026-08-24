@@ -799,6 +799,7 @@ private fun ProvidersSection(
             onScanQr = { qrScanner.launch() },
             onImportCode = { parsed -> scannedSyncData = parsed },
             onDismiss = { showImportEntryDialog = false },
+            subtitle = "Imports providers (API keys, budgets), the dashboard connection, and preferences. Existing agents are not touched — agents sync separately.",
         )
     }
 

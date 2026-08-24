@@ -36,6 +36,9 @@ object AgentSettingsStore {
 
     /**
      * Generates a unique ID for a new agent config.
+     * Milliseconds + random suffix — two agents added in the same
+     * millisecond (bulk import, fast taps) must not collide.
      */
-    fun generateAgentId(): String = "agent-${System.currentTimeMillis()}"
+    fun generateAgentId(): String =
+        "agent-${System.currentTimeMillis()}-${kotlin.random.Random.nextInt(1_000, 9_999)}"
 }

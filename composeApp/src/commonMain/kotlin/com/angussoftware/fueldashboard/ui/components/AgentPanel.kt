@@ -253,6 +253,7 @@ fun AgentPanel(
             onImportCode = { parsed -> scannedSyncData = parsed },
             onDismiss = { showImportEntryDialog = false },
             title = "Import Agents",
+            subtitle = "Imports agent configurations (name, launcher command, model) from the other device. Providers and settings are not touched.",
         )
     }
 
@@ -765,6 +766,8 @@ private fun StatusDot(status: String) {
         "connected" -> Color(0xFF4CAF50) // green
         "idle" -> Color(0xFFFFA726) // amber
         "thinking" -> Color(0xFF42A5F5) // blue
+        "synced" -> Color(0xFF26A69A) // teal — config-synced, no live connection
+        "error" -> MaterialTheme.colorScheme.error // red — distinct from plain grey
         else -> MaterialTheme.colorScheme.outline // grey for disconnected
     }
     Box(

@@ -63,7 +63,6 @@ import com.angussoftware.fueldashboard.ui.components.HelpIcon
 import com.angussoftware.fueldashboard.ui.components.HelpText
 import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
 import com.angussoftware.fueldashboard.ui.components.FuelStatusCard
-import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.CountdownText
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -379,7 +378,7 @@ private fun MobileEmptyState(
             )
             if (showHelp) {
                 Spacer(Modifier.height(16.dp))
-                HelpText("Welcome! Add a provider by clicking + Add in Providers below.")
+                HelpText("Providers live in Settings now — the gear icon in the top bar opens provider setup.")
             }
         }
     }

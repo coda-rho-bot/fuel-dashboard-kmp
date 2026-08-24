@@ -82,7 +82,6 @@ import com.angussoftware.fueldashboard.ui.components.JunieProviderBalance
 import com.angussoftware.fueldashboard.ui.components.FuelStatusCard
 import com.angussoftware.fueldashboard.ui.components.MeteredUsagePanel
 import com.angussoftware.fueldashboard.ui.components.ModelDrainRatesPanel
-import com.angussoftware.fueldashboard.ui.components.RecommendationBanner
 import com.angussoftware.fueldashboard.ui.components.SettingsPanel
 import com.angussoftware.fueldashboard.ui.components.CountdownText
 import com.angussoftware.theming.compose.ui.settings.ThemeSettingsPanel
@@ -211,7 +210,7 @@ fun FuelDashboardApp(
 // ---------------------------------------------------------------------------
 
 internal enum class DesktopTab(val label: String) {
-    OVERVIEW("Overview"),
+    OVERVIEW("Fuel"), // aligned with mobile's tab name — was "Overview"
     USAGE("Usage"),
     INTEL("Intel"),
     AGENTS("Agents"),
@@ -301,6 +300,13 @@ private fun DesktopLayout(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
+                        if (state.showHelp) {
+                            Text(
+                                "Reorder sections with the ▲▼ arrows on each panel.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            )
+                        }
                         val sections = usageOrder.mapIndexed { i, key ->
                             key to (
                                 (if (i > 0) ({ moveUsage(key, -1) }) else null) to
@@ -358,6 +364,13 @@ private fun DesktopLayout(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
+                        if (state.showHelp) {
+                            Text(
+                                "Reorder sections with the ▲▼ arrows on each panel.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            )
+                        }
                         val sections = intelOrder.mapIndexed { i, key ->
                             key to (
                                 (if (i > 0) ({ moveIntel(key, -1) }) else null) to
@@ -587,7 +600,7 @@ private fun EmptyState(
             )
             if (showHelp) {
                 Spacer(Modifier.height(16.dp))
-                HelpText("Welcome! Add a provider by clicking + Add in Providers below.")
+                HelpText("Providers live in Settings now — the gear icon in the top bar opens provider setup.")
             }
         }
     }

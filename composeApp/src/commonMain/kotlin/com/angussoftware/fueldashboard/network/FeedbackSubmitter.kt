@@ -73,8 +73,8 @@ object FeedbackSubmitter {
     /** Maps an HTTP failure to a user-actionable message. */
     internal fun mapFailure(status: Int, text: String): Result.Failure = Result.Failure(
         when (status) {
-            403 -> "Feedback token was rejected (403) — re-sync settings from the main dashboard."
-            401 -> "Feedback token is invalid (401) — re-sync settings from the main dashboard."
+            403 -> "Feedback token was rejected (403) — the built-in report token may have been rotated. Please report this via the project repository directly."
+            401 -> "Feedback token is invalid (401) — the built-in report token may have been rotated. Please report this via the project repository directly."
             else -> "HTTP $status: $text"
         },
     )

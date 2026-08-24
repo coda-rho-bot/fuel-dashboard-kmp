@@ -60,7 +60,7 @@ class FeedbackSubmitterTest {
     fun mapFailure401AdvisesResync() {
         val result = FeedbackSubmitter.mapFailure(401, "unauthorized")
         assertEquals(
-            "Feedback token is invalid (401) — re-sync settings from the main dashboard.",
+            "Feedback token is invalid (401) — the built-in report token may have been rotated. Please report this via the project repository directly.",
             (result as FeedbackSubmitter.Result.Failure).message,
         )
     }
@@ -69,7 +69,7 @@ class FeedbackSubmitterTest {
     fun mapFailure403AdvisesResync() {
         val result = FeedbackSubmitter.mapFailure(403, "forbidden")
         assertEquals(
-            "Feedback token was rejected (403) — re-sync settings from the main dashboard.",
+            "Feedback token was rejected (403) — the built-in report token may have been rotated. Please report this via the project repository directly.",
             (result as FeedbackSubmitter.Result.Failure).message,
         )
     }
