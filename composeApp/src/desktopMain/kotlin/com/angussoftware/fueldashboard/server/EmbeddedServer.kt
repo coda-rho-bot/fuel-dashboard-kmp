@@ -70,6 +70,12 @@ class EmbeddedServer(
     private val onProvidersChanged: () -> Unit = {},
     private val onImportSettings: ((SettingsSyncData) -> Unit)? = null,
     private val dashboardStateProvider: () -> com.angussoftware.fueldashboard.presentation.DashboardState? = { null },
+    /** API key for auth. Defaults to the persisted key from ServerApiKeyStore. Tests inject a known key. */
+    internal val apiKey: String = ServerApiKeyStore.loadOrCreate(Companion::generateApiKey),
+    /** When false, the MCP streamable HTTP endpoint is not installed (for tests). */
+    private val enableMcp: Boolean = true,
+    /** Override Junie balance data (for tests). Defaults to reading from persisted settings. */
+    private val junieBalanceProvider: () -> JunieBalanceData? = Companion::defaultJunieBalanceData,
 ) {
     companion object {
         const val DEFAULT_PORT = 8322
@@ -77,10 +83,25 @@ class EmbeddedServer(
         const val DEFAULT_HOST = "0.0.0.0"
         private const val GRACE_PERIOD_MS = 500L
         private const val TIMEOUT_MS = 1_000L
+
+        private fun generateApiKey(): String = ByteArray(32)
+            .also(SecureRandom()::nextBytes)
+            .let { Base64.getUrlEncoder().withoutPadding().encodeToString(it) }
+
+        private fun defaultJunieBalanceData(): JunieBalanceData? {
+            val balance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull()
+                ?: return null
+            val license = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null }
+            val lastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull()
+            return JunieBalanceData(
+                balance = balance,
+                license = license,
+                lastChecked = lastChecked,
+            )
+        }
     }
 
     private var server: KtorServer<*, *>? = null
-    private val apiKey = ServerApiKeyStore.loadOrCreate(::generateApiKey)
 
     /** Public server URL (tunnel or LAN) — set by main.kt, used for sync data. */
     var serverUrl: String? = null
@@ -133,7 +154,7 @@ class EmbeddedServer(
     fun start() {
         if (server != null) return
         try {
-            server = embeddedServer(CIO, host = host, port = port) { configureRouting() }
+            server = embeddedServer(CIO, host = host, port = port) { configureRouting(this) }
             server?.start(wait = false)
             println("[EmbeddedServer] Listening on http://$host:$port")
         } catch (e: java.net.BindException) {
@@ -183,23 +204,7 @@ class EmbeddedServer(
         }
     }
 
-    /**
-     * Reads the last-known Junie balance from persisted settings.
-     * Returns null if no balance has ever been checked.
-     */
-    private fun junieBalanceData(): JunieBalanceData? {
-        val balance = loadStringSetting(FuelSettingsKeys.JUNIE_BALANCE, "").toDoubleOrNull()
-            ?: return null
-        val license = loadStringSetting(FuelSettingsKeys.JUNIE_LICENSE, "").ifBlank { null }
-        val lastChecked = loadStringSetting(FuelSettingsKeys.JUNIE_LAST_CHECKED, "").toLongOrNull()
-        return JunieBalanceData(
-            balance = balance,
-            license = license,
-            lastChecked = lastChecked,
-        )
-    }
-
-    private fun Application.configureRouting() {
+    internal fun configureRouting(app: Application) = with(app) {
         // CORS: anyHost() is safe because credentials are NOT enabled.
         // MCP clients and browsers from any origin can connect, but they still
         // need a valid Bearer API key for every endpoint except /health.
@@ -219,27 +224,37 @@ class EmbeddedServer(
         }
 
         // Create the MCP server with shared access to the agent registry and fuel state
-        val mcpServer = FuelMcpServer(
-            registeredAgents = registeredAgents,
-            agentIdCounter = agentIdCounter,
-            fuelStateProvider = { fuelState },
-            agentRegistry = agentRegistry,
-            onProvidersChanged = onProvidersChanged,
-            serverUrlProvider = { serverUrl },
-            serverApiKeyProvider = { apiKey },
-            usageRepository = usageRepository,
-            dashboardStateProvider = dashboardStateProvider,
-        ).createServer()
+        if (enableMcp) {
+            val mcpServer = FuelMcpServer(
+                registeredAgents = registeredAgents,
+                agentIdCounter = agentIdCounter,
+                fuelStateProvider = { fuelState },
+                agentRegistry = agentRegistry,
+                onProvidersChanged = onProvidersChanged,
+                serverUrlProvider = { serverUrl },
+                serverApiKeyProvider = { apiKey },
+                usageRepository = usageRepository,
+                dashboardStateProvider = dashboardStateProvider,
+            ).createServer()
+
+            // MCP endpoint (Streamable HTTP at /mcp) — allows agents to self-register via MCP protocol
+            // Note: mcpStreamableHttp auto-installs ContentNegotiation with McpJson, but since we already
+            // installed it above, the SDK will log a warning and use our existing config (which is compatible
+            // because we set explicitNulls = false and encodeDefaults = true).
+            mcpStreamableHttp(enableDnsRebindingProtection = false) {
+                mcpServer
+            }
+        }
 
         routing {
             get("/") {
-                call.respond(ServiceInfo("fuel-dashboard", "2.0", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /sync", "POST /sync", "GET /dashboard", "GET /v1/usage", "POST /v1/usage (universal usage ingestion)", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
+                call.respond(ServiceInfo("fuel-dashboard", "0.1", listOf("GET /fuel", "GET /decisions", "GET /agents", "GET /alerts", "GET /sync", "POST /sync", "GET /dashboard", "GET /v1/usage", "POST /v1/usage (universal usage ingestion)", "GET /health (no auth)", "POST /agents/register", "POST /agents/{id}/state", "DELETE /agents/{id}", "POST /mcp (MCP Streamable HTTP)")))
             }
 
             get("/fuel") {
                 val state = fuelState
-                val withJunie = state?.copy(junie = junieBalanceData())
-                    ?: FuelResponse(junie = junieBalanceData())
+                val withJunie = state?.copy(junie = junieBalanceProvider())
+                    ?: FuelResponse(junie = junieBalanceProvider())
                 call.respond(withJunie)
             }
 
@@ -502,14 +517,6 @@ class EmbeddedServer(
                 call.respondText("""{"status":"ok"}""", ContentType.Application.Json)
             }
         }
-
-        // MCP endpoint (Streamable HTTP at /mcp) — allows agents to self-register via MCP protocol
-        // Note: mcpStreamableHttp auto-installs ContentNegotiation with McpJson, but since we already
-        // installed it above, the SDK will log a warning and use our existing config (which is compatible
-        // because we set explicitNulls = false and encodeDefaults = true).
-        mcpStreamableHttp(enableDnsRebindingProtection = false) {
-            mcpServer
-        }
     }
 
     private suspend fun ApplicationCall.requireApiKey(): Boolean {
@@ -519,10 +526,6 @@ class EmbeddedServer(
         respond(HttpStatusCode.Unauthorized, ErrorResponse(error))
         return false
     }
-
-    private fun generateApiKey(): String = ByteArray(32)
-        .also(SecureRandom()::nextBytes)
-        .let { Base64.getUrlEncoder().withoutPadding().encodeToString(it) }
 
     private fun epochMillisNow(): Long = System.currentTimeMillis()
 }

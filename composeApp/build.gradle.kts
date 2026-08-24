@@ -66,6 +66,7 @@ kotlin {
 
     sourceSets {
         val desktopMain by getting
+        val desktopTest by getting
 
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -128,6 +129,11 @@ kotlin {
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+
+        desktopTest.dependencies {
+            implementation(libs.ktor.server.test.host)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
