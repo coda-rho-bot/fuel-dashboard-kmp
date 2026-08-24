@@ -62,6 +62,8 @@ nav:
   - Where Data Comes From: data-flow.md
   - Self-Hosting & API: self-hosting.md
   - Troubleshooting: troubleshooting.md
+  - Privacy Policy: privacy-policy.md
+  - Release Notes: beta-release-notes.md
   - Research Notes (archive):
       - Agent Framework: research/agent-framework-research.md
       - MCP Server: research/mcp-server-research.md
