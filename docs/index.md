@@ -43,3 +43,6 @@ It runs as a Kotlin Multiplatform app (desktop + Android) with an embedded API s
 - **[The Advisor](advisor.md)** — how the fuel advisor decides what (if anything) to recommend
 - **[Where Data Comes From](data-flow.md)** — the source of every number you see
 - **[Troubleshooting](troubleshooting.md)** — the real failure modes and their fixes
+- **[Privacy Policy](privacy-policy.md)** — local-first, no telemetry, no data collection
+- **[Play Store Listing](play-store-listing.md)** — Google Play listing text, data-safety, content rating
+- **[Release Notes](beta-release-notes.md)** — 0.2.0-beta.1 changelog and known limitations
