@@ -368,19 +368,31 @@ private fun StatusSurfaceSection() {
     }
 }
 
-/** One-line documentation link — reference material, belongs at the bottom. */
+/** Footer links — documentation and support, belongs at the bottom. */
 @Composable
 private fun DocumentationFooter() {
     val uriHandler = LocalUriHandler.current
-    Text(
-        text = "Documentation: docs.angussoftware.dev/fuel-dashboard",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-        textDecoration = TextDecoration.Underline,
-        modifier = Modifier.clickable {
-            uriHandler.openUri("https://docs.angussoftware.dev/fuel-dashboard")
-        },
-    )
+    Column {
+        Text(
+            text = "Documentation: docs.angussoftware.dev/fuel-dashboard",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable {
+                uriHandler.openUri("https://docs.angussoftware.dev/fuel-dashboard")
+            },
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Support the project on Ko-fi",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable {
+                uriHandler.openUri("https://ko-fi.com/angussoftware")
+            },
+        )
+    }
 }
 
 /**
