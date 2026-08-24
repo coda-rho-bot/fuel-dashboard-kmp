@@ -770,6 +770,14 @@ class FuelViewModel {
         val isAgentsOnly = syncData.scope == com.angussoftware.fueldashboard.model.SettingsSyncData.SCOPE_AGENTS
         val isSettingsOnly = syncData.scope == com.angussoftware.fueldashboard.model.SettingsSyncData.SCOPE_SETTINGS
 
+        // NOTE on serverApiKey: this path deliberately does NOT write
+        // syncData.serverApiKey to ServerApiKeyStore (unlike the server's
+        // legacy fallback path). The payload's key is the SENDER's copy of
+        // THIS device's key — saving it would be a self-no-op in the normal
+        // case and would clobber this device's own key when importing a
+        // foreign dashboard's settings. The key lands in the CONNECTED_API
+        // provider entry below, which is the correct destination for it.
+
         // Section orders (Usage/Intel tabs) — empty lists keep the receiver's own.
         if (!isAgentsOnly && syncData.usageSectionOrder.isNotEmpty()) {
             com.angussoftware.fueldashboard.settings.SectionOrder.save(
@@ -863,6 +871,11 @@ class FuelViewModel {
         }
 
         // Remote Dashboard provider is already added above in the providers list
+
+        // Bump lastUpdated: UI caches keyed on it (e.g. mobile section order)
+        // re-read their prefs after an import instead of showing stale order
+        // until the tab is left and re-entered.
+        _state.update { it.copy(lastUpdated = epochMillis()) }
     }
 
     /**

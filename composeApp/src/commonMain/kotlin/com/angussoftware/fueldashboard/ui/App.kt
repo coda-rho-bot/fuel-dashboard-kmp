@@ -290,6 +290,9 @@ private fun DesktopLayout(
                             SectionOrder.USAGE_KEYS,
                             key,
                             offset,
+                            // Skip hidden sections when swapping — moving past
+                            // an invisible panel looks like a dead button.
+                            isVisible = { section -> section != "drain" || state.modelDrainRates.isNotEmpty() },
                         )
                     }
                     Column(
@@ -354,6 +357,7 @@ private fun DesktopLayout(
                             SectionOrder.INTEL_KEYS,
                             key,
                             offset,
+                            isVisible = { _ -> true }, // all Intel sections always rendered
                         )
                     }
                     Column(

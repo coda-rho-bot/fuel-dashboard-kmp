@@ -29,9 +29,9 @@ data class SettingsSyncData(
      */
     val scope: String = SCOPE_FULL,
     val providers: List<ProviderConfig>,
-    val themeMode: String,
-    val lightColorTheme: String,
-    val darkColorTheme: String,
+    val themeMode: String = "SYSTEM",
+    val lightColorTheme: String = "Default",
+    val darkColorTheme: String = "Default",
     val serverUrl: String? = null,
     val serverApiKey: String? = null,
     val agentSettings: AgentSettings = AgentSettings(),
@@ -189,6 +189,12 @@ data class SettingsSyncData(
     fun forAgentsQr(): SettingsSyncData = copy(
         scope = SCOPE_AGENTS,
         providers = emptyList(),
+        // Theme fields are required-but-ignored for agents-scope imports;
+        // canonical defaults let the QR encoder (encodeDefaults=false)
+        // drop them instead of paying dead bytes.
+        themeMode = "SYSTEM",
+        lightColorTheme = "Default",
+        darkColorTheme = "Default",
         serverUrl = null,
         serverApiKey = null,
         junieBalance = null,

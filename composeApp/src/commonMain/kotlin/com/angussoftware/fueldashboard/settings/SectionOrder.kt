@@ -40,12 +40,37 @@ object SectionOrder {
     }
 
     /** Move a key up (-1) / down (+1); persists and returns the new order. */
-    fun move(settingKey: String, defaultKeys: List<String>, key: String, offset: Int): List<String> {
+    /**
+     * Moves [key] by [offset] positions, skipping sections for which
+     * [isVisible] is false. Without the predicate, moving past a hidden
+     * section (e.g. model drain rates with no data) appears to do nothing
+     * — the swap partner is invisible.
+     */
+    fun move(
+        settingKey: String,
+        defaultKeys: List<String>,
+        key: String,
+        offset: Int,
+        isVisible: (String) -> Boolean = { _ -> true },
+    ): List<String> {
         val order = load(settingKey, defaultKeys).toMutableList()
         val index = order.indexOf(key)
         if (index < 0) return order
-        val target = index + offset
-        if (target < 0 || target >= order.size) return order
+
+        val direction = if (offset < 0) -1 else 1
+        var target = index
+        var remaining = kotlin.math.abs(offset)
+        while (remaining > 0) {
+            // Find the next VISIBLE neighbor in the move direction.
+            var next = target + direction
+            while (next >= 0 && next < order.size && !isVisible(order[next])) {
+                next += direction
+            }
+            if (next < 0 || next >= order.size) return order // no visible neighbor that way
+            target = next
+            remaining--
+        }
+
         val item = order.removeAt(index)
         order.add(target, item)
         save(settingKey, order)

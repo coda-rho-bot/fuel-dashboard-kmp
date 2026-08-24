@@ -57,7 +57,7 @@ class FeedbackSubmitterTest {
     }
 
     @Test
-    fun mapFailure401AdvisesResync() {
+    fun mapFailure401ExplainsRotation() {
         val result = FeedbackSubmitter.mapFailure(401, "unauthorized")
         assertEquals(
             "Feedback token is invalid (401) — the built-in report token may have been rotated. Please report this via the project repository directly.",
@@ -66,7 +66,7 @@ class FeedbackSubmitterTest {
     }
 
     @Test
-    fun mapFailure403AdvisesResync() {
+    fun mapFailure403ExplainsRotation() {
         val result = FeedbackSubmitter.mapFailure(403, "forbidden")
         assertEquals(
             "Feedback token was rejected (403) — the built-in report token may have been rotated. Please report this via the project repository directly.",

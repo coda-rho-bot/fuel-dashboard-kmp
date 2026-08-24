@@ -154,7 +154,7 @@ fun MobileDashboard(
                     ) {
                         // Sections in the user's synced order (reordered on desktop;
                         // order syncs across devices via SettingsSyncData)
-                        for (key in remember { com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage() }) {
+                        for (key in remember(state.lastUpdated) { com.angussoftware.fueldashboard.settings.SectionOrder.loadUsage() }) {
                             when (key) {
                                 "metered" -> MeteredUsagePanel(
                                     bySource24h = state.meteredBySource24h,
