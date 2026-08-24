@@ -25,6 +25,9 @@ steps:
   build:
     image: localhost:5000/ci-theming:latest
     commands:
+      # libskiko.so (Compose Desktop UI tests) links libGL + libX11 — absent
+      # from the base image, the native lib dies with ExceptionInInitializerError
+      - apt-get update -qq >/dev/null && apt-get install -y -qq libgl1 libx11-6 >/dev/null
       - mkdir -p ~/.gradle
       - echo "forgejo.token=${FORGEJO_TOKEN}" >> ~/.gradle/gradle.properties
       - mkdir -p /tmp/android-sdk
