@@ -128,7 +128,8 @@ class OpenAIProviderAdapter(
                 priceObj?.sumOf { line ->
                     (line as? JsonObject)?.get("amount")?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 0.0
                 } ?: 0.0
-            }.let { if (it > 0.0) it else null }
+            } // genuine $0.00 month is valid data — null only on failure, or
+            // the UI conflates "no spend yet" with "costs API unavailable"
         } catch (e: Exception) {
             null
         }

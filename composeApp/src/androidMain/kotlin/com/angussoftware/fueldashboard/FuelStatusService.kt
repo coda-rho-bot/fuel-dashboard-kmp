@@ -115,24 +115,8 @@ class FuelStatusService : Service() {
         // Fixed app title; data lives in the body / expanded HUD — the
         // headline provider no longer masquerades as the notification title.
         val title = getString(R.string.fuel_status)
-        val body: CharSequence = when {
-            model == null || !model.hasAnyData -> getString(R.string.loading_status)
-            else -> buildString {
-                // Show ALL quota providers in collapsed text (not just headline)
-                for ((i, line) in model.quotaLines.withIndex()) {
-                    if (i > 0) append("  ·  ")
-                    val pct = line.remainingPct?.let { "$it%" } ?: "—"
-                    val cd = FuelStatusModel.formatCountdown(line.resetsAt)
-                    append(if (cd != null) "${line.name} $pct · $cd" else "${line.name} $pct")
-                }
-                model.creditLines.firstOrNull { it.creditsTotal != null }?.let {
-                    append("  ·  ${it.name} ${it.creditsTotal} cr")
-                }
-                model.creditLines.firstOrNull { it.junieBalance != null }?.let {
-                    append("  ·  ${it.name} $${formatRoot("%.2f", it.junieBalance!!)}")
-                }
-            }.ifEmpty { getString(R.string.loading_status) }
-        }
+        val body: CharSequence = model?.collapsedBodyText(getString(R.string.loading_status))
+            ?: getString(R.string.loading_status)
 
         // Choose small icon: fuel drop or transparent (hide from status bar)
         // while keeping the notification at IMPORTANCE_LOW (not minimized).

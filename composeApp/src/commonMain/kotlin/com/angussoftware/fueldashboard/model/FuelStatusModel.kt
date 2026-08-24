@@ -57,6 +57,30 @@ data class FuelStatusModel(
 
     val hasAnyData: Boolean get() = headline != null || creditLines.isNotEmpty()
 
+    /**
+     * Collapsed-notification body text: all quota providers joined with
+     * separators, plus credit-total and Junie-balance extras. Pure
+     * function over the model — rendered by the Android notification
+     * and unit-tested on desktop (status-surface renderer).
+     */
+    fun collapsedBodyText(loadingText: String): String {
+        if (!hasAnyData) return loadingText
+        return buildString {
+            for ((i, line) in quotaLines.withIndex()) {
+                if (i > 0) append("  ·  ")
+                val pct = line.remainingPct?.let { "$it%" } ?: "—"
+                val cd = formatCountdown(line.resetsAt)
+                append(if (cd != null) "${line.name} $pct · $cd" else "${line.name} $pct")
+            }
+            creditLines.firstOrNull { it.creditsTotal != null }?.let {
+                append("  ·  ${it.name} ${it.creditsTotal} cr")
+            }
+            creditLines.firstOrNull { it.junieBalance != null }?.let {
+                append("  ·  ${it.name} $${com.angussoftware.fueldashboard.util.formatRoot("%.2f", it.junieBalance!!)}")
+            }
+        }.ifEmpty { loadingText }
+    }
+
     companion object {
         fun from(state: DashboardState): FuelStatusModel {
             // Order by the user's provider order (Settings list); reports for

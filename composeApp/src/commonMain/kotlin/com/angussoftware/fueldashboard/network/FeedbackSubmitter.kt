@@ -52,22 +52,30 @@ object FeedbackSubmitter {
                 )
             }
             if (response.status.isSuccess()) {
-                val issue = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-                val htmlUrl = issue["html_url"]?.jsonPrimitive?.content ?: "$forgejoUrl/$repo/issues"
-                val number = issue["number"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1
-                Result.Success(url = htmlUrl, number = number)
+                parseSuccess(response.bodyAsText(), forgejoUrl, repo)
             } else {
-                val text = response.bodyAsText().take(300)
-                Result.Failure(
-                    when (response.status.value) {
-                        403 -> "Feedback token was rejected (403) — re-sync settings from the main dashboard."
-                        401 -> "Feedback token is invalid (401) — re-sync settings from the main dashboard."
-                        else -> "HTTP ${response.status.value}: $text"
-                    },
-                )
+                mapFailure(response.status.value, response.bodyAsText().take(300))
             }
         } catch (e: Exception) {
             Result.Failure("Could not reach the issue tracker — ${e.message ?: e::class.simpleName}")
         }
     }
+
+    /** Parses a created-issue response into [Result.Success]. */
+    internal fun parseSuccess(responseBody: String, forgejoUrl: String, repo: String): Result.Success {
+        val issue = Json.parseToJsonElement(responseBody).jsonObject
+        val htmlUrl = issue["html_url"]?.jsonPrimitive?.content
+            ?: forgejoUrl.trimEnd('/') + "/$repo/issues"
+        val number = issue["number"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1
+        return Result.Success(url = htmlUrl, number = number)
+    }
+
+    /** Maps an HTTP failure to a user-actionable message. */
+    internal fun mapFailure(status: Int, text: String): Result.Failure = Result.Failure(
+        when (status) {
+            403 -> "Feedback token was rejected (403) — re-sync settings from the main dashboard."
+            401 -> "Feedback token is invalid (401) — re-sync settings from the main dashboard."
+            else -> "HTTP $status: $text"
+        },
+    )
 }

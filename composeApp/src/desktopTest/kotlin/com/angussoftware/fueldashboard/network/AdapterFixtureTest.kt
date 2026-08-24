@@ -322,6 +322,30 @@ class AdapterFixtureTest {
         assertEquals(0, report.windows[0].remainingPct)
     }
 
+    @Test
+    fun openAI_genuineZeroSpend_isValidData_notUnavailable() {
+        // A fetched $0.00 month must render as a real 100%-remaining budget —
+        // NOT null/unavailable ("requires admin key" conflation).
+        val adapter = OpenAIProviderAdapter("openai-test", "fake-key", monthlyBudgetUsd = 100.0)
+        val report = adapter.buildReport(spend = 0.0, limits = null)
+
+        assertTrue(report.available)
+        assertEquals(0.0, report.usedDollars) // 0.0 ≠ null — the distinction the UI renders on
+        assertEquals(100, report.remainingPct)
+        assertTrue(report.rawDisplay.contains("$0.00"), report.rawDisplay)
+    }
+
+    @Test
+    fun anthropic_genuineZeroSpend_isValidData_notUnavailable() {
+        val adapter = AnthropicProviderAdapter("anthropic-test", "fake-key", monthlyBudgetUsd = 50.0)
+        val report = adapter.buildReport(spend = 0.0, limits = null)
+
+        assertTrue(report.available)
+        assertEquals(0.0, report.usedDollars)
+        assertEquals(100, report.remainingPct)
+        assertTrue(report.rawDisplay.contains("$0.00"), report.rawDisplay)
+    }
+
     // -----------------------------------------------------------------------
     // Anthropic
     // -----------------------------------------------------------------------
@@ -464,6 +488,48 @@ class AdapterFixtureTest {
 
         assertTrue(report.creditsLow)
         assertTrue(report.rawDisplay.contains("LOW"))
+    }
+
+    @Test
+    fun lettaCloud_unknownBucketIsNullAndFlagged_notZero() {
+        // A bucket name Letta introduces that we don't map must NOT read as
+        // 0%/exhausted (false CRITICAL) — null + visible flag instead.
+        val adapter = LettaCloudProviderAdapter("letta-test", "fake-key")
+        val quota = LettaQuotaResponse(
+            lettaTier = LettaTierInfo(bucket = "ultra", dailyBucket = "medium"),
+            quotaWindowEnd = "2026-08-23T16:00:00Z",
+            dailyQuotaWindowEnd = "2026-08-24T00:00:00Z",
+        )
+        val report = adapter.buildReport(quota, billing = null)
+
+        assertNull(report.windows.first { it.name == "4h Quota Window" }.remainingPct)
+        assertEquals(50, report.windows.first { it.name == "Daily Quota Window" }.remainingPct)
+        // Overall = min of known values only — unknown contributes nothing
+        assertEquals(50, report.remainingPct)
+        assertTrue(report.rawDisplay.contains("unknown-bucket:ultra"), report.rawDisplay)
+    }
+
+    @Test
+    fun lettaCloud_exactPercentageOverridesUnknownBucket() {
+        // Billing exactness wins over an unmapped bucket — no flag needed.
+        val adapter = LettaCloudProviderAdapter("letta-test", "fake-key")
+        val quota = LettaQuotaResponse(
+            lettaTier = LettaTierInfo(bucket = "ultra", dailyBucket = "ultra"),
+            quotaWindowEnd = "2026-08-23T16:00:00Z",
+            dailyQuotaWindowEnd = "2026-08-24T00:00:00Z",
+        )
+        val billing = LettaCloudProviderAdapter.BillingData(
+            percentUsed = 40.0,
+            used = null,
+            limit = null,
+            totalCredits = null,
+            isLow = null,
+            billingPeriodEnd = null,
+        )
+        val report = adapter.buildReport(quota, billing)
+
+        assertEquals(60, report.remainingPct)
+        assertFalse(report.rawDisplay.contains("unknown-bucket"), report.rawDisplay)
     }
 
     @Test

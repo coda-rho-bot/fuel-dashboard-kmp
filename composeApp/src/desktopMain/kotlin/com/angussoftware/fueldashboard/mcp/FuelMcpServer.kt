@@ -1,6 +1,9 @@
 package com.angussoftware.fueldashboard.mcp
 
 import com.angussoftware.fueldashboard.database.AgentRegistry
+import com.angussoftware.fueldashboard.usage.UsageFieldError
+import com.angussoftware.fueldashboard.usage.longFieldOr
+import com.angussoftware.fueldashboard.usage.longFieldOrNull
 import com.angussoftware.fueldashboard.model.FuelResponse
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
@@ -656,11 +659,20 @@ internal class FuelMcpServer(
             if (source.isNullOrBlank() || model.isNullOrBlank()) {
                 return@addTool errorResult("source and model are required")
             }
-            val inputTokens = args?.get("input_tokens")?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
-            val outputTokens = args?.get("output_tokens")?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
-            val requestCount = args?.get("request_count")?.jsonPrimitive?.content?.toLongOrNull() ?: 1L
-            val timestamp = args?.get("timestamp")?.jsonPrimitive?.content?.toLongOrNull()
-                ?: com.angussoftware.fueldashboard.util.epochMillis()
+            // Present-but-malformed numeric args are a tool error naming the field —
+            // never silently coerced to 0 (shared rule with POST /v1/usage).
+            val (timestamp, inputTokens, outputTokens, requestCount) = try {
+                with(args!!.jsonObject) {
+                    arrayOf(
+                        longFieldOrNull("timestamp") ?: com.angussoftware.fueldashboard.util.epochMillis(),
+                        longFieldOr("input_tokens", 0L),
+                        longFieldOr("output_tokens", 0L),
+                        longFieldOr("request_count", 1L),
+                    )
+                }
+            } catch (e: UsageFieldError) {
+                return@addTool errorResult(e.message ?: "invalid usage field")
+            }
 
             val repo = usageRepository
                 ?: return@addTool errorResult("usage storage unavailable")

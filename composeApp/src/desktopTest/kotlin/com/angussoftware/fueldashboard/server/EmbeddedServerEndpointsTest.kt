@@ -271,6 +271,72 @@ class EmbeddedServerEndpointsTest {
     }
 
     @Test
+    fun postUsageRejectsMalformedTokensWith400() = testApplication {
+        val server = createServer()
+        application { server.configureRouting(this) }
+
+        // Present-but-invalid numeric field must 400 naming the field —
+        // never silently recorded as 0 tokens.
+        client.post("/v1/usage") {
+            header(HttpHeaders.Authorization, "Bearer test-api-key")
+            contentType(ContentType.Application.Json)
+            setBody("""{"source":"letta","model":"glm-5.2","input_tokens":"abc"}""")
+        }.apply {
+            assertEquals(HttpStatusCode.BadRequest, status)
+            val body: String = body()
+            assertTrue(body.contains("input_tokens"), body)
+        }
+    }
+
+    @Test
+    fun postUsageRejectsObjectTokensWith400() = testApplication {
+        val server = createServer()
+        application { server.configureRouting(this) }
+
+        client.post("/v1/usage") {
+            header(HttpHeaders.Authorization, "Bearer test-api-key")
+            contentType(ContentType.Application.Json)
+            setBody("""{"source":"letta","model":"glm-5.2","output_tokens":{"n":5}}""")
+        }.apply {
+            assertEquals(HttpStatusCode.BadRequest, status)
+            val body: String = body()
+            assertTrue(body.contains("output_tokens"), body)
+        }
+    }
+
+    @Test
+    fun postUsageRejectsMalformedTimestampWith400() = testApplication {
+        val server = createServer()
+        application { server.configureRouting(this) }
+
+        client.post("/v1/usage") {
+            header(HttpHeaders.Authorization, "Bearer test-api-key")
+            contentType(ContentType.Application.Json)
+            setBody("""{"source":"letta","model":"glm-5.2","timestamp":"yesterday"}""")
+        }.apply {
+            assertEquals(HttpStatusCode.BadRequest, status)
+            val body: String = body()
+            assertTrue(body.contains("timestamp"), body)
+        }
+    }
+
+    @Test
+    fun postUsageAcceptsAbsentOptionalFields() = testApplication {
+        val server = createServer()
+        application { server.configureRouting(this) }
+
+        // All optional numeric fields absent → defaults apply (0/0/1) and the
+        // request proceeds to the repository stage (503 here = no repo wired).
+        client.post("/v1/usage") {
+            header(HttpHeaders.Authorization, "Bearer test-api-key")
+            contentType(ContentType.Application.Json)
+            setBody("""{"source":"letta","model":"glm-5.2"}""")
+        }.apply {
+            assertEquals(HttpStatusCode.ServiceUnavailable, status)
+        }
+    }
+
+    @Test
     fun postUsageWithoutRepositoryReturns503() = testApplication {
         val server = createServer()
         application { server.configureRouting(this) }

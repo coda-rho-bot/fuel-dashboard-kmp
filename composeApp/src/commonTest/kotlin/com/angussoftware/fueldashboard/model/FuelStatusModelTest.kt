@@ -163,4 +163,77 @@ class FuelStatusModelTest {
         assertEquals("Zeta", model.quotaLines[0].name)
         assertEquals("Orphan", model.quotaLines[1].name)
     }
+
+    // ── collapsedBodyText (status-surface renderer) ─────────────────
+
+    private fun modelWith(
+        quota: List<FuelStatusModel.QuotaLine> = emptyList(),
+        credits: List<FuelStatusModel.CreditLine> = emptyList(),
+        headline: FuelStatusModel.Headline? = null,
+    ) = FuelStatusModel(
+        headline = headline,
+        quotaLines = quota,
+        creditLines = credits,
+        lastUpdated = 0L,
+    )
+
+    @Test
+    fun collapsedBody_noDataShowsLoadingText() {
+        assertEquals("Loading…", modelWith().collapsedBodyText("Loading…"))
+    }
+
+    @Test
+    fun collapsedBody_joinsQuotaLinesWithSeparator() {
+        val m = modelWith(
+            quota = listOf(
+                FuelStatusModel.QuotaLine("z.ai", 58, resetsAt = null, available = true),
+                FuelStatusModel.QuotaLine("Letta", 75, resetsAt = null, available = true),
+            ),
+            headline = FuelStatusModel.Headline("z.ai", 58, null),
+        )
+        val body = m.collapsedBodyText("Loading…")
+        assertTrue(body.startsWith("z.ai 58%"), body)
+        assertTrue(body.contains("·  Letta 75%"), body)
+    }
+
+    @Test
+    fun collapsedBody_nullPctRendersDash_notZero() {
+        val m = modelWith(
+            quota = listOf(FuelStatusModel.QuotaLine("Unknown provider", null, resetsAt = null, available = true)),
+            headline = FuelStatusModel.Headline("Unknown provider", null, null),
+        )
+        // hasAnyData requires headline != null; null pct renders as "—", never "0%"
+        assertEquals("Unknown provider —", m.collapsedBodyText("Loading…"))
+    }
+
+    @Test
+    fun collapsedBody_includesCreditTotalAndJunieBalance() {
+        val m = modelWith(
+            credits = listOf(
+                FuelStatusModel.CreditLine("Letta Cloud", creditsTotal = 1200, creditsUsed = 600),
+                FuelStatusModel.CreditLine("Junie", creditsTotal = null, creditsUsed = null, junieBalance = 38.5),
+            ),
+        )
+        val body = m.collapsedBodyText("Loading…")
+        assertTrue(body.contains("Letta Cloud 1200 cr"), body)
+        assertTrue(body.contains("Junie $38.50"), body)
+    }
+
+    @Test
+    fun collapsedBody_countdownAppendedWhenResetKnown() {
+        val now = com.angussoftware.fueldashboard.util.epochMillis()
+        val m = modelWith(
+            quota = listOf(
+                FuelStatusModel.QuotaLine(
+                    "z.ai", 40,
+                    resetsAt = now + (2 * 60 + 15) * 60_000, // 2h 15m
+                    available = true,
+                ),
+            ),
+            headline = FuelStatusModel.Headline("z.ai", 40, now + (2 * 60 + 15) * 60_000),
+        )
+        val body = m.collapsedBodyText("Loading…")
+        assertTrue(body.startsWith("z.ai 40% · 2h 1"), body) // 2h 15m ± minute boundary
+    }
+
 }

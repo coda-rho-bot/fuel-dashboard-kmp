@@ -79,7 +79,7 @@ fun ProviderContent(
         when (report.type) {
             ProviderType.SPEND_BUDGET -> {
                 report.usedDollars?.let { BudgetBar(it, report.limitDollars, showHelp = showHelp) } ?: Text(
-                    "No spend data (requires admin key for costs API)",
+                    "No spend data (costs API unavailable — admin key required, or request failed)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

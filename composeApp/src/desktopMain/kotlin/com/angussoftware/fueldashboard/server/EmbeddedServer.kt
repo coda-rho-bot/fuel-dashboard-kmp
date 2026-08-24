@@ -1,6 +1,9 @@
 package com.angussoftware.fueldashboard.server
 
 import com.angussoftware.fueldashboard.database.DecisionRepository
+import com.angussoftware.fueldashboard.usage.UsageFieldError
+import com.angussoftware.fueldashboard.usage.longFieldOr
+import com.angussoftware.fueldashboard.usage.longFieldOrNull
 import com.angussoftware.fueldashboard.database.UsageRepository
 import com.angussoftware.fueldashboard.mcp.FuelMcpServer
 import com.angussoftware.fueldashboard.database.AgentRegistry
@@ -436,10 +439,18 @@ class EmbeddedServer(
                     call.respond(HttpStatusCode.BadRequest, ErrorResponse("source and model are required"))
                     return@post
                 }
-                val timestamp = json["timestamp"]?.jsonPrimitive?.content?.toLongOrNull() ?: epochMillisNow()
-                val inputTokens = json["input_tokens"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
-                val outputTokens = json["output_tokens"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
-                val requestCount = json["request_count"]?.jsonPrimitive?.content?.toLongOrNull() ?: 1L
+                // Present-but-malformed numeric fields are a 400 naming the field —
+                // never silently coerced to 0 (shared rule with MCP report_usage).
+                val numbers = try {
+                    usageNumbers(json)
+                } catch (e: UsageFieldError) {
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "invalid field"))
+                    return@post
+                }
+                val timestamp = numbers[0]
+                val inputTokens = numbers[1]
+                val outputTokens = numbers[2]
+                val requestCount = numbers[3]
 
                 usageRepository?.insert(
                     timestamp = timestamp,
@@ -528,6 +539,21 @@ class EmbeddedServer(
     }
 
     private fun epochMillisNow(): Long = System.currentTimeMillis()
+
+    /**
+     * Parses the numeric usage-ingestion fields. Absent fields default;
+     * present-but-malformed fields throw [UsageFieldError] (mapped to 400
+     * by the caller) instead of silently coercing to 0.
+     * Order: [timestamp, input_tokens, output_tokens, request_count].
+     */
+    private fun usageNumbers(json: kotlinx.serialization.json.JsonObject): LongArray = with(json) {
+        longArrayOf(
+            longFieldOrNull("timestamp") ?: epochMillisNow(),
+            longFieldOr("input_tokens", 0L),
+            longFieldOr("output_tokens", 0L),
+            longFieldOr("request_count", 1L),
+        )
+    }
 }
 
 internal fun bearerAuthorizationError(expectedKey: String, authorizationHeader: String?): String? {

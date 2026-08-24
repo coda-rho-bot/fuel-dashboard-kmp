@@ -152,12 +152,18 @@ class LettaCloudProviderAdapter(
         val exactUsedPct = billing?.percentUsed
         val exactRemaining = exactUsedPct?.let { (100.0 - it).coerceIn(0.0, 100.0).roundToInt() }
 
+        var unknownBuckets: List<String> = emptyList()
         if (lettaTier != null) {
             val shortBucket = lettaTier.bucket ?: "unknown"
             val dailyBucket = lettaTier.dailyBucket ?: "unknown"
 
             val shortPct = exactRemaining ?: bucketToPct(shortBucket)
             val dailyPct = exactRemaining ?: bucketToPct(dailyBucket)
+
+            // Flag unmapped bucket names so "unknown" is visible, not silent
+            unknownBuckets = listOf(shortBucket, dailyBucket)
+                .filter { exactRemaining == null && BUCKET_PCT[it] == null }
+                .distinct()
 
             // Short window (~4h)
             if (windowEnd != null) {
@@ -185,7 +191,7 @@ class LettaCloudProviderAdapter(
 
             // Fallback: no window ends available — use the more pessimistic bucket
             if (windows.isEmpty()) {
-                val worstPct = minOf(shortPct, dailyPct)
+                val worstPct = listOfNotNull(shortPct, dailyPct).minOrNull()
                 windows.add(
                     ReportWindow(
                         name = "Quota",
@@ -218,6 +224,9 @@ class LettaCloudProviderAdapter(
             if (billing?.isLow == true) {
                 append(" LOW")
             }
+            if (unknownBuckets.isNotEmpty()) {
+                append(" unknown-bucket:${unknownBuckets.joinToString(",")}")
+            }
         }
 
         return ProviderReport(
@@ -238,8 +247,13 @@ class LettaCloudProviderAdapter(
         )
     }
 
-    private fun bucketToPct(bucket: String): Int =
-        BUCKET_PCT[bucket] ?: 0
+    /**
+     * Maps a categorical bucket to remaining pct. Unknown bucket names
+     * (e.g. Letta introducing new tiers) return null — displayed as
+     * "unknown" — instead of a false 0%/CRITICAL.
+     */
+    private fun bucketToPct(bucket: String): Int? =
+        BUCKET_PCT[bucket]
 
     /**
      * Parses an ISO-8601 timestamp to epoch milliseconds.

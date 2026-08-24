@@ -142,9 +142,10 @@ class AnthropicProviderAdapter(
                 } ?: 0.0
             }
 
-            // Convert cents to dollars
-            val totalDollars = totalCents / 100.0
-            if (totalDollars > 0.0) totalDollars else null
+            // Convert cents to dollars. A genuine $0.00 month is valid data —
+            // return it; null only on failure, or the UI conflates "no spend
+            // yet" with "costs API unavailable".
+            totalCents / 100.0
         } catch (e: Exception) {
             null
         }
