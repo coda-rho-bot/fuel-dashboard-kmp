@@ -16,3 +16,4 @@ xcode
 !*.xcworkspace/contents.xcworkspacedata
 **/xcode/**/xcuserdata/
 .kotlin
+android-signing.properties

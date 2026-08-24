@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 
@@ -188,6 +189,31 @@ compose.desktop {
             windows {
                 menuGroup = "Angus Software"
                 upgradeUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            }
+        }
+    }
+}
+
+
+// Release signing (AGP extension): reads android-signing.properties
+// (gitignored) at the repo root when present. Without it, release builds are
+// unsigned — local dev never needs it. Keystore + password live OUTSIDE the
+// repo (~/.keystores/) — see docs/release-signing.md.
+android {
+    val signingProps = rootProject.file("android-signing.properties")
+    if (signingProps.exists()) {
+        val props = Properties().apply { signingProps.inputStream().use { load(it) } }
+        signingConfigs {
+            create("release") {
+                storeFile = rootProject.file(props.getProperty("storeFile")!!)
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+        buildTypes {
+            release {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }

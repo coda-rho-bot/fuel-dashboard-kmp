@@ -39,6 +39,7 @@ It runs as a Kotlin Multiplatform app (desktop + Android) with an embedded API s
 
 - **[Getting Started](getting-started.md)** — run the app, connect providers, enable usage metering
 - **[API Reference](api-reference.md)** — embedded HTTP server endpoints and wire formats
+- **[Release Signing](release-signing.md)** — Android keystore layout, Play upload flow, backup expectations
 - **[The Advisor](advisor.md)** — how the fuel advisor decides what (if anything) to recommend
 - **[Where Data Comes From](data-flow.md)** — the source of every number you see
 - **[Troubleshooting](troubleshooting.md)** — the real failure modes and their fixes
