@@ -60,15 +60,15 @@ class Base45Test {
 
     @Test
     fun decodeRejectsChunkOverflowBeyondUint16() {
-        // "zzz" decodes to 44 + 44*45 + 44*45*45 = 91,124 > 0xFFFF
-        assertNull(Base45.decode("zzz"))
+        // RFC 9285 §6's own example: "GGW" = 6 + 6*45 + 22*2025 = 44,586? No —
+        // G=16, G=16, W=32: 16 + 16*45 + 32*2025 = 65,536 > 0xFFFF exactly.
+        assertNull(Base45.decode("GGW"))
     }
 
     @Test
     fun decodeRejectsTailOverflowBeyondUint8() {
-        // 2-char tail max value is 44 + 44*45 = 2024 > 0xFF needs check
-        // "zz" = 2024 → invalid for a single trailing byte
-        assertNull(Base45.decode("zz"))
+        // "88" = 8 + 8*45 = 368 > 0xFF — 2-char tail must decode into one byte
+        assertNull(Base45.decode("88"))
     }
 
     @Test

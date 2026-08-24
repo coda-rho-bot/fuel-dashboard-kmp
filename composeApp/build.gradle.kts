@@ -168,15 +168,21 @@ compose.desktop {
         mainClass = "com.angussoftware.fueldashboard.MainKt"
 
         nativeDistributions {
+            // Rpm target removed: jpackage's rpm build requires rpmbuild,
+            // absent on this Debian machine — the task failed on every
+            // packageDistributionForCurrentOS run. Deb + Windows portable
+            // (createDistributable) cover actual distribution. Restore Rpm
+            // when an rpm toolchain exists.
             targetFormats(
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm,
             )
             // java.sql: SQLDelight JDBC loads DriverManager reflectively — jdeps can't see it
             // jdk.crypto.ec: EC crypto for HTTPS TLS — not always included in jlink suggestions
             modules("java.sql", "jdk.crypto.ec")
             packageName = "fuel-dashboard"
-            packageVersion = project.version.toString()
+            // RPM/Deb forbid dashes in versions — map semver pre-release
+            // "0.2.0-beta.1" → "0.2.0~beta.1" (RPM pre-release convention).
+            packageVersion = project.version.toString().replace("-beta.", "~beta.")
             description = "Fuel Dashboard for Letta — AI provider fuel monitoring"
             vendor = "Angus Software"
             windows {
