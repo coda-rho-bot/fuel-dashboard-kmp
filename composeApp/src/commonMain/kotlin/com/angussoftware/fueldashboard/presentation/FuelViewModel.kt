@@ -1160,6 +1160,34 @@ class FuelViewModel {
         val remoteMetered = remoteSnapshot?.metered
         val remoteIntelligence = remoteSnapshot?.intelligence
 
+        // Connected-mode gauge parity: current servers serve provider gauges on
+        // /dashboard, not the legacy /fuel endpoint (providers: {}). When the
+        // connected adapter's report has no windows, source quota lines from
+        // the snapshot so the Fuel tab cards and the status notification show
+        // real per-provider bars.
+        if (remoteSnapshot != null && remoteSnapshot.providers.isNotEmpty()) {
+            for ((providerId, adapter) in adapterSnapshot) {
+                if (adapter !is com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter) continue
+                val existing = reports[providerId] ?: continue
+                if (existing.windows.isNotEmpty()) continue
+                val windows = remoteSnapshot.providers.map { p ->
+                    ReportWindow(
+                        name = p.name,
+                        remainingPct = p.remainingPct,
+                        resetsAt = p.resetsAt,
+                        windowHours = p.windowHours,
+                    )
+                }
+                val headline = windows.firstOrNull { it.remainingPct != null }
+                reports[providerId] = existing.copy(
+                    remainingPct = headline?.remainingPct ?: existing.remainingPct,
+                    resetsAt = windows.firstOrNull { it.resetsAt != null }?.resetsAt ?: existing.resetsAt,
+                    windowHours = windows.firstOrNull { it.windowHours > 0 }?.windowHours ?: existing.windowHours,
+                    windows = windows,
+                )
+            }
+        }
+
         _state.update { it.copy(
             providerReports = reports,
             providerErrors = errors,

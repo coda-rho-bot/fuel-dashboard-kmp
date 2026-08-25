@@ -6,6 +6,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.contentOrNull
 
@@ -18,6 +19,21 @@ import kotlinx.serialization.json.contentOrNull
 internal class RemoteDashboardSnapshot(
     val metered: MeteredUsageWindows?,
     val intelligence: IntelligenceData?,
+    /** Provider gauges from the remote dashboard (quota % + reset windows). */
+    val providers: List<RemoteProviderGauge> = emptyList(),
+)
+
+/**
+ * One provider gauge line from the remote /dashboard snapshot — feeds the
+ * Fuel tab provider cards and the status notification in connected mode.
+ */
+internal data class RemoteProviderGauge(
+    val id: String,
+    val name: String,
+    val kind: String,
+    val remainingPct: Int?,
+    val resetsAt: Long?,
+    val windowHours: Double,
 )
 
 internal object RemoteDashboardFetcher {
@@ -44,9 +60,29 @@ internal object RemoteDashboardFetcher {
             RemoteDashboardSnapshot(
                 metered = mapMetered(root),
                 intelligence = mapIntelligence(root),
+                providers = mapProviders(root),
             )
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /**
+     * Parses the `providers` object map: id → {name, kind, remaining_pct,
+     * resets_at, window_hours} (the DashboardSnapshot wire format).
+     */
+    private fun mapProviders(root: kotlinx.serialization.json.JsonObject): List<RemoteProviderGauge> {
+        val providers = root["providers"]?.jsonObject ?: return emptyList()
+        return providers.mapNotNull { (id, v) ->
+            val o = v.jsonObject
+            RemoteProviderGauge(
+                id = id,
+                name = o["name"]?.jsonPrimitive?.contentOrNull ?: id,
+                kind = o["kind"]?.jsonPrimitive?.contentOrNull ?: "",
+                remainingPct = o["remaining_pct"]?.jsonPrimitive?.intOrNull,
+                resetsAt = o["resets_at"]?.jsonPrimitive?.longOrNull,
+                windowHours = o["window_hours"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+            )
         }
     }
 
