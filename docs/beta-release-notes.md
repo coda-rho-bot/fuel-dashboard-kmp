@@ -1,3 +1,25 @@
+# Fuel Dashboard 0.2.0-beta.2 — Release Notes
+
+**August 25, 2026**
+
+Beta.2 — fixes for connected mode (mobile paired with a desktop dashboard).
+
+## Changes since 0.2.0-beta.1
+
+- **Android fuel display fixed**: the Fuel tab now renders provider gauges and
+  burn-rate data when connected to a remote dashboard (callbacks were not
+  wired on Android — the tab sat on "Collecting data" forever)
+- **Status notification fixed in connected mode**: the persistent notification
+  was stuck on "Loading fuel status…" because provider gauges were read from
+  the legacy `/fuel` endpoint, which no longer carries them. Gauges now come
+  from the `/dashboard` snapshot — live quota %, reset countdown, and timer
+  bars, updating every 30s poll
+- **Connected-mode history/projection parity**: fuel history, projection, and
+  burn rates now also see remote gauges (not just the cards and notification)
+- Wire-contract tests added pinning the `/dashboard` providers format
+
+---
+
 # Fuel Dashboard 0.2.0-beta.1 — Release Notes
 
 **August 24, 2026**
