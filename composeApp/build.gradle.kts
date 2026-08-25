@@ -168,6 +168,16 @@ compose.desktop {
     application {
         mainClass = "com.angussoftware.fueldashboard.MainKt"
 
+        // Proguard disabled for release packaging: the app uses slf4j-simple,
+        // so kotlin-logging's optional logback adapter triggers 44 unresolved-
+        // reference warnings that abort ProGuard ("Please correct the above
+        // warnings first"). Minification buys little for a beta and risks
+        // kotlinx.serialization/SQLDelight reflective breakage. Re-enable with
+        // proper -dontwarn rules if size ever matters.
+        buildTypes.release.proguard {
+            isEnabled = false
+        }
+
         nativeDistributions {
             // Rpm target removed: jpackage's rpm build requires rpmbuild,
             // absent on this Debian machine — the task failed on every
