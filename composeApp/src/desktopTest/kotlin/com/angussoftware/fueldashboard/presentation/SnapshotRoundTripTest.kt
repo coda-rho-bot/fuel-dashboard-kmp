@@ -170,6 +170,57 @@ class SnapshotRoundTripTest {
     }
 
     @Test
+    fun roundTrip_providersPreserved() {
+        val json = DashboardSnapshot.build(fullState()).toString()
+        val parsed = RemoteDashboardFetcher.parse(json)
+
+        val providers = assertNotNull(parsed?.providers, "providers lost in round-trip")
+        assertEquals(1, providers.size)
+
+        val gauge = providers.single()
+        assertEquals("zai-1", gauge.id)
+        assertEquals("z.ai", gauge.name)
+        assertEquals("ZAI", gauge.kind)
+        assertEquals(58, gauge.remainingPct)
+        assertEquals(1_760_000_100_000L, gauge.resetsAt)
+        assertEquals(5.0, gauge.windowHours)
+    }
+
+    @Test
+    fun roundTrip_providerOmissionSemantics() {
+        // Producers omit null remaining_pct / resets_at and zero window_hours
+        // (DashboardSnapshot.build). The parser must map omitted keys to
+        // null / 0.0 — never crash or invent values. A credit-only provider
+        // (e.g. Junie) serializes with no gauge fields at all.
+        val state = DashboardState(
+            settings = MultiProviderSettings(
+                providers = listOf(
+                    ProviderConfig(id = "junie-1", kind = ProviderKind.JUNIE),
+                ),
+            ),
+            providerReports = mapOf(
+                "junie-1" to ProviderReport(
+                    providerId = "junie-1",
+                    displayName = "Junie",
+                    type = ProviderType.WINDOW_CREDIT,
+                    remainingPct = null,
+                    resetsAt = null,
+                    windowHours = 0.0,
+                ),
+            ),
+        )
+        val json = DashboardSnapshot.build(state).toString()
+        val parsed = assertNotNull(RemoteDashboardFetcher.parse(json))
+
+        val gauge = parsed.providers.single()
+        assertEquals("junie-1", gauge.id)
+        assertEquals("Junie", gauge.name)
+        assertNull(gauge.remainingPct)
+        assertNull(gauge.resetsAt)
+        assertEquals(0.0, gauge.windowHours)
+    }
+
+    @Test
     fun roundTrip_garbageBodyReturnsNull() {
         assertNull(RemoteDashboardFetcher.parse("not json at all {"))
         assertNull(RemoteDashboardFetcher.parse("\"just a string\""))

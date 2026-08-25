@@ -1066,6 +1066,48 @@ class FuelViewModel {
             alerts = AlertsResponse(alerts.alerts + generatedAlerts)
         }
 
+        // ── Connected-mode data parity (mobile) ────────────────────────────
+        // When a Remote Dashboard is configured, fetch its /dashboard snapshot
+        // and populate the metered / intelligence state locally — mobile has
+        // no local repos, so this is the ONLY source of usage/waste/events
+        // data on Android.
+        val remoteSnapshot = fetchConnectedDashboardSnapshot()
+        val remoteMetered = remoteSnapshot?.metered
+        val remoteIntelligence = remoteSnapshot?.intelligence
+
+        // Connected-mode gauge parity: current servers serve provider gauges
+        // on /dashboard, not the legacy /fuel endpoint (providers: {}). When
+        // the connected adapter's report has no windows, source quota lines
+        // from the snapshot. Runs BEFORE snapshot logging so fuel history,
+        // projection, and burn rates also see the gauges — not just the
+        // Fuel tab cards and status notification.
+        if (remoteSnapshot != null && remoteSnapshot.providers.isNotEmpty()) {
+            for ((providerId, adapter) in adapterSnapshot) {
+                if (adapter !is com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter) continue
+                val existing = reports[providerId] ?: continue
+                if (existing.windows.isNotEmpty()) continue
+                val windows = remoteSnapshot.providers.map { p ->
+                    ReportWindow(
+                        name = p.name,
+                        remainingPct = p.remainingPct,
+                        resetsAt = p.resetsAt,
+                        windowHours = p.windowHours,
+                    )
+                }
+                // Headline must come from ONE gauge: %, reset, and window from
+                // the same provider so heterogeneous multi-provider remotes
+                // never pair provider B's percentage with provider A's
+                // countdown (review finding, PR #84).
+                val headline = windows.firstOrNull { it.remainingPct != null }
+                reports[providerId] = existing.copy(
+                    remainingPct = headline?.remainingPct ?: existing.remainingPct,
+                    resetsAt = headline?.resetsAt ?: existing.resetsAt,
+                    windowHours = headline?.windowHours?.takeIf { it > 0 } ?: existing.windowHours,
+                    windows = windows,
+                )
+            }
+        }
+
         // ── Real fuel tracking — ALL providers ─────────────────────────────
         // Log every provider's fuel state, not just the first one.
         val activeAgents = _state.value.acpAgents.filter { it.status == "connected" }
@@ -1151,42 +1193,6 @@ class FuelViewModel {
             ?: providerBurnRates.firstOrNull()
         val dataPoints = primaryBurnRate?.history?.size ?: 0
         val burnRate = primaryBurnRate?.burnRatePerHr
-
-        // Connected-mode data parity (mobile): when a Remote Dashboard is
-        // configured, fetch its /dashboard snapshot and populate the metered /
-        // intelligence state locally — mobile has no local repos, so this is
-        // the ONLY source of usage/waste/events data on Android.
-        val remoteSnapshot = fetchConnectedDashboardSnapshot()
-        val remoteMetered = remoteSnapshot?.metered
-        val remoteIntelligence = remoteSnapshot?.intelligence
-
-        // Connected-mode gauge parity: current servers serve provider gauges on
-        // /dashboard, not the legacy /fuel endpoint (providers: {}). When the
-        // connected adapter's report has no windows, source quota lines from
-        // the snapshot so the Fuel tab cards and the status notification show
-        // real per-provider bars.
-        if (remoteSnapshot != null && remoteSnapshot.providers.isNotEmpty()) {
-            for ((providerId, adapter) in adapterSnapshot) {
-                if (adapter !is com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter) continue
-                val existing = reports[providerId] ?: continue
-                if (existing.windows.isNotEmpty()) continue
-                val windows = remoteSnapshot.providers.map { p ->
-                    ReportWindow(
-                        name = p.name,
-                        remainingPct = p.remainingPct,
-                        resetsAt = p.resetsAt,
-                        windowHours = p.windowHours,
-                    )
-                }
-                val headline = windows.firstOrNull { it.remainingPct != null }
-                reports[providerId] = existing.copy(
-                    remainingPct = headline?.remainingPct ?: existing.remainingPct,
-                    resetsAt = windows.firstOrNull { it.resetsAt != null }?.resetsAt ?: existing.resetsAt,
-                    windowHours = windows.firstOrNull { it.windowHours > 0 }?.windowHours ?: existing.windowHours,
-                    windows = windows,
-                )
-            }
-        }
 
         _state.update { it.copy(
             providerReports = reports,
