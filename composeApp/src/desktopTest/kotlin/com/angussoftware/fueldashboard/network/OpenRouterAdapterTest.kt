@@ -137,6 +137,38 @@ class OpenRouterAdapterTest {
     }
 
     // -----------------------------------------------------------------------
+    // Balance precedence (review 1819): cap > budget gauge > credits pool
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun precedence_capWins_noPrepaidFlag() {
+        val data = adapter.parseKeyResponse(wireBody())!! // has cap
+        val report = adapter.buildReport(data, OpenRouterCredits(110.0, 154.42))
+        assertTrue(report.remainingPct != null) // cap gauge
+        assertTrue(!report.isPrepaidCreditPool) // cap present -> no prepaid card
+        assertTrue(report.rawDisplay.contains("balance"))
+    }
+
+    @Test
+    fun precedence_budgetGauge_notPrepaidCard() {
+        val budgeted = OpenRouterProviderAdapter("or-test", "fake-key", monthlyBudgetUsd = 100.0)
+        val data = budgeted.parseKeyResponse(wireBody(limit = null, limitRemaining = null, usageMonthly = 40.0))!!
+        val report = budgeted.buildReport(data, OpenRouterCredits(110.0, 154.42))
+        assertEquals(60, report.remainingPct) // budget gauge active
+        assertTrue(!report.isPrepaidCreditPool) // budget branch owns limitDollars
+        assertTrue(report.rawDisplay.contains("balance")) // balance rides along
+    }
+
+    @Test
+    fun precedence_creditsPool_onlyWhenNoCapNoBudget() {
+        val data = adapter.parseKeyResponse(wireBody(limit = null, limitRemaining = null))!!
+        val report = adapter.buildReport(data, OpenRouterCredits(110.0, 154.42))
+        assertTrue(report.isPrepaidCreditPool)
+        assertEquals(-44.42, report.limitDollars!!, 0.001) // FP: 110 - 154.42
+        assertTrue(report.rawDisplay.contains("NEGATIVE"))
+    }
+
+    // -----------------------------------------------------------------------
     // rawDisplay
     // -----------------------------------------------------------------------
 

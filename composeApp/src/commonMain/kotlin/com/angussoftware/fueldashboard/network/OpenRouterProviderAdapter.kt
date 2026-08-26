@@ -161,6 +161,9 @@ class OpenRouterProviderAdapter(
 
         fun hasKeyCap(): Boolean = capLimit != null && capRemaining != null
 
+        val budgetBranch = monthlyBudgetUsd != null && monthlyBudgetUsd > 0 && key.usageMonthly != null &&
+            capLimit == null
+
         when {
             capLimit != null && capRemaining != null -> {
                 usedDollars = (capLimit - capRemaining).coerceAtLeast(0.0)
@@ -229,7 +232,10 @@ class OpenRouterProviderAdapter(
             resetsAt = null,
             windowHours = 0.0,
             available = true,
-            isPrepaidCreditPool = credits != null && capLimit == null,
+            // Prepaid display ONLY when the credits branch actually produced
+            // limitDollars — a budget-gauge config (uncapped + monthlyBudget)
+            // keeps its BudgetBar (review 1819 precedence fix).
+            isPrepaidCreditPool = credits != null && capLimit == null && !budgetBranch,
             usedDollars = usedDollars,
             limitDollars = limitDollars,
             rawDisplay = rawDisplay,
