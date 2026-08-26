@@ -76,6 +76,7 @@ fun FuelHudContent(model: FuelStatusModel, modifier: Modifier = Modifier) {
                 )
                 Text(
                     text = when {
+                        credit.dollarBalance != null -> "$${formatRoot("%.2f", credit.dollarBalance)}"
                         credit.creditsTotal != null -> "${credit.creditsTotal} cr"
                         credit.junieBalance != null -> "$${formatRoot("%.2f", credit.junieBalance)}"
                         else -> "—"

@@ -42,9 +42,10 @@ data class FuelStatusModel(
 
     data class CreditLine(
         val name: String,
-        val creditsTotal: Int?,
-        val creditsUsed: Int?,
+        val creditsTotal: Int? = null,
+        val creditsUsed: Int? = null,
         val junieBalance: Double? = null,
+        val dollarBalance: Double? = null,
     )
 
     val hasAnyData: Boolean get() = quotaLines.isNotEmpty() || creditLines.isNotEmpty()
@@ -104,7 +105,9 @@ data class FuelStatusModel(
                 }
 
             val creditLines = buildList {
-                reports.firstOrNull { it.creditsTotal != null }?.let { r ->
+                // ALL credit-pool providers (was firstOrNull only) + prepaid
+                // dollar balances (DeepSeek-style) + Junie's special line.
+                reports.filter { it.creditsTotal != null }.forEach { r ->
                     add(
                         CreditLine(
                             name = r.displayName,
@@ -113,8 +116,11 @@ data class FuelStatusModel(
                         ),
                     )
                 }
+                reports.filter { it.isPrepaidCreditPool && it.limitDollars != null }.forEach { r ->
+                    add(CreditLine(name = r.displayName, dollarBalance = r.limitDollars))
+                }
                 state.junieBalance?.let { bal ->
-                    add(CreditLine(name = "Junie", creditsTotal = null, creditsUsed = null, junieBalance = bal))
+                    add(CreditLine(name = "Junie", junieBalance = bal))
                 }
             }
 

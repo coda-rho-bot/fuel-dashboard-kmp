@@ -151,6 +151,30 @@ fun ProviderContent(
             GeminiStudioLinks()
         }
 
+        // OpenRouter: account balance is not exposed to regular API keys.
+        if (config.kind == ProviderKind.OPENROUTER) {
+            val uriHandler = LocalUriHandler.current
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Account balance & key caps: ",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "openrouter.ai/credits",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable { uriHandler.openUri("https://openrouter.ai/credits") },
+                )
+                Text(
+                    " — set a key credit limit for a live gauge",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         // Groq/Mistral(regular key): monitoring itself consumes request quota — disclose it.
         if (config.kind == ProviderKind.GROQ || config.kind == ProviderKind.MISTRAL) {
             Spacer(Modifier.height(4.dp))

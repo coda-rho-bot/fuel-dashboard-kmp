@@ -124,6 +124,8 @@ class OpenRouterProviderAdapter(
         val limitDollars: Double?
         val remainingPct: Int?
 
+        fun hasKeyCap(): Boolean = capLimit != null && capRemaining != null
+
         when {
             capLimit != null && capRemaining != null -> {
                 usedDollars = (capLimit - capRemaining).coerceAtLeast(0.0)
@@ -157,6 +159,11 @@ class OpenRouterProviderAdapter(
             }
             if (key.isFreeTier && isEmpty()) {
                 append("Free tier")
+            }
+            if (!hasKeyCap() && monthlyBudgetUsd == null && isEmpty()) {
+                // Spend-only, no cap, no budget: the account balance is not
+                // exposed to regular keys — point where it lives.
+                append("No key cap — balance at openrouter.ai/credits")
             }
         }
 
