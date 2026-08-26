@@ -22,6 +22,7 @@ enum class ProviderKind(val displayName: String, val category: ProviderCategory)
     GROQ("Groq", ProviderCategory.LLM_PROVIDER),
     MISTRAL("Mistral AI", ProviderCategory.LLM_PROVIDER),
     OPENROUTER("OpenRouter", ProviderCategory.LLM_PROVIDER),
+    GEMINI("Google Gemini", ProviderCategory.LLM_PROVIDER),
     JUNIE("Junie", ProviderCategory.LLM_PROVIDER),
     CONNECTED_API("Remote Dashboard", ProviderCategory.AGENT_BACKEND),
 }
@@ -59,6 +60,7 @@ data class ProviderConfig(
         ProviderKind.GROQ -> serverUrl.ifBlank { "https://api.groq.com/openai" }
         ProviderKind.MISTRAL -> serverUrl.ifBlank { "https://api.mistral.ai" }
         ProviderKind.OPENROUTER -> serverUrl.ifBlank { "https://openrouter.ai/api" }
+        ProviderKind.GEMINI -> serverUrl.ifBlank { "https://generativelanguage.googleapis.com" }
         ProviderKind.JUNIE -> ""
         ProviderKind.CONNECTED_API -> serverUrl.ifBlank { "http://127.0.0.1:8322" }
     }

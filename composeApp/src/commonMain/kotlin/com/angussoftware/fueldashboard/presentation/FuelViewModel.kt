@@ -23,6 +23,7 @@ import com.angussoftware.fueldashboard.model.ReportWindow
 import com.angussoftware.fueldashboard.network.AnthropicProviderAdapter
 import com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter
 import com.angussoftware.fueldashboard.network.DeepSeekProviderAdapter
+import com.angussoftware.fueldashboard.network.GeminiProviderAdapter
 import com.angussoftware.fueldashboard.network.GroqProviderAdapter
 import com.angussoftware.fueldashboard.network.JunieProviderAdapter
 import com.angussoftware.fueldashboard.network.LettaCloudProviderAdapter
@@ -963,6 +964,12 @@ class FuelViewModel {
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
                 monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.GEMINI -> GeminiProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.JUNIE -> JunieProviderAdapter(
