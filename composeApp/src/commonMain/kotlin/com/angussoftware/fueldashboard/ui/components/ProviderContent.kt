@@ -129,7 +129,7 @@ fun ProviderContent(
         }
 
         // Universal status line: adapters put their honest per-surface status
-        // in rawDisplay (e.g. Gemini "50 models · limits in AI Studio" with no
+        // in rawDisplay (e.g. Gemini "50 models" status with no
         // rate headers, OpenRouter spend-only "$1.25 today | $74.25 this
         // month"). Without this line those degraded states render as an empty
         // tile with just the provider name.
@@ -166,7 +166,7 @@ private fun GeminiStudioLinks() {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             textDecoration = TextDecoration.Underline,
-            modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/rate-limits") },
+            modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/rate-limit") },
         )
         Text(" · ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
