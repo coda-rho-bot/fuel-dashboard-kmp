@@ -15,6 +15,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -138,6 +141,49 @@ fun ProviderContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        // Gemini: Google exposes no quota/usage API for API keys — limits,
+        // billing, and spend live only in AI Studio. Point users there.
+        if (config.kind == ProviderKind.GEMINI) {
+            GeminiStudioLinks()
+        }
+    }
+}
+
+/** Clickable links to the AI Studio pages where Gemini limits/billing live. */
+@Composable
+private fun GeminiStudioLinks() {
+    val uriHandler = LocalUriHandler.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "Limits, billing & spend live in AI Studio:",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "rate limits",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/rate-limits") },
+        )
+        Text(" · ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "billing",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/billing") },
+        )
+        Text(" · ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "usage",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/usage") },
+        )
     }
 }
 

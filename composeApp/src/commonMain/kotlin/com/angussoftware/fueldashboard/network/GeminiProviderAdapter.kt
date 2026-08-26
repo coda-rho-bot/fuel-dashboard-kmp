@@ -142,7 +142,7 @@ class GeminiProviderAdapter(
                 append("${data.modelCount} models")
             }
             if (isEmpty()) {
-                append("Available · limits in AI Studio")
+                append("Available")
             }
         }
 
