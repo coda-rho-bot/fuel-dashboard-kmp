@@ -52,6 +52,14 @@ class GroqProviderAdapter(
 
     companion object {
         private const val MODELS_PATH = "/v1/models"
+        private const val CHAT_PATH = "/v1/chat/completions"
+
+        // Preference order for the header-ping model: cheap, stable ids.
+        private val PING_MODEL_PREFERENCES = listOf(
+            "openai/gpt-oss-20b",
+            "groq/compound-mini",
+            "llama-3.1-8b-instant",
+        )
 
         // Header names for rate limits
         private const val HDR_LIMIT_REQUESTS = "x-ratelimit-limit-requests"
@@ -72,22 +80,28 @@ class GroqProviderAdapter(
     // -----------------------------------------------------------------------
 
     /**
-     * Fetches rate-limit data by making a lightweight GET /v1/models call.
+     * Fetches rate-limit data via a minimal chat completion.
      *
-     * Groq includes rate-limit headers on all API responses. The /v1/models
-     * endpoint is chosen because it's fast, free, and doesn't consume tokens.
+     * Empirical (Aug 2026, live key): Groq emits x-ratelimit-* headers on
+     * chat completion responses but NOT on GET /v1/models — the old
+     * models.list poll came back headerless and reported "Rate limit data
+     * unavailable". We now list models (cheap, no quota cost) to pick an
+     * available one, then make a max_tokens=1 ping to harvest the headers.
      *
      * Groq's headers:
-     * - `x-ratelimit-limit-requests`: RPD (requests/day)
-     * - `x-ratelimit-limit-tokens`: TPM (tokens/min)
-     * - Reset values are duration strings like "2m59.56s" or "7.66s"
+     * - `x-ratelimit-limit-requests` / `x-ratelimit-remaining-requests`
+     * - `x-ratelimit-limit-tokens` / `x-ratelimit-remaining-tokens` (TPM)
+     * - Reset values are duration strings like "1m26.4s" or "577ms"
      *
-     * Returns null if the call fails or headers are absent.
+     * Returns null if the calls fail or headers are absent.
      */
     private suspend fun fetchRateLimits(): GroqRateLimitData? {
         return try {
-            val response: HttpResponse = client.get("$baseUrl$MODELS_PATH") {
+            val model = pickPollModel() ?: return null
+            val response: HttpResponse = client.post("$baseUrl$CHAT_PATH") {
                 header(HttpHeaders.Authorization, "Bearer $apiKey")
+                contentType(ContentType.Application.Json)
+                setBody("""{"model":"$model","messages":[{"role":"user","content":"hi"}],"max_tokens":1}""")
             }
 
             if (!response.status.isSuccess()) return null
@@ -116,6 +130,30 @@ class GroqProviderAdapter(
                 resetTokens = resetTokens,
             )
         } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Lists models and picks one for the rate-limit ping: first match from
+     * the preference list that the account can access, else the first
+     * available. Model ids churn (llama-3.1-8b-instant vanished between
+     * adapter versions), so availability is checked every poll.
+     */
+    private suspend fun pickPollModel(): String? {
+        return try {
+            val response: HttpResponse = client.get("$baseUrl$MODELS_PATH") {
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+            }
+            if (!response.status.isSuccess()) return null
+            val ids = SharedHttpClient.json.parseToJsonElement(response.bodyAsText())
+                .let { root ->
+                    (root as? kotlinx.serialization.json.JsonObject)?.get("data") as? kotlinx.serialization.json.JsonArray
+                }?.mapNotNull { entry ->
+                    ((entry as? kotlinx.serialization.json.JsonObject)?.get("id") as? kotlinx.serialization.json.JsonPrimitive)?.content
+                }.orEmpty()
+            PING_MODEL_PREFERENCES.firstOrNull { it in ids } ?: ids.firstOrNull()
+        } catch (_: Exception) {
             null
         }
     }
