@@ -37,7 +37,7 @@ allowing AI agents to query fuel state and register themselves as providers.
 attribution — which agents and models are consuming your fuel, and when.
 
 **Open source.** Licensed under Apache 2.0. Source code available at
-git.angussoftware.dev/coda/fuel-dashboard-kmp.
+github.com/coda-rho-bot/fuel-dashboard-kmp.
 
 This is a beta release. Features may change, and some rough edges are
 expected. Feedback welcome via the in-app issue reporter.

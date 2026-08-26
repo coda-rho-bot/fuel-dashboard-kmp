@@ -65,4 +65,4 @@ First public beta release.
 
 Use the in-app Feedback → Report an Issue feature (requires a Forgejo API
 token with `write:issue` scope), or file directly at
-[git.angussoftware.dev/coda/fuel-dashboard-kmp/issues](https://git.angussoftware.dev/coda/fuel-dashboard-kmp/issues)
+[github.com/coda-rho-bot/fuel-dashboard-kmp/issues](https://github.com/coda-rho-bot/fuel-dashboard-kmp/issues)

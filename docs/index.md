@@ -8,6 +8,12 @@ Cross-platform fuel monitoring for an AI agent fleet. The Fuel Dashboard answers
 
 It runs as a Kotlin Multiplatform app (desktop + Android) with an embedded API server, and it is deliberately **honest**: every number is either metered from a real API or clearly labeled as an estimate. There are no fake recommendations and no decorative metrics.
 
+## Download
+
+**Current release: [0.2.0-beta.2](https://docs.angussoftware.dev/fuel-dashboard/download/)** — Android (APK + Google Play closed beta), Linux (DEB + portable), Windows (portable zip), with SHA256 checksums.
+
+Source code: [github.com/coda-rho-bot/fuel-dashboard-kmp](https://github.com/coda-rho-bot/fuel-dashboard-kmp) (Apache 2.0).
+
 ## The 2-minute mental model
 
 **Fuel** is whatever limits your agents: a z.ai 5-hour token window, Letta credits, a Junie balance, an OpenRouter budget. Each provider has a quota type:

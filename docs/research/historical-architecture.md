@@ -200,7 +200,7 @@ CORS enabled for all origins (dashboards may run on different hosts).
 
 ### 5. Fuel Dashboard KMP (`~/dev/infra/fuel-dashboard-kmp/`)
 
-**Repo:** https://git.angussoftware.dev/coda/fuel-dashboard-kmp
+**Repo:** https://github.com/coda-rho-bot/fuel-dashboard-kmp
 **Platforms:** Desktop (JVM — primary), Android (ready), iOS (stubbed)
 **Package:** `com.angussoftware.fueldashboard`
 **Build:** Gradle 9.6.1, Kotlin 2.3.21, Compose Multiplatform 1.9.0
@@ -307,4 +307,4 @@ Dashboard (every 30s):
 
 - [SPEC.md](./SPEC.md) — Detailed orchestrator + mod design spec (46KB, living)
 - [Angus-Software-Theming](https://git.angussoftware.dev/rhomancer/angus-software-theming) — Theme library source
-- [Fuel Dashboard KMP](https://git.angussoftware.dev/coda/fuel-dashboard-kmp) — Dashboard repo
+- [Fuel Dashboard KMP](https://github.com/coda-rho-bot/fuel-dashboard-kmp) — Dashboard repo
