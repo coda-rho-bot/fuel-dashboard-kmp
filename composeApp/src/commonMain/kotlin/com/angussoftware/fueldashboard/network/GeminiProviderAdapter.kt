@@ -53,7 +53,7 @@ class GeminiProviderAdapter(
     private val client = SharedHttpClient.client
 
     companion object {
-        private const val MODELS_PATH = "/v1beta/models"
+        private const val MODELS_PATH = "/v1beta/models?pageSize=1000"
         private const val HDR_LIMIT = "x-ratelimit-limit"
         private const val HDR_REMAINING = "x-ratelimit-remaining"
         private const val HDR_RESET = "x-ratelimit-reset"

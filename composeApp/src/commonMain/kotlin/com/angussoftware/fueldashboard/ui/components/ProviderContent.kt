@@ -78,11 +78,11 @@ fun ProviderContent(
         Spacer(Modifier.height(contentSpacing))
         when (report.type) {
             ProviderType.SPEND_BUDGET -> {
-                report.usedDollars?.let { BudgetBar(it, report.limitDollars, showHelp = showHelp) } ?: Text(
+                report.usedDollars?.let { BudgetBar(it, report.limitDollars, showHelp = showHelp) } ?: if (report.rawDisplay.isBlank()) Text(
                     "No spend data (costs API unavailable — admin key required, or request failed)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                ) else Unit
                 val rateLimitWindows = report.windows.filter { it.name == "Requests/min" || it.name == "Tokens/min" }
                 if (rateLimitWindows.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
@@ -123,6 +123,20 @@ fun ProviderContent(
                     ProviderCreditBalance(report, showHelp, boxedCreditBalance)
                 }
             }
+        }
+
+        // Universal status line: adapters put their honest per-surface status
+        // in rawDisplay (e.g. Gemini "50 models · limits in AI Studio" with no
+        // rate headers, OpenRouter spend-only "$1.25 today | $74.25 this
+        // month"). Without this line those degraded states render as an empty
+        // tile with just the provider name.
+        if (report.rawDisplay.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                report.rawDisplay,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
