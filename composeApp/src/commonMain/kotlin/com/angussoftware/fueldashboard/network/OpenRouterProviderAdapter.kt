@@ -59,6 +59,12 @@ class OpenRouterProviderAdapter(
 
     companion object {
         private const val KEY_PATH = "/v1/key"
+
+        // Contrary to the docs ("management key required"), /v1/credits
+        // returns data for regular inference keys too (live-verified Aug
+        // 2026): { data: { total_credits, total_usage } } — lifetime
+        // purchases and lifetime consumption; balance is the difference.
+        private const val CREDITS_PATH = "/v1/credits"
     }
 
     override suspend fun poll(): ProviderReport {
@@ -70,7 +76,33 @@ class OpenRouterProviderAdapter(
             available = false,
             rawDisplay = "Key data unavailable",
         )
-        return buildReport(keyData)
+        val credits = fetchCredits()
+        return buildReport(keyData, credits)
+    }
+
+    /** Lifetime purchased/used credits; null when the endpoint misbehaves. */
+    private suspend fun fetchCredits(): OpenRouterCredits? {
+        return try {
+            val response: HttpResponse = client.get("$baseUrl$CREDITS_PATH") {
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+            }
+            if (!response.status.isSuccess()) return null
+            parseCreditsResponse(response.bodyAsText())
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    internal fun parseCreditsResponse(body: String): OpenRouterCredits? {
+        return try {
+            val data = SharedHttpClient.json.parseToJsonElement(body)
+                .jsonObject["data"]?.jsonObject ?: return null
+            val total = (data["total_credits"] as? JsonPrimitive)?.doubleOrNull
+            val used = (data["total_usage"] as? JsonPrimitive)?.doubleOrNull
+            if (total == null || used == null) null else OpenRouterCredits(total, used)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -113,7 +145,10 @@ class OpenRouterProviderAdapter(
     // Report building
     // -----------------------------------------------------------------------
 
-    internal fun buildReport(key: OpenRouterKeyData): ProviderReport {
+    internal fun buildReport(
+        key: OpenRouterKeyData,
+        credits: OpenRouterCredits? = null,
+    ): ProviderReport {
         // Capture locals so the when-branch null checks smart-cast them.
         val capLimit = key.limit?.takeIf { it > 0 }
         val capRemaining = key.limitRemaining
@@ -139,13 +174,22 @@ class OpenRouterProviderAdapter(
                 remainingPct = (100 - usedPct.roundToInt()).coerceIn(0, 100)
             }
             else -> {
-                usedDollars = null
-                limitDollars = null
-                remainingPct = null
+                if (credits != null) {
+                    // No key cap: the account balance (lifetime credits minus
+                    // lifetime usage) becomes the prepaid-pool display. May be
+                    // negative — OpenRouter allows overdraft until 402s.
+                    usedDollars = null
+                    limitDollars = credits.totalCredits - credits.totalUsage
+                    remainingPct = null
+                } else {
+                    usedDollars = null
+                    limitDollars = null
+                    remainingPct = null
+                }
             }
         }
 
-        val rawDisplay = buildString {
+        var rawDisplay = buildString {
             if (capLimit != null && capRemaining != null) {
                 append(formatRoot("$%.2f left of $%.2f cap", capRemaining, capLimit))
             }
@@ -167,6 +211,16 @@ class OpenRouterProviderAdapter(
             }
         }
 
+        val balance = credits?.let { it.totalCredits - it.totalUsage }
+        if (balance != null) {
+            if (rawDisplay.isNotEmpty()) rawDisplay += " · "
+            rawDisplay += formatRoot(
+                "balance $%.2f (%.2f credits − %.2f used)",
+                balance, credits!!.totalCredits, credits.totalUsage,
+            )
+            if (balance < 0) rawDisplay += " — NEGATIVE, top up"
+        }
+
         return ProviderReport(
             providerId = providerId,
             displayName = displayName,
@@ -175,6 +229,7 @@ class OpenRouterProviderAdapter(
             resetsAt = null,
             windowHours = 0.0,
             available = true,
+            isPrepaidCreditPool = credits != null && capLimit == null,
             usedDollars = usedDollars,
             limitDollars = limitDollars,
             rawDisplay = rawDisplay,
@@ -187,6 +242,12 @@ class OpenRouterProviderAdapter(
 // -----------------------------------------------------------------------
 // Internal data class
 // -----------------------------------------------------------------------
+
+/** Lifetime credit totals from /v1/credits (works with regular keys). */
+internal data class OpenRouterCredits(
+    val totalCredits: Double,
+    val totalUsage: Double,
+)
 
 internal data class OpenRouterKeyData(
     val limit: Double?,
