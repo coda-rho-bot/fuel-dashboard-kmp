@@ -89,6 +89,13 @@ class MistralProviderAdapter(
         private const val USAGE_PATH = "/v1/admin/usage"
         private const val SPEND_LIMIT_PATH = "/v1/admin/spend-limit"
         private const val RATE_LIMIT_PATH = "/v1/admin/rate-limit"
+        private const val MODELS_PATH = "/v1/models"
+        private const val CHAT_PATH = "/v1/chat/completions"
+
+        // Regular keys (console.mistral.ai) get 401 on /v1/admin/* — admin
+        // endpoints need a Backoffice admin key. Fallback: harvest rate
+        // headers from a chat ping. Self-throttled like the Groq adapter.
+        internal const val MIN_FETCH_INTERVAL_MS = 60_000L
 
         /**
          * Keys in the usage response that are arrays of usage entries (token counts)
@@ -114,9 +121,20 @@ class MistralProviderAdapter(
         )
     }
 
+    // Self-throttle state (see GroqProviderAdapter — same pattern).
+    private var cachedFallbackReport: ProviderReport? = null
+    private var lastFallbackFetchMs: Long = 0L
+
     override suspend fun poll(): ProviderReport {
         // 1. Fetch usage data (primary — for spend tracking)
         val usage = fetchUsage()
+
+        if (usage == null) {
+            // Admin endpoints unavailable — regular (console) API keys get
+            // 401 on /v1/admin/* (admin keys are Backoffice-only). Fall back
+            // to rate-limit harvesting via a minimal chat ping.
+            return fallbackPoll()
+        }
 
         // 2. Fetch spend-limit status (supplementary — budget cap status)
         val spendLimit = fetchSpendLimit()
@@ -126,6 +144,83 @@ class MistralProviderAdapter(
 
         // 4. Build report
         return buildReport(usage, spendLimit, rateLimit)
+    }
+
+    // -----------------------------------------------------------------------
+    // Regular-key fallback (rate headers via chat ping)
+    // -----------------------------------------------------------------------
+
+    private suspend fun fallbackPoll(): ProviderReport {
+        val now = com.angussoftware.fueldashboard.util.epochMillis()
+        if (cachedFallbackReport != null && now - lastFallbackFetchMs < MIN_FETCH_INTERVAL_MS) {
+            return cachedFallbackReport!!
+        }
+        val report = fetchRateHeaderFallback() ?: ProviderReport(
+            providerId = providerId,
+            displayName = displayName,
+            type = providerType,
+            remainingPct = null,
+            available = false,
+            rawDisplay = "No data — admin key required for spend, chat ping failed",
+        )
+        cachedFallbackReport = report
+        lastFallbackFetchMs = now
+        return report
+    }
+
+    /**
+     * Minimal chat completion to harvest Mistral's rate headers (regular
+     * keys): x-ratelimit-limit-req-minute / x-ratelimit-remaining-req-minute
+     * and x-ratelimit-limit-tokens-minute / x-ratelimit-remaining-tokens-minute.
+     */
+    private suspend fun fetchRateHeaderFallback(): ProviderReport? {
+        return try {
+            val modelsResponse: HttpResponse = client.get("$baseUrl$MODELS_PATH") {
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+            }
+            if (!modelsResponse.status.isSuccess()) return null
+            val model = SharedHttpClient.json.parseToJsonElement(modelsResponse.bodyAsText())
+                .let { (it as? JsonObject)?.get("data") as? kotlinx.serialization.json.JsonArray }
+                ?.mapNotNull { m -> ((m as? JsonObject)?.get("id") as? kotlinx.serialization.json.JsonPrimitive)?.content }
+                ?.firstOrNull { it.startsWith("mistral-") && !it.contains("embed") && !it.contains("ocr") }
+                ?: return null
+
+            val response: HttpResponse = client.post("$baseUrl$CHAT_PATH") {
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+                contentType(ContentType.Application.Json)
+                setBody("""{"model":"$model","messages":[{"role":"user","content":"hi"}],"max_tokens":1}""")
+            }
+            if (!response.status.isSuccess()) return null
+            val h = response.headers
+
+            val limitReq = h["x-ratelimit-limit-req-minute"]?.toIntOrNull()
+            val remainingReq = h["x-ratelimit-remaining-req-minute"]?.toIntOrNull()
+            val limitTok = h["x-ratelimit-limit-tokens-minute"]?.toIntOrNull()
+            val remainingTok = h["x-ratelimit-remaining-tokens-minute"]?.toIntOrNull()
+
+            val windows = mutableListOf<ReportWindow>()
+            if (limitReq != null && limitReq > 0 && remainingReq != null) {
+                windows.add(ReportWindow(name = "Requests/min", remainingPct = (remainingReq * 100 / limitReq).coerceIn(0, 100), resetsAt = null, windowHours = 1.0 / 60.0))
+            }
+            if (limitTok != null && limitTok > 0 && remainingTok != null) {
+                windows.add(ReportWindow(name = "Tokens/min", remainingPct = (remainingTok * 100 / limitTok).coerceIn(0, 100), resetsAt = null, windowHours = 1.0 / 60.0))
+            }
+            if (windows.isEmpty()) return null
+
+            ProviderReport(
+                providerId = providerId,
+                displayName = displayName,
+                type = providerType,
+                remainingPct = windows.minOf { it.remainingPct ?: 100 },
+                resetsAt = null,
+                windowHours = 0.0,
+                available = true,
+                windows = windows,
+                rawDisplay = "Regular key — rate limits only (spend needs admin key)",
+            )
+        } catch (_: Exception) {
+            null
+        }
     }
 
     // -----------------------------------------------------------------------
