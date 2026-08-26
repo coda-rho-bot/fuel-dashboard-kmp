@@ -620,4 +620,21 @@ class AdapterFixtureTest {
 
         assertEquals(0, report.remainingPct) // min(0%, 100%) = 0
     }
+
+    // -------------------------------------------------------------------
+    // Groq self-throttle (fast follow: poll-cost control)
+    // -------------------------------------------------------------------
+
+    @Test
+    fun groq_throttle_constants_reasonable() {
+        // 1 fetch/min max while the loop polls every 30s; model TTL hourly.
+        assertTrue(GroqProviderAdapter.MIN_FETCH_INTERVAL_MS >= 60_000L, "fetch interval must be >= 60s")
+        assertTrue(GroqProviderAdapter.MODEL_CACHE_TTL_MS >= 3_600_000L, "model cache must be >= 1h")
+    }
+
+    @Test
+    fun groq_coldCache_notFresh() {
+        val adapter = GroqProviderAdapter("groq-t", "k")
+        assertFalse(adapter.isCacheFresh(0L), "cold cache must not be fresh")
+    }
 }

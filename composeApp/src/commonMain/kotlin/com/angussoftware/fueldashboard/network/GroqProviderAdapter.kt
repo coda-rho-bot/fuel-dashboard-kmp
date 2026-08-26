@@ -19,8 +19,10 @@ import kotlin.math.roundToInt
  *
  * **Single data source:**
  *
- * - **Rate-limit headers**: Groq includes comprehensive rate-limit headers on
- *   every API response. We make a lightweight `GET /v1/models` call to capture:
+ * - **Rate-limit headers on chat completions**: empirically (Aug 2026, live
+ *   key) Groq emits x-ratelimit-* on chat completion responses but NOT on
+ *   GET /v1/models. We resolve a ping model (hourly TTL cache), then make a
+ *   max_tokens=1 chat ping to capture:
  *   - `x-ratelimit-limit-requests` / `x-ratelimit-remaining-requests` (RPD — requests/day)
  *   - `x-ratelimit-limit-tokens` / `x-ratelimit-remaining-tokens` (TPM — tokens/min)
  *   - `x-ratelimit-reset-requests` / `x-ratelimit-reset-tokens` (duration strings)
@@ -50,6 +52,16 @@ class GroqProviderAdapter(
     private val json = SharedHttpClient.json
     private val client = SharedHttpClient.client
 
+    // Self-throttle state: the poll loop fires every 30s, but each network
+    // fetch costs request quota. Cap at one fetch per minute; between fetches
+    // the cached report is served.
+    private var cachedReport: ProviderReport? = null
+    private var lastFetchMs: Long = 0L
+
+    // Ping-model cache: model ids churn on a day scale — resolve hourly.
+    private var cachedPingModel: String? = null
+    private var pingModelResolvedAtMs: Long = 0L
+
     companion object {
         private const val MODELS_PATH = "/v1/models"
         private const val CHAT_PATH = "/v1/chat/completions"
@@ -61,6 +73,13 @@ class GroqProviderAdapter(
             "llama-3.1-8b-instant",
         )
 
+        // One network fetch per minute (the loop polls every 30s — serve
+        // cache in between so an open dashboard costs <= 1 request/min).
+        internal const val MIN_FETCH_INTERVAL_MS = 60_000L
+
+        // Ping model re-resolved hourly.
+        internal const val MODEL_CACHE_TTL_MS = 3_600_000L
+
         // Header names for rate limits
         private const val HDR_LIMIT_REQUESTS = "x-ratelimit-limit-requests"
         private const val HDR_REMAINING_REQUESTS = "x-ratelimit-remaining-requests"
@@ -71,9 +90,28 @@ class GroqProviderAdapter(
     }
 
     override suspend fun poll(): ProviderReport {
-        val rateLimits = fetchRateLimits()
-        return buildReport(rateLimits)
+        val now = epochMillis()
+        if (isCacheFresh(now)) return cachedReport!!
+        val rateLimits = fetchRateLimits(now)
+        val report = if (rateLimits != null) {
+            buildReport(rateLimits)
+        } else {
+            ProviderReport(
+                providerId = providerId,
+                displayName = displayName,
+                type = providerType,
+                remainingPct = null,
+                available = false,
+                rawDisplay = "Rate limit data unavailable",
+            )
+        }
+        cachedReport = report
+        lastFetchMs = now
+        return report
     }
+
+    internal fun isCacheFresh(nowMs: Long): Boolean =
+        cachedReport != null && nowMs - lastFetchMs < MIN_FETCH_INTERVAL_MS
 
     // -----------------------------------------------------------------------
     // Rate Limits
@@ -95,9 +133,9 @@ class GroqProviderAdapter(
      *
      * Returns null if the calls fail or headers are absent.
      */
-    private suspend fun fetchRateLimits(): GroqRateLimitData? {
+    private suspend fun fetchRateLimits(now: Long): GroqRateLimitData? {
         return try {
-            val model = pickPollModel() ?: return null
+            val model = pingModel(now) ?: return null
             val response: HttpResponse = client.post("$baseUrl$CHAT_PATH") {
                 header(HttpHeaders.Authorization, "Bearer $apiKey")
                 contentType(ContentType.Application.Json)
@@ -140,7 +178,17 @@ class GroqProviderAdapter(
      * available. Model ids churn (llama-3.1-8b-instant vanished between
      * adapter versions), so availability is checked every poll.
      */
-    private suspend fun pickPollModel(): String? {
+    private suspend fun pingModel(now: Long): String? {
+        cachedPingModel?.let { cached ->
+            if (now - pingModelResolvedAtMs < MODEL_CACHE_TTL_MS) return cached
+        }
+        val resolved = resolvePingModel() ?: return null
+        cachedPingModel = resolved
+        pingModelResolvedAtMs = now
+        return resolved
+    }
+
+    private suspend fun resolvePingModel(): String? {
         return try {
             val response: HttpResponse = client.get("$baseUrl$MODELS_PATH") {
                 header(HttpHeaders.Authorization, "Bearer $apiKey")
