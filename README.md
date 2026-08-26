@@ -1,6 +1,6 @@
 # Fuel Dashboard (KMP)
 
-> **Beta** — this is pre-release software. Features may change, and some rough edges are expected. Feedback welcome via the in-app issue reporter or [the issue tracker](https://git.angussoftware.dev/coda/fuel-dashboard-kmp/issues).
+> **Beta** — this is pre-release software. Features may change, and some rough edges are expected. Feedback welcome via the in-app issue reporter or [the issue tracker](https://github.com/coda-rho-bot/fuel-dashboard-kmp/issues).
 
 Cross-platform dashboard for monitoring AI provider fuel/quota status.
 Monitor and manage provider fuel state across your AI fleet.
@@ -9,7 +9,7 @@ Monitor and manage provider fuel state across your AI fleet.
 
 ### Linux (DEB)
 
-Download `fuel-dashboard_0.2.0~beta.1_amd64.deb` from the [releases page](https://git.angussoftware.dev/coda/fuel-dashboard-kmp/releases) and install:
+Download `fuel-dashboard_0.2.0~beta.1_amd64.deb` from the [releases page](https://github.com/coda-rho-bot/fuel-dashboard-kmp/releases) and install:
 
 ```bash
 sudo dpkg -i fuel-dashboard_0.2.0~beta.1_amd64.deb
@@ -18,7 +18,7 @@ fuel-dashboard
 
 ### Windows
 
-Download the portable zip from the [releases page](https://git.angussoftware.dev/coda/fuel-dashboard-kmp/releases), extract, and run `fuel-dashboard.exe`.
+Download the portable zip from the [releases page](https://github.com/coda-rho-bot/fuel-dashboard-kmp/releases), extract, and run `fuel-dashboard.exe`.
 
 ### Android (Google Play beta)
 
@@ -31,7 +31,7 @@ Join the closed beta track on Google Play (link coming soon). The app is also bu
 ### Build from source
 
 ```bash
-git clone https://git.angussoftware.dev/coda/fuel-dashboard-kmp.git
+git clone https://github.com/coda-rho-bot/fuel-dashboard-kmp.git
 cd fuel-dashboard-kmp
 ./gradlew :composeApp:run
 ```
@@ -138,7 +138,7 @@ composeApp/src/
 
 ## Forgejo
 
-https://git.angussoftware.dev/coda/fuel-dashboard-kmp
+https://github.com/coda-rho-bot/fuel-dashboard-kmp
 
 ## License
 
