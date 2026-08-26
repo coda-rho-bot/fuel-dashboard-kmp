@@ -122,11 +122,13 @@ class QwenProviderAdapter(
             }
         }
 
+        // Limits are known but current usage is not — no remainingPct, and no
+        // fabricated reset timer (null resetsAt renders without a countdown).
         if (q.rpm != null && q.rpm > 0) {
-            windows.add(ReportWindow(name = "RPM", remainingPct = null, resetsAt = epochMillis() + 60_000, windowHours = 1.0 / 60.0))
+            windows.add(ReportWindow(name = "Requests/min", remainingPct = null, resetsAt = null, windowHours = 1.0 / 60.0))
         }
         if (q.tpm != null && q.tpm > 0) {
-            windows.add(ReportWindow(name = "TPM", remainingPct = null, resetsAt = epochMillis() + 60_000, windowHours = 1.0 / 60.0))
+            windows.add(ReportWindow(name = "Tokens/min", remainingPct = null, resetsAt = null, windowHours = 1.0 / 60.0))
         }
 
         val rawDisplay = buildString {

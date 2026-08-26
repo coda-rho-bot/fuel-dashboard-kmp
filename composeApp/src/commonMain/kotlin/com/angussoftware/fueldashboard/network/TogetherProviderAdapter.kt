@@ -7,11 +7,14 @@ import com.angussoftware.fueldashboard.util.formatRoot
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlin.math.roundToInt
+import kotlin.time.Clock
 
 /**
  * Polls the Together AI billing usage API.
@@ -91,8 +94,8 @@ class TogetherProviderAdapter(
     }
 
     private fun currentUtcMonthPrefix(): String {
-        val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
-        return "%04d-%02d".format(now.year, now.monthValue)
+        val now = Clock.System.now().toLocalDateTime(TimeZone.UTC)
+        return formatRoot("%04d-%02d", now.year, now.monthNumber)
     }
 
     internal fun buildReport(monthlyCost: Double): ProviderReport {

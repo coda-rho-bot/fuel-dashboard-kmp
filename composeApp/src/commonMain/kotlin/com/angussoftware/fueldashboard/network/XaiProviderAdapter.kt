@@ -3,32 +3,35 @@ package com.angussoftware.fueldashboard.network
 import com.angussoftware.fueldashboard.model.ProviderAdapter
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
+import com.angussoftware.fueldashboard.util.formatRoot
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlin.math.roundToInt
 
 /**
- * Polls the xAI (Grok) API for key status.
+ * Polls the xAI (Grok) API for key status and prepaid balance.
  *
- * **What this surface exposes (and what it doesn't):**
+ * **Single data source:**
  *
- * xAI's regular API-key surface has no balance/credits endpoint — prepaid
- * credit balances live behind the separate Management API
- * (management-api.x.ai, management key required), and per-request costs are
- * returned inline on inference responses (`cost_in_usd_ticks`) rather than
- * as a queryable total.
+ * - **`GET /v1/api-key`** (regular API key, Bearer auth): key metadata and
+ *   prepaid credit fields. Wire fields (xAI docs + OpenUsage, Aug 2026):
+ *   - `name` — key label
+ *   - `api_key_blocked` / `api_key_disabled` / `team_blocked` — booleans
+ *     (there is no `status` string)
+ *   - `remaining_balance` / `spent_balance` / `total_granted` — USD
  *
- * What we CAN do with a regular key:
+ * **Fuel type**: SPEND_BUDGET — usedDollars = spent_balance,
+ * limitDollars = total_granted, gauge from remaining_balance. When the
+ * balance fields are absent (older surface / no grant), the report degrades
+ * to key-name display without a gauge.
  *
- * - **`GET /v1/api-key`**: key metadata — name, status, permissions. Proves
- *  the key is valid and shows which key is active.
- *
- * **Auth**: `Authorization: Bearer $XAI_API_KEY`
- *
- * **Fuel type**: RATE_LIMIT placeholder (no throttle or spend data on this
- * surface — the report is availability + key metadata, no gauge).
+ * The separate Management API (management-api.x.ai) offers richer team
+ * billing, but requires a management key — deliberately not used.
  */
 class XaiProviderAdapter(
     override val providerId: String,
@@ -38,7 +41,7 @@ class XaiProviderAdapter(
 ) : ProviderAdapter {
 
     override val displayName: String = customDisplayName ?: "xAI"
-    override val providerType: ProviderType = ProviderType.RATE_LIMIT
+    override val providerType: ProviderType = ProviderType.SPEND_BUDGET
 
     private val client = SharedHttpClient.client
 
@@ -47,7 +50,7 @@ class XaiProviderAdapter(
     }
 
     override suspend fun poll(): ProviderReport {
-        val data = fetchKeyInfo() ?: return ProviderReport(
+        val info = fetchKeyInfo() ?: return ProviderReport(
             providerId = providerId,
             displayName = displayName,
             type = providerType,
@@ -55,7 +58,7 @@ class XaiProviderAdapter(
             available = false,
             rawDisplay = "Key info unavailable — check API key",
         )
-        return buildReport(data)
+        return buildReport(info)
     }
 
     private suspend fun fetchKeyInfo(): XaiKeyInfo? {
@@ -75,9 +78,16 @@ class XaiProviderAdapter(
             val root = SharedHttpClient.json.parseToJsonElement(body).jsonObject
             fun s(field: String): String? =
                 (root[field] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
+            fun d(field: String): Double? =
+                (root[field] as? JsonPrimitive)?.doubleOrNull
+            fun b(field: String): Boolean =
+                (root[field] as? JsonPrimitive)?.booleanOrNull ?: false
             XaiKeyInfo(
                 name = s("name"),
-                status = s("status"),
+                blocked = b("api_key_blocked") || b("api_key_disabled") || b("team_blocked"),
+                remainingBalance = d("remaining_balance"),
+                spentBalance = d("spent_balance"),
+                totalGranted = d("total_granted"),
             )
         } catch (_: Exception) {
             null
@@ -85,23 +95,48 @@ class XaiProviderAdapter(
     }
 
     internal fun buildReport(info: XaiKeyInfo): ProviderReport {
+        val hasBalance = info.totalGranted != null && info.totalGranted > 0 && info.remainingBalance != null
+
+        val usedDollars: Double?
+        val limitDollars: Double?
+        val remainingPct: Int?
+
+        if (hasBalance) {
+            usedDollars = info.spentBalance ?: ((info.totalGranted!! - info.remainingBalance!!).coerceAtLeast(0.0))
+            limitDollars = info.totalGranted
+            remainingPct = (info.remainingBalance!! / info.totalGranted!! * 100).coerceIn(0.0, 100.0).roundToInt()
+        } else {
+            usedDollars = null
+            limitDollars = null
+            remainingPct = null
+        }
+
         val rawDisplay = buildString {
-            info.name?.let { append(it) }
-            info.status?.let {
-                if (isNotEmpty()) append(" · ")
+            if (hasBalance) {
+                append(formatRoot("$%.2f left of $%.2f", info.remainingBalance, info.totalGranted))
+            }
+            info.name?.let {
+                if (isNotEmpty()) append(" | ")
                 append(it)
             }
+            if (info.blocked) {
+                if (isNotEmpty()) append(" | ")
+                append("BLOCKED")
+            }
             if (isEmpty()) append("Key active")
-            else append(" · balance in console")
+            else if (!hasBalance) append(" · balance in console")
         }
+
         return ProviderReport(
             providerId = providerId,
             displayName = displayName,
             type = providerType,
-            remainingPct = null,
+            remainingPct = remainingPct,
             resetsAt = null,
             windowHours = 0.0,
-            available = true,
+            available = !info.blocked,
+            usedDollars = usedDollars,
+            limitDollars = limitDollars,
             rawDisplay = rawDisplay,
         )
     }
@@ -111,5 +146,8 @@ class XaiProviderAdapter(
 
 internal data class XaiKeyInfo(
     val name: String?,
-    val status: String?,
+    val blocked: Boolean,
+    val remainingBalance: Double?,
+    val spentBalance: Double?,
+    val totalGranted: Double?,
 )
