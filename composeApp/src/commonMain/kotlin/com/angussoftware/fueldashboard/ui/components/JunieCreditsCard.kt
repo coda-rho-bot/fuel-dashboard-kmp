@@ -56,7 +56,7 @@ fun JunieProviderBalance(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = report?.limitDollars?.let { "${'$'}${formatRoot("%.2f", it)}" } ?: "Not checked yet",
+                text = report?.limitDollars?.let { "${formatRoot("%.2f", it)} AI Credits" } ?: "Not checked yet",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,

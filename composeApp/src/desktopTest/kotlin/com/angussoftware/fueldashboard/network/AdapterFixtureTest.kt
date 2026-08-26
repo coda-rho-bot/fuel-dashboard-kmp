@@ -625,6 +625,28 @@ class AdapterFixtureTest {
     }
 
     // -------------------------------------------------------------------
+    // Junie balance parsing (CLI format drift protection)
+    // -------------------------------------------------------------------
+
+    @Test
+    fun junie_aiCreditsFormat_parses() {
+        val info = parseJunieBalance("Balance left: 35.88 AI Credits")!!
+        assertEquals(35.88, info.balance)
+    }
+
+    @Test
+    fun junie_legacyDollarFormats_stillParse() {
+        assertEquals(12.0, parseJunieBalance("Balance left: $12.00")!!.balance)
+        assertEquals(5.5, parseJunieBalance("... $5.50 remaining ...")!!.balance)
+    }
+
+    @Test
+    fun junie_licenseLine_parsed() {
+        val info = parseJunieBalance("Balance left: 35.88 AI Credits\nLicense: JetBrains AI Ultimate")!!
+        assertEquals("JetBrains AI Ultimate", info.license)
+    }
+
+    // -------------------------------------------------------------------
     // Groq self-throttle (fast follow: poll-cost control)
     // -------------------------------------------------------------------
 
