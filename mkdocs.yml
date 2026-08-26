@@ -1,7 +1,7 @@
 site_name: Fuel Dashboard
 site_description: Cross-platform fuel monitoring for AI agent fleets — track quotas, burn rates, and per-conversation usage across providers.
 site_url: https://docs.angussoftware.dev/fuel-dashboard
-repo_url: https://git.angussoftware.dev/coda/fuel-dashboard-kmp
+repo_url: https://github.com/coda-rho-bot/fuel-dashboard-kmp
 repo_name: coda/fuel-dashboard-kmp
 edit_uri: edit/main/docs/
 

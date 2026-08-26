@@ -54,4 +54,4 @@ the "Last updated" date will be revised.
 
 ## Contact
 
-File an issue at [git.angussoftware.dev/coda/fuel-dashboard-kmp](https://git.angussoftware.dev/coda/fuel-dashboard-kmp/issues)
+File an issue at [github.com/coda-rho-bot/fuel-dashboard-kmp](https://github.com/coda-rho-bot/fuel-dashboard-kmp/issues)
