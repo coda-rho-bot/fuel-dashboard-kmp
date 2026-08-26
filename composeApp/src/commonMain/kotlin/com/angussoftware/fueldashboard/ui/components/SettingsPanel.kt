@@ -1468,9 +1468,9 @@ private fun AddProviderDialog(
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = if (selectedKind == ProviderKind.GROQ) {
-                            "Note: monitoring consumes Groq request quota - the dashboard pings a chat endpoint about once a minute (~1,440 requests/day if left open 24/7). Token cost is negligible; request count is what's metered."
+                            "Note: monitoring consumes Groq request quota - the dashboard pings a chat endpoint about once a minute by default (~1,440 requests/day if left open 24/7; adjustable per provider in its settings after adding). Token cost is negligible; request count is what's metered."
                         } else {
-                            "Note: with a regular API key, monitoring pings a chat endpoint about once a minute against your request quota (admin/enterprise keys use the admin API instead - no pings)."
+                            "Note: with a regular API key, monitoring pings a chat endpoint about once a minute by default against your request quota (adjustable per provider in its settings; admin/enterprise keys use the admin API instead - no pings)."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

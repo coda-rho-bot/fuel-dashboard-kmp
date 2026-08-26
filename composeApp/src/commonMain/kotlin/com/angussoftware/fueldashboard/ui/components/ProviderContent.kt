@@ -175,15 +175,21 @@ fun ProviderContent(
             }
         }
 
-        // Groq/Mistral(regular key): monitoring itself consumes request quota — disclose it.
+        // Groq/Mistral(regular key): monitoring itself consumes request quota —
+        // disclose the EFFECTIVE ping rate (user interval, floored at 60s by
+        // the adapters' quota protection).
         if (config.kind == ProviderKind.GROQ || config.kind == ProviderKind.MISTRAL) {
             Spacer(Modifier.height(4.dp))
+            val effectiveSec = maxOf(config.pollIntervalSeconds, 60)
+            val cadence = when {
+                effectiveSec < 60 -> "$effectiveSec seconds"
+                effectiveSec == 60 -> "1 minute"
+                effectiveSec < 3600 -> "${effectiveSec / 60} minutes"
+                else -> "${effectiveSec / 3600} hour" + if (effectiveSec > 3600) "s" else ""
+            }
+            val adminNote = if (config.kind == ProviderKind.MISTRAL) " (regular key; admin keys poll the admin API instead)" else ""
             Text(
-                if (config.kind == ProviderKind.MISTRAL) {
-                    "Rate gauges are read from a ~once-a-minute chat ping that counts against your request quota (regular key; admin keys poll the admin API instead)."
-                } else {
-                    "Rate gauges are read from a ~once-a-minute chat ping that counts against your request quota."
-                },
+                "Rate gauges are read from a chat ping every $cadence that counts against your request quota$adminNote.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
