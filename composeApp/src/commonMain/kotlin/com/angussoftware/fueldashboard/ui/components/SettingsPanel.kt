@@ -1422,6 +1422,14 @@ private fun AddProviderDialog(
                     Text(defaultUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 )
+                if (selectedKind == ProviderKind.GROQ) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Note: monitoring consumes Groq request quota - the dashboard pings a chat endpoint about once a minute (~1,440 requests/day if left open 24/7). Token cost is negligible; request count is what's metered.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             } else {
                 Text(
                     text = "Requires Junie CLI installed (junie or junie-auth in PATH) and ~/.junie/auth present. The balance checker script is bundled with this app (needs python3 + pexpect). Each check costs ~$0.05-0.20.",

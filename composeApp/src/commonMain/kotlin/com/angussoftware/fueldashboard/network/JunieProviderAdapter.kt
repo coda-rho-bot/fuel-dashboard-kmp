@@ -14,8 +14,13 @@ data class JunieBalanceInfo(
 )
 
 fun parseJunieBalance(output: String): JunieBalanceInfo? {
-    // Try "Balance left: $XX.XX" format first
-    var balance = Regex("Balance left: \\$(\\d+(?:\\.\\d+)?)").find(output)?.groupValues?.get(1)?.toDoubleOrNull()
+    // Current CLI format (verified live Aug 2026): "Balance left: 35.88 AI Credits"
+    var balance = Regex("Balance left: (\\d+(?:\\.\\d+)?)\\s*(?:AI Credits|credits)?", RegexOption.IGNORE_CASE)
+        .find(output)?.groupValues?.get(1)?.toDoubleOrNull()
+    // Legacy: "Balance left: $XX.XX"
+    if (balance == null) {
+        balance = Regex("Balance left: \\$(\\d+(?:\\.\\d+)?)").find(output)?.groupValues?.get(1)?.toDoubleOrNull()
+    }
     // Try "$XX.XX remaining" format (from task result line)
     if (balance == null) {
         balance = Regex("\\$(\\d+(?:\\.\\d+)?)\\s*remaining").find(output)?.groupValues?.get(1)?.toDoubleOrNull()

@@ -150,6 +150,16 @@ fun ProviderContent(
         if (config.kind == ProviderKind.GEMINI) {
             GeminiStudioLinks()
         }
+
+        // Groq: monitoring itself consumes request quota — disclose it.
+        if (config.kind == ProviderKind.GROQ) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Rate gauges are read from a ~once-a-minute chat ping that counts against your request quota.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
