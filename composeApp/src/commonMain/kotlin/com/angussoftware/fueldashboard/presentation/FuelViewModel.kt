@@ -1020,6 +1020,11 @@ class FuelViewModel {
      */
     private fun pollIntervalMs(): Long = 30_000L
 
+    // Per-provider poll scheduling: last time each provider was actually
+    // polled, used to honor ProviderConfig.pollIntervalSeconds inside the
+    // 30s global loop.
+    private val lastPolledMs = mutableMapOf<String, Long>()
+
     private suspend fun refresh() = refreshMutex.withLock {
         // Snapshot adapters to avoid ConcurrentModificationException if
         // applySettings mutates the map during iteration.
@@ -1034,8 +1039,21 @@ class FuelViewModel {
             return
         }
 
-        // Poll all provider adapters in parallel
-        val reportResults = adapterSnapshot.map { (providerId, adapter) ->
+        // Honor per-provider intervals: only poll adapters whose interval
+        // has elapsed since their last poll. Skipped providers keep their
+        // existing report (reports persist in state between refreshes).
+        val nowMs = epochMillis()
+        val dueAdapters = adapterSnapshot.filter { (providerId, _) ->
+            val intervalSec = _state.value.settings.providers
+                .firstOrNull { it.id == providerId }?.pollIntervalSeconds ?: 60
+            val intervalMs = (intervalSec.coerceAtLeast(15)) * 1000L
+            val last = lastPolledMs[providerId]
+            last == null || nowMs - last >= intervalMs
+        }
+        dueAdapters.forEach { (providerId, _) -> lastPolledMs[providerId] = nowMs }
+
+        // Poll due provider adapters in parallel
+        val reportResults = dueAdapters.map { (providerId, adapter) ->
             scope.async {
                 try {
                     providerId to Result.success(adapter.poll())
@@ -1049,6 +1067,13 @@ class FuelViewModel {
 
         val reports = mutableMapOf<String, ProviderReport>()
         val errors = mutableMapOf<String, String>()
+
+        // Providers skipped by their interval keep their previous report —
+        // seed them so the wholesale state replace doesn't blank their tiles.
+        val dueIds = dueAdapters.map { it.first }.toSet()
+        _state.value.providerReports.forEach { (id, existing) ->
+            if (id !in dueIds) reports[id] = existing
+        }
 
         for ((providerId, result) in reportResults) {
             result

@@ -368,6 +368,38 @@ private fun StatusSurfaceSection() {
     }
 }
 
+/**
+ * Per-provider poll frequency selector. Presets cover fast (30s) to lazy
+ * (60m). Note: some adapters self-throttle further for quota protection
+ * (Groq/Mistral floor at 1/min) regardless of this setting.
+ */
+@Composable
+private fun PollIntervalSelector(selectedSeconds: Int, onSelected: (Int) -> Unit) {
+    val presets = listOf(30, 60, 120, 300, 900, 3600)
+    val labels = mapOf(
+        30 to "30 seconds", 60 to "1 minute", 120 to "2 minutes",
+        300 to "5 minutes", 900 to "15 minutes", 3600 to "1 hour",
+    )
+    var expanded by remember { mutableStateOf(false) }
+    val selected = presets.minByOrNull { kotlin.math.abs(it - selectedSeconds) } ?: 60
+    Box {
+        OutlinedButton(onClick = { expanded = true }) {
+            Text("Check every: " + (labels[selected] ?: "${selected}s"), style = MaterialTheme.typography.bodySmall)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            presets.forEach { sec ->
+                DropdownMenuItem(
+                    text = { Text(labels[sec] ?: "${sec}s") },
+                    onClick = {
+                        onSelected(sec)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
 /** One-line documentation link — reference material, belongs at the bottom. */
 @Composable
 private fun DocumentationFooter() {
@@ -963,6 +995,9 @@ private fun ProviderConfigRow(
     var localKey by remember(config.id, isEditing) { mutableStateOf(config.apiKey) }
     var localName by remember(config.id, isEditing) { mutableStateOf(config.displayName) }
     var localUrl by remember(config.id, isEditing) { mutableStateOf(config.serverUrl) }
+    var localPollInterval by remember(config.id, isEditing) {
+        mutableStateOf(config.pollIntervalSeconds.toString())
+    }
     var localMonthlyBudgetUsd by remember(config.id, isEditing) {
         mutableStateOf(config.monthlyBudgetUsd.takeIf { it > 0 }?.toString().orEmpty())
     }
@@ -1196,12 +1231,18 @@ private fun ProviderConfigRow(
                     Spacer(Modifier.height(8.dp))
                 }
 
+                PollIntervalSelector(
+                    selectedSeconds = localPollInterval.toIntOrNull()?.coerceAtLeast(15) ?: 60,
+                    onSelected = { localPollInterval = it.toString() },
+                )
+
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                     TextButton(onClick = {
                         localKey = config.apiKey
                         localName = config.displayName
                         localUrl = config.serverUrl
                         localMonthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 }?.toString().orEmpty()
+                        localPollInterval = config.pollIntervalSeconds.toString()
                         isEditing = false
                     }) {
                         Text("Cancel", style = MaterialTheme.typography.labelSmall)
@@ -1212,6 +1253,7 @@ private fun ProviderConfigRow(
                             displayName = localName.trim(),
                             serverUrl = localUrl.trim(),
                             monthlyBudgetUsd = localMonthlyBudgetUsd.toDoubleOrNull()?.takeIf { it > 0 } ?: 0.0,
+                            pollIntervalSeconds = localPollInterval.toIntOrNull()?.coerceAtLeast(15) ?: 60,
                         ))
                         isEditing = false
                     }) {

@@ -44,6 +44,8 @@ data class ProviderConfig(
     val serverUrl: String = "",
     val displayName: String = "",
     val monthlyBudgetUsd: Double = 0.0,
+    /** How often this provider is polled, in seconds. Default 60. */
+    val pollIntervalSeconds: Int = 60,
 ) {
     /**
      * Resolved display name: custom name > provider's default.
