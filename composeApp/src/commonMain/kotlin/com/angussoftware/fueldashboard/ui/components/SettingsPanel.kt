@@ -1422,10 +1422,14 @@ private fun AddProviderDialog(
                     Text(defaultUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 )
-                if (selectedKind == ProviderKind.GROQ) {
+                if (selectedKind == ProviderKind.GROQ || selectedKind == ProviderKind.MISTRAL) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "Note: monitoring consumes Groq request quota - the dashboard pings a chat endpoint about once a minute (~1,440 requests/day if left open 24/7). Token cost is negligible; request count is what's metered.",
+                        text = if (selectedKind == ProviderKind.GROQ) {
+                            "Note: monitoring consumes Groq request quota - the dashboard pings a chat endpoint about once a minute (~1,440 requests/day if left open 24/7). Token cost is negligible; request count is what's metered."
+                        } else {
+                            "Note: with a regular API key, monitoring pings a chat endpoint about once a minute against your request quota (admin/enterprise keys use the admin API instead - no pings)."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

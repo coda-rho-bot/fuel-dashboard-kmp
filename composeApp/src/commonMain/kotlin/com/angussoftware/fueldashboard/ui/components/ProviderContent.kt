@@ -151,11 +151,15 @@ fun ProviderContent(
             GeminiStudioLinks()
         }
 
-        // Groq: monitoring itself consumes request quota — disclose it.
-        if (config.kind == ProviderKind.GROQ) {
+        // Groq/Mistral(regular key): monitoring itself consumes request quota — disclose it.
+        if (config.kind == ProviderKind.GROQ || config.kind == ProviderKind.MISTRAL) {
             Spacer(Modifier.height(4.dp))
             Text(
-                "Rate gauges are read from a ~once-a-minute chat ping that counts against your request quota.",
+                if (config.kind == ProviderKind.MISTRAL) {
+                    "Rate gauges are read from a ~once-a-minute chat ping that counts against your request quota (regular key; admin keys poll the admin API instead)."
+                } else {
+                    "Rate gauges are read from a ~once-a-minute chat ping that counts against your request quota."
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
