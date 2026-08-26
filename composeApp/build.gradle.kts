@@ -199,6 +199,12 @@ compose.desktop {
             windows {
                 menuGroup = "Angus Software"
                 upgradeUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                // jpackage on Windows requires numeric-only version components —
+                // the "~beta" Debian convention above makes it fail with
+                // "Version [0.2.0~beta.2] contains invalid component [0~beta]".
+                // Map pre-release to a 4th numeric component: "0.2.0-beta.2" → "0.2.0.2".
+                packageVersion = project.version.toString()
+                    .replace(Regex("-beta\\.(\\d+)"), ".$1")
             }
         }
     }
