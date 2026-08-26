@@ -990,6 +990,7 @@ private fun ProviderConfigRow(
                         ProviderKind.GROQ -> Icons.Default.Api
                         ProviderKind.MISTRAL -> Icons.Default.Api
                         ProviderKind.OPENROUTER -> Icons.Default.Api
+                        ProviderKind.GEMINI -> Icons.Default.Api
                         ProviderKind.JUNIE -> Icons.Default.Api
                         ProviderKind.CONNECTED_API -> Icons.Default.Hub
                     },
@@ -1384,6 +1385,7 @@ private fun AddProviderDialog(
                 ProviderKind.GROQ -> "https://api.groq.com/openai"
                 ProviderKind.MISTRAL -> "https://api.mistral.ai"
                 ProviderKind.OPENROUTER -> "https://openrouter.ai/api"
+                ProviderKind.GEMINI -> "https://generativelanguage.googleapis.com"
                 ProviderKind.JUNIE -> ""
                 ProviderKind.CONNECTED_API -> "http://127.0.0.1:8322"
             }
