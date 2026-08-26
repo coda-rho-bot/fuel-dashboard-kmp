@@ -619,6 +619,10 @@ class FuelViewModel {
     private fun applySettings(newSettings: MultiProviderSettings) {
         stopPolling()
         closeAdapters()
+        // Reset per-provider poll scheduling: the immediate post-save refresh
+        // must treat every provider as due, or tiles stay blank until each
+        // provider's interval elapses (review 1815).
+        lastPolledMs.clear()
 
         _state.update { it.copy(
             settings = newSettings,
