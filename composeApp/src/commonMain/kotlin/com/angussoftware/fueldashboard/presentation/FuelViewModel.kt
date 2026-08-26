@@ -29,6 +29,9 @@ import com.angussoftware.fueldashboard.network.JunieProviderAdapter
 import com.angussoftware.fueldashboard.network.LettaCloudProviderAdapter
 import com.angussoftware.fueldashboard.network.MistralProviderAdapter
 import com.angussoftware.fueldashboard.network.OpenRouterProviderAdapter
+import com.angussoftware.fueldashboard.network.QwenProviderAdapter
+import com.angussoftware.fueldashboard.network.TogetherProviderAdapter
+import com.angussoftware.fueldashboard.network.XaiProviderAdapter
 import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
 import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
 import com.angussoftware.fueldashboard.settings.AgentSettingsStore
@@ -970,6 +973,26 @@ class FuelViewModel {
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.XAI -> XaiProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.QWEN -> QwenProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.TOGETHER -> TogetherProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.JUNIE -> JunieProviderAdapter(

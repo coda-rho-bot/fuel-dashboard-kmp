@@ -991,6 +991,9 @@ private fun ProviderConfigRow(
                         ProviderKind.MISTRAL -> Icons.Default.Api
                         ProviderKind.OPENROUTER -> Icons.Default.Api
                         ProviderKind.GEMINI -> Icons.Default.Api
+                        ProviderKind.XAI -> Icons.Default.Api
+                        ProviderKind.QWEN -> Icons.Default.Api
+                        ProviderKind.TOGETHER -> Icons.Default.Api
                         ProviderKind.JUNIE -> Icons.Default.Api
                         ProviderKind.CONNECTED_API -> Icons.Default.Hub
                     },
@@ -1386,6 +1389,9 @@ private fun AddProviderDialog(
                 ProviderKind.MISTRAL -> "https://api.mistral.ai"
                 ProviderKind.OPENROUTER -> "https://openrouter.ai/api"
                 ProviderKind.GEMINI -> "https://generativelanguage.googleapis.com"
+                ProviderKind.XAI -> "https://api.x.ai"
+                ProviderKind.QWEN -> "https://dashscope.aliyuncs.com/api"
+                ProviderKind.TOGETHER -> "https://api.together.xyz"
                 ProviderKind.JUNIE -> ""
                 ProviderKind.CONNECTED_API -> "http://127.0.0.1:8322"
             }

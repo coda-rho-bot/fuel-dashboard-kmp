@@ -23,6 +23,9 @@ enum class ProviderKind(val displayName: String, val category: ProviderCategory)
     MISTRAL("Mistral AI", ProviderCategory.LLM_PROVIDER),
     OPENROUTER("OpenRouter", ProviderCategory.LLM_PROVIDER),
     GEMINI("Google Gemini", ProviderCategory.LLM_PROVIDER),
+    XAI("xAI", ProviderCategory.LLM_PROVIDER),
+    QWEN("Qwen (DashScope)", ProviderCategory.LLM_PROVIDER),
+    TOGETHER("Together AI", ProviderCategory.LLM_PROVIDER),
     JUNIE("Junie", ProviderCategory.LLM_PROVIDER),
     CONNECTED_API("Remote Dashboard", ProviderCategory.AGENT_BACKEND),
 }
@@ -61,6 +64,9 @@ data class ProviderConfig(
         ProviderKind.MISTRAL -> serverUrl.ifBlank { "https://api.mistral.ai" }
         ProviderKind.OPENROUTER -> serverUrl.ifBlank { "https://openrouter.ai/api" }
         ProviderKind.GEMINI -> serverUrl.ifBlank { "https://generativelanguage.googleapis.com" }
+        ProviderKind.XAI -> serverUrl.ifBlank { "https://api.x.ai" }
+        ProviderKind.QWEN -> serverUrl.ifBlank { "https://dashscope.aliyuncs.com/api" }
+        ProviderKind.TOGETHER -> serverUrl.ifBlank { "https://api.together.xyz" }
         ProviderKind.JUNIE -> ""
         ProviderKind.CONNECTED_API -> serverUrl.ifBlank { "http://127.0.0.1:8322" }
     }
@@ -79,7 +85,7 @@ data class ProviderConfig(
 
 val ProviderKind.supportsMonthlyBudget: Boolean
     get() = this == ProviderKind.OPENAI || this == ProviderKind.ANTHROPIC || this == ProviderKind.MISTRAL ||
-        this == ProviderKind.OPENROUTER
+        this == ProviderKind.OPENROUTER || this == ProviderKind.QWEN || this == ProviderKind.TOGETHER
 
 /**
  * Serializable settings wrapper for multi-provider storage.
