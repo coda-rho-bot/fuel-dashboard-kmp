@@ -21,6 +21,7 @@ enum class ProviderKind(val displayName: String, val category: ProviderCategory)
     DEEPSEEK("DeepSeek", ProviderCategory.LLM_PROVIDER),
     GROQ("Groq", ProviderCategory.LLM_PROVIDER),
     MISTRAL("Mistral AI", ProviderCategory.LLM_PROVIDER),
+    OPENROUTER("OpenRouter", ProviderCategory.LLM_PROVIDER),
     JUNIE("Junie", ProviderCategory.LLM_PROVIDER),
     CONNECTED_API("Remote Dashboard", ProviderCategory.AGENT_BACKEND),
 }
@@ -57,6 +58,7 @@ data class ProviderConfig(
         ProviderKind.DEEPSEEK -> serverUrl.ifBlank { "https://api.deepseek.com" }
         ProviderKind.GROQ -> serverUrl.ifBlank { "https://api.groq.com/openai" }
         ProviderKind.MISTRAL -> serverUrl.ifBlank { "https://api.mistral.ai" }
+        ProviderKind.OPENROUTER -> serverUrl.ifBlank { "https://openrouter.ai/api" }
         ProviderKind.JUNIE -> ""
         ProviderKind.CONNECTED_API -> serverUrl.ifBlank { "http://127.0.0.1:8322" }
     }
@@ -74,7 +76,8 @@ data class ProviderConfig(
 }
 
 val ProviderKind.supportsMonthlyBudget: Boolean
-    get() = this == ProviderKind.OPENAI || this == ProviderKind.ANTHROPIC || this == ProviderKind.MISTRAL
+    get() = this == ProviderKind.OPENAI || this == ProviderKind.ANTHROPIC || this == ProviderKind.MISTRAL ||
+        this == ProviderKind.OPENROUTER
 
 /**
  * Serializable settings wrapper for multi-provider storage.

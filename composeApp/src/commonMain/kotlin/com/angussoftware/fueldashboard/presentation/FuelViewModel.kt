@@ -27,6 +27,7 @@ import com.angussoftware.fueldashboard.network.GroqProviderAdapter
 import com.angussoftware.fueldashboard.network.JunieProviderAdapter
 import com.angussoftware.fueldashboard.network.LettaCloudProviderAdapter
 import com.angussoftware.fueldashboard.network.MistralProviderAdapter
+import com.angussoftware.fueldashboard.network.OpenRouterProviderAdapter
 import com.angussoftware.fueldashboard.network.OpenAIProviderAdapter
 import com.angussoftware.fueldashboard.network.ZaiProviderAdapter
 import com.angussoftware.fueldashboard.settings.AgentSettingsStore
@@ -951,6 +952,13 @@ class FuelViewModel {
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.MISTRAL -> MistralProviderAdapter(
+                providerId = config.id,
+                apiKey = config.apiKey,
+                baseUrl = config.resolvedServerUrl(),
+                monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
+                customDisplayName = config.resolvedDisplayName(),
+            )
+            ProviderKind.OPENROUTER -> OpenRouterProviderAdapter(
                 providerId = config.id,
                 apiKey = config.apiKey,
                 baseUrl = config.resolvedServerUrl(),
