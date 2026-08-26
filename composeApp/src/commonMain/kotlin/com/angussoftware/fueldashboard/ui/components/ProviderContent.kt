@@ -32,6 +32,7 @@ import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
+import com.angussoftware.fueldashboard.util.formatRoot
 import com.angussoftware.fueldashboard.model.ReportWindow
 
 @Composable
@@ -81,7 +82,9 @@ fun ProviderContent(
         Spacer(Modifier.height(contentSpacing))
         when (report.type) {
             ProviderType.SPEND_BUDGET -> {
-                report.usedDollars?.let { BudgetBar(it, report.limitDollars, showHelp = showHelp) } ?: if (report.rawDisplay.isBlank()) Text(
+                if (report.isPrepaidCreditPool) {
+                    PrepaidCreditBalance(report)
+                } else report.usedDollars?.let { BudgetBar(it, report.limitDollars, showHelp = showHelp) } ?: if (report.rawDisplay.isBlank()) Text(
                     "No spend data (costs API unavailable — admin key required, or request failed)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -147,6 +150,26 @@ fun ProviderContent(
         if (config.kind == ProviderKind.GEMINI) {
             GeminiStudioLinks()
         }
+    }
+}
+
+/**
+ * Prepaid credit pool display (DeepSeek-style): prominent remaining balance,
+ * no spend-of-budget framing. Mirrors ProviderCreditBalance styling but is
+ * dollar-denominated.
+ */
+@Composable
+private fun PrepaidCreditBalance(report: ProviderReport) {
+    val balance = report.limitDollars ?: 0.0
+    val low = balance < 1.0
+    val containerColor = if (low) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (low) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface
+    val subColor = if (low) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(containerColor).padding(12.dp),
+    ) {
+        Text(formatRoot("$%.2f", balance), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = contentColor)
+        Text("prepaid credit remaining", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = subColor)
     }
 }
 

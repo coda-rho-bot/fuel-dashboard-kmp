@@ -160,10 +160,11 @@ class DeepSeekProviderAdapter(
             remainingPct = null,
             available = balance.isAvailable,
             windows = windows,
-            // Use the Junie pattern: limitDollars = total balance, usedDollars = 0.
-            // BudgetBar shows "$0.00 / $X.XX" — correctly represents remaining
-            // prepaid credit, not monthly spend.
-            usedDollars = 0.0,
+            // Prepaid credit pool: limitDollars carries the remaining balance
+            // and the UI renders a "credit remaining" display — NOT the
+            // used-of-budget spend bar (which misread as a monthly limit).
+            isPrepaidCreditPool = true,
+            usedDollars = null,
             limitDollars = balance.totalBalance,
             rawDisplay = rawDisplay,
         )

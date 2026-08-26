@@ -38,6 +38,12 @@ data class ProviderReport(
     // Credit-based tracking (Letta Cloud, etc.)
     val creditsUsed: Int? = null,
     val creditsLimit: Int? = null,
+    /**
+     * True when limitDollars holds a PREPAID CREDIT BALANCE (DeepSeek, not a
+     * monthly spend limit). The UI renders a "credit remaining" display
+     * instead of the used-of-budget spend bar.
+     */
+    val isPrepaidCreditPool: Boolean = false,
     val creditsTotal: Int? = null,
     val creditsLow: Boolean = false,
     val creditsResetAt: Long? = null, // when monthly quota refreshes (epoch ms)

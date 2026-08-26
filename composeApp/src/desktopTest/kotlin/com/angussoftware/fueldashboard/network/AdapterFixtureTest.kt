@@ -127,7 +127,10 @@ class AdapterFixtureTest {
         assertEquals("DeepSeek", report.displayName)
         assertEquals(ProviderType.SPEND_BUDGET, report.type)
         assertTrue(report.available)
-        assertEquals(0.0, report.usedDollars)
+        // Prepaid credit pool semantics: no fake "used" dollars — the UI
+        // renders a "credit remaining" display from limitDollars.
+        assertTrue(report.isPrepaidCreditPool)
+        assertEquals(null, report.usedDollars)
         assertEquals(10.05, report.limitDollars)
         assertEquals(1, report.windows.size)
         assertEquals("Credit Balance", report.windows[0].name)
