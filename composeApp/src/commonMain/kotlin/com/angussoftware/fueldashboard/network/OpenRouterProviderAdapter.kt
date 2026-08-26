@@ -3,6 +3,7 @@ package com.angussoftware.fueldashboard.network
 import com.angussoftware.fueldashboard.model.ProviderAdapter
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
+import com.angussoftware.fueldashboard.util.formatRoot
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -113,7 +114,9 @@ class OpenRouterProviderAdapter(
     // -----------------------------------------------------------------------
 
     internal fun buildReport(key: OpenRouterKeyData): ProviderReport {
-        val hasKeyCap = key.limit != null && key.limit > 0 && key.limitRemaining != null
+        // Capture locals so the when-branch null checks smart-cast them.
+        val capLimit = key.limit?.takeIf { it > 0 }
+        val capRemaining = key.limitRemaining
 
         // Primary: per-key spending cap. Secondary: user-set monthly budget
         // vs the API-reported monthly usage.
@@ -122,14 +125,10 @@ class OpenRouterProviderAdapter(
         val remainingPct: Int?
 
         when {
-            hasKeyCap -> {
-                val limit = key.limit!!
-                val remaining = key.limitRemaining!!
-                usedDollars = (limit - remaining).coerceAtLeast(0.0)
-                limitDollars = limit
-                remainingPct = if (limit > 0) {
-                    (remaining / limit * 100).coerceIn(0.0, 100.0).roundToInt()
-                } else null
+            capLimit != null && capRemaining != null -> {
+                usedDollars = (capLimit - capRemaining).coerceAtLeast(0.0)
+                limitDollars = capLimit
+                remainingPct = (capRemaining / capLimit * 100).coerceIn(0.0, 100.0).roundToInt()
             }
             monthlyBudgetUsd != null && monthlyBudgetUsd > 0 && key.usageMonthly != null -> {
                 usedDollars = key.usageMonthly
@@ -145,16 +144,16 @@ class OpenRouterProviderAdapter(
         }
 
         val rawDisplay = buildString {
-            if (hasKeyCap) {
-                append("$%.2f left of $%.2f cap".format(key.limitRemaining, key.limit))
+            if (capLimit != null && capRemaining != null) {
+                append(formatRoot("$%.2f left of $%.2f cap", capRemaining, capLimit))
             }
             if (key.usageDaily != null) {
                 if (isNotEmpty()) append(" | ")
-                append("$%.2f today".format(key.usageDaily))
+                append(formatRoot("$%.2f today", key.usageDaily))
             }
             if (key.usageMonthly != null) {
                 if (isNotEmpty()) append(" | ")
-                append("$%.2f this month".format(key.usageMonthly))
+                append(formatRoot("$%.2f this month", key.usageMonthly))
             }
             if (key.isFreeTier && isEmpty()) {
                 append("Free tier")
