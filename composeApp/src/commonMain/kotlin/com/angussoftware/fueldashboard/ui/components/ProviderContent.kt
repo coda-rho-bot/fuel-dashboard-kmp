@@ -205,7 +205,7 @@ private fun PrepaidCreditBalance(report: ProviderReport) {
 @Composable
 private fun ProviderConsoleLink(kind: ProviderKind) {
     val (label, url) = when (kind) {
-        ProviderKind.ZAI -> "billing & credits" to "https://z.ai/manage-apikey/billing"
+        ProviderKind.ZAI -> "usage gauge" to "https://z.ai/manage-apikey/coding-plan/personal/usage"
         ProviderKind.LETTA_CLOUD -> "usage dashboard" to "https://platform.letta.com/settings/organization/usage"
         ProviderKind.OPENAI -> "credit balance & billing" to "https://platform.openai.com/settings/organization/billing"
         ProviderKind.ANTHROPIC -> "usage & billing" to "https://console.anthropic.com/settings/billing"
@@ -214,7 +214,7 @@ private fun ProviderConsoleLink(kind: ProviderKind) {
         ProviderKind.MISTRAL -> "usage & billing" to "https://console.mistral.ai/usage"
         ProviderKind.OPENROUTER -> "balance & key caps" to "https://openrouter.ai/credits"
         ProviderKind.XAI -> "usage & credits" to "https://console.x.ai/team/default/usage"
-        ProviderKind.QWEN -> "billing & usage" to "https://modelstudio.alibaba.com/billing"
+        ProviderKind.QWEN -> "billing & usage" to "https://bailian.console.aliyun.com/"
         ProviderKind.TOGETHER -> "usage & billing" to "https://api.together.ai/settings/organization/~current/billing"
         ProviderKind.GEMINI, ProviderKind.JUNIE, ProviderKind.CONNECTED_API -> return
     }
