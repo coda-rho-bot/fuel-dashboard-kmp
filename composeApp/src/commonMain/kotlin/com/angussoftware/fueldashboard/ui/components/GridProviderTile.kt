@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -282,7 +283,7 @@ fun GridProviderTile(
         Column(
             Modifier
                 .padding(10.dp)
-                .fillMaxWidth()
+                .width(IntrinsicSize.Max)
                 .heightIn(min = 140.dp),
         ) {
             // Name + availability dot

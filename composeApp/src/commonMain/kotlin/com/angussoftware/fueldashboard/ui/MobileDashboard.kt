@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -395,7 +396,7 @@ private fun MobileFuelContent(
                                 com.angussoftware.fueldashboard.ui.components.GridProviderTile(
                                     config = config,
                                     report = state.providerReports[config.id],
-                                    modifier = Modifier.width(160.dp),
+                                    modifier = Modifier.widthIn(min = 160.dp),
                                 )
                             }
                         }
