@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -155,12 +156,16 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
 @Composable
 fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
     val frameColor = MaterialTheme.colorScheme.outline
-    // Sand uses the theme's tertiary color (purple-cyan palette) — this is
-    // a TIME gauge, not a fuel gauge. The needle gauge already uses the
-    // green-amber-red fuelColor gradient for remainingPct; the hourglass
-    // visually distinguishes itself by representing TIME with a different
-    // color system (Harry: "purple-cyan color percentages").
-    val sandColor = MaterialTheme.colorScheme.tertiary
+    // Sand transitions purple -> cyan as time drains: purple when full
+    // (sand in the top bulb, plenty of time) to cyan when empty (all sand
+    // fallen, time nearly expired). This is a TIME gauge, visually distinct
+    // from the needle's green-amber-red fuel gradient.
+    // Purple 0xFF9C27B0 at sandFraction=1, Cyan 0xFF00BCD4 at sandFraction=0.
+    val sandColor = lerp(
+        Color(0xFF00BCD4), // cyan — empty (bottom)
+        Color(0xFF9C27B0), // purple — full (top)
+        sandFraction ?: 0f,
+    )
     Canvas(modifier = modifier) {
         if (sandFraction == null) return@Canvas
         val w = size.width
