@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,8 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -444,6 +447,14 @@ internal fun FuelColumnContent(
     viewModel: FuelViewModel,
     modifier: Modifier = Modifier,
 ) {
+    // Grid/list view of provider tiles (persisted).
+    var gridView by remember {
+        mutableStateOf(
+            com.angussoftware.fueldashboard.settings.loadStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FUEL_GRID_VIEW, "false",
+            ).toBoolean(),
+        )
+    }
     when {
         // Empty state — no providers configured
         state.settings.providers.isEmpty() -> {
@@ -528,7 +539,7 @@ internal fun FuelColumnContent(
                     item { HorizontalDivider() }
                 }
 
-                // Last updated timestamp
+                // Last updated timestamp + view toggle
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -540,6 +551,24 @@ internal fun FuelColumnContent(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (state.activeProviders.size > 1) {
+                            IconButton(
+                                onClick = {
+                                    gridView = !gridView
+                                    com.angussoftware.fueldashboard.settings.saveStringSetting(
+                                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FUEL_GRID_VIEW, gridView.toString(),
+                                    )
+                                },
+                                modifier = Modifier.size(28.dp),
+                            ) {
+                                Icon(
+                                    if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
+                                    contentDescription = if (gridView) "List view" else "Grid view",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                         if (state.showHelp) {
                             Spacer(Modifier.width(4.dp))
                             HelpIcon("Last time provider data was polled. Updates every 30 seconds.")
@@ -555,23 +584,41 @@ internal fun FuelColumnContent(
                     }
                 }
 
-                // Provider sections — one per active adapter
-                items(state.activeProviders, key = { it.id }) { config ->
-                    val report = state.providerReports[config.id]
-                    val error = state.providerErrors[config.id]
+                // Provider sections — grid of compact tiles, or full list
+                if (gridView) {
+                    item {
+                        androidx.compose.foundation.layout.FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            state.activeProviders.forEach { config ->
+                                com.angussoftware.fueldashboard.ui.components.GridProviderTile(
+                                    config = config,
+                                    report = state.providerReports[config.id],
+                                    modifier = Modifier.width(200.dp),
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(state.activeProviders, key = { it.id }) { config ->
+                        val report = state.providerReports[config.id]
+                        val error = state.providerErrors[config.id]
 
-                    ProviderSection(
-                        config = config,
-                        report = report,
-                        error = error,
-                        showHelp = state.showHelp,
-                        isChecking = config.id in state.checkingProviderIds,
-                        onCheckJunieBalance = if (canCheckJunieBalance) {
-                            { viewModel.checkJunieCredits(config.id) }
-                        } else {
-                            null
-                        },
-                    )
+                        ProviderSection(
+                            config = config,
+                            report = report,
+                            error = error,
+                            showHelp = state.showHelp,
+                            isChecking = config.id in state.checkingProviderIds,
+                            onCheckJunieBalance = if (canCheckJunieBalance) {
+                                { viewModel.checkJunieCredits(config.id) }
+                            } else {
+                                null
+                            },
+                        )
+                    }
                 }
 
                 // Usage / Intelligence / Agents live in their own tabs.

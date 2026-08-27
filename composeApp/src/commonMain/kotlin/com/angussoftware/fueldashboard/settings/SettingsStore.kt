@@ -14,6 +14,7 @@ internal expect fun saveStringSetting(key: String, value: String)
 // ---------------------------------------------------------------------------
 
 internal object FuelSettingsKeys {
+    const val FUEL_GRID_VIEW = "fuelGridView"
     // Legacy keys — kept for one-time migration only
     const val MODE = "fuelSourceMode"           // DIRECT | CONNECTED (legacy)
     const val PROVIDER = "fuelProvider"          // zai (legacy)
