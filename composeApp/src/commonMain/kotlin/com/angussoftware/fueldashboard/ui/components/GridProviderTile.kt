@@ -92,7 +92,12 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
         // the full 240° arc + needle inside the canvas.
         val r = size.height * 0.64f
         val arcSize = Size(r * 2f, r * 2f)
-        val topLeft = Offset((size.width - arcSize.width) / 2f, (size.height - arcSize.height) / 2f)
+        // Zero-bleed top (review 1834 follow-up): the stroke is centered on
+        // the arc path, so a flush-top box still paints half a stroke-width
+        // above the canvas. Inset by half the stroke so NO ink escapes the
+        // canvas — no reliance on neighboring spacers.
+        val halfStroke = size.height * 0.10f / 2f
+        val topLeft = Offset((size.width - arcSize.width) / 2f, halfStroke)
 
         // Full track: from E (150°) sweeping +240° over the top to F (390°).
         drawArc(
