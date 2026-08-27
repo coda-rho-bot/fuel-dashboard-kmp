@@ -10,6 +10,8 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import com.angussoftware.fueldashboard.model.ProviderReport
+import com.angussoftware.fueldashboard.model.ProviderType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
@@ -112,9 +114,19 @@ class EmbeddedServerEndpointsTest {
     // ── Fuel (GET /fuel) ─────────────────────────────────────────────
 
     @Test
-    fun fuelEndpointReturnsFuelState() = testApplication {
-        val fuel = FuelResponse(burnRatePctPerHr = 2.5, recommendedModel = "glm-5.2")
-        val server = createServer(fuelState = fuel)
+    fun fuelEndpointReturnsProviderReports() = testApplication {
+        // /fuel now serves the CURRENT provider adapter reports (what the
+        // dashboard actually displays), not the stale orchestrator state.
+        // ConnectedApi clients expect live gauges here.
+        val report = ProviderReport(
+            providerId = "test-prov",
+            displayName = "z.ai",
+            type = ProviderType.WINDOW_CREDIT,
+            remainingPct = 58,
+            resetsAt = 1700000000000L,
+        )
+        val state = DashboardState(providerReports = mapOf("test-prov" to report))
+        val server = createServer(dashboardState = state)
         application { server.configureRouting(this) }
 
         client.get("/fuel") {
@@ -122,11 +134,8 @@ class EmbeddedServerEndpointsTest {
         }.apply {
             assertEquals(HttpStatusCode.OK, status)
             val body: String = body()
-            // snake_case wire format (not camelCase)
-            assertTrue(body.contains("burn_rate_pct_per_hr"), "wire format should be snake_case: $body")
-            assertTrue(body.contains("2.5"), body)
-            assertTrue(body.contains("recommended_model"), "wire format should be snake_case: $body")
-            assertTrue(body.contains("glm-5.2"), body)
+            assertTrue(body.contains("z.ai"), "provider name should appear: $body")
+            assertTrue(body.contains("58"), "remaining pct should appear: $body")
         }
     }
 
