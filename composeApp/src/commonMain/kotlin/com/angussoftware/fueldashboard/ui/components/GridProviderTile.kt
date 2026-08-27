@@ -179,14 +179,20 @@ fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
                 y += step
             }
         }
-        // Sand in the bottom bulb: always some if sand has fallen.
+        // Sand in the bottom bulb: fills from the bottom up. The bottom bulb
+        // is an INVERTED triangle (wide at bottom, narrow at waist) — the
+        // half-width at any height y grows linearly from ~0 at the waist to
+        // 0.40w at the bottom. The previous implementation had this exactly
+        // backwards (wide at waist, narrow at bottom), rendering the sand as
+        // an upside-down pyramid instead of filling the bowl.
         if (sandFraction < 1f) {
             val bottomFill = (1f - sandFraction)
             val topOfSand = waistY + (h * 0.88f - waistY) * (1f - bottomFill)
             var y = topOfSand
             val step = (h * 0.88f - waistY) / 20f
             while (y < h * 0.90f) {
-                val t = 1f - (y - waistY) / (h * 0.88f - waistY)        // 1 at waist, 0 at bottom
+                // Progress from waist (0) to bottom (1) — width grows downward.
+                val t = (y - waistY) / (h * 0.88f - waistY)
                 val halfW = w * (0.40f * t)
                 drawLine(sandColor, Offset(w * 0.5f - halfW, y), Offset(w * 0.5f + halfW, y), step * 1.4f, StrokeCap.Butt)
                 y += step
@@ -260,13 +266,19 @@ fun GridProviderTile(
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "${report.remainingPct}%" + (report.resetsAt?.let {
-                        val mins = ((it - epochMillis()) / 60_000).coerceAtLeast(0)
-                        if (mins >= 60) " · ${mins / 60}h ${mins % 60}m" else " · ${mins}m"
-                    } ?: ""),
+                    buildString {
+                        append("${report.remainingPct}% full")
+                        report.resetsAt?.let {
+                            val mins = ((it - epochMillis()) / 60_000).coerceAtLeast(0)
+                            if (mins >= 60) append(" · ${mins / 60}h ${mins % 60}m til reset")
+                            else append(" · ${mins}m til reset")
+                        }
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = if (report.remainingPct < 20) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             } else if (report?.isPrepaidCreditPool == true && report.limitDollars != null) {
                 // Prepaid balance: prominent figure
