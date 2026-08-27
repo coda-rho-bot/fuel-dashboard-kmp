@@ -303,7 +303,7 @@ private fun MobileFuelContent(
                 }
 
                 if (state.providerReports.isNotEmpty() || state.fuel != null) {
-                    item {
+                    if (state.showHelp) item {
                         Text(
                             text = "Providers managed in Settings",
                             style = MaterialTheme.typography.labelSmall,

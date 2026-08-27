@@ -111,6 +111,7 @@ fun HelpIcon(
  */
 @Composable
 fun EmptyTabState(
+    showHelp: Boolean = true,
     title: String,
     message: String,
     hint: String? = null,

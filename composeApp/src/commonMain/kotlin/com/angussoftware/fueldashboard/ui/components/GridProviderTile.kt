@@ -3,6 +3,7 @@ package com.angussoftware.fueldashboard.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -154,10 +155,12 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
 @Composable
 fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
     val frameColor = MaterialTheme.colorScheme.outline
-    // Sand color tracks the quota health: green when plenty of time remains,
-    // amber at half, red when nearly expired — same gradient as the list
-    // view's FuelBar (fuelColor).
-    val sandColor = fuelColor(((sandFraction ?: 0f) * 100).toInt())
+    // Sand uses the theme's tertiary color (purple-cyan palette) — this is
+    // a TIME gauge, not a fuel gauge. The needle gauge already uses the
+    // green-amber-red fuelColor gradient for remainingPct; the hourglass
+    // visually distinguishes itself by representing TIME with a different
+    // color system (Harry: "purple-cyan color percentages").
+    val sandColor = MaterialTheme.colorScheme.tertiary
     Canvas(modifier = modifier) {
         if (sandFraction == null) return@Canvas
         val w = size.width
@@ -231,11 +234,11 @@ fun GridProviderTile(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.height(IntrinsicSize.Min),
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Column(Modifier.padding(10.dp)) {
+        Column(Modifier.padding(10.dp).fillMaxWidth()) {
             // Name + availability dot
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -265,13 +268,13 @@ fun GridProviderTile(
                     Column(Modifier.weight(1f)) {
                         NeedleGauge(
                             remainingPct = report.remainingPct,
-                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            modifier = Modifier.fillMaxWidth().height(64.dp),
                         )
                     }
                     val sand = sandFraction(report.resetsAt, report.windowHours)
                     if (sand != null) {
                         Spacer(Modifier.width(10.dp))
-                        HourglassGauge(sandFraction = sand, modifier = Modifier.size(26.dp, 40.dp))
+                        HourglassGauge(sandFraction = sand, modifier = Modifier.size(36.dp, 54.dp))
                     }
                 }
                 Spacer(Modifier.height(2.dp))

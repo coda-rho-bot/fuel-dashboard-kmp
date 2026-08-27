@@ -173,7 +173,7 @@ fun AgentPanel(
                 HelpText("A Remote Dashboard is configured, but no agents are available. Agents appear here when they are registered on the remote dashboard.")
             } else {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
+                    if (showHelp) Text(
                         text = "• Agents can self-register via MCP (add this app as an MCP server in your agent config)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -646,8 +646,8 @@ private fun AgentCard(
                 )
             } else if (!isSyncedOnly) {
                 Text(
-                    text = "No metered usage in the last 24h — models are set per conversation; " +
-                        "there's no single \"agent model\".",
+                    text = "No metered usage in the last 24h" + (if (showHelp) " — models are set per conversation; " +
+                        "there's no single \"agent model\"." else ""),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -151,18 +151,20 @@ fun ProviderContent(
 
         // Gemini: Google exposes no quota/usage API for API keys — limits,
         // billing, and spend live only in AI Studio. Point users there.
-        if (config.kind == ProviderKind.GEMINI) {
+        if (config.kind == ProviderKind.GEMINI && showHelp) {
             GeminiStudioLinks()
         }
 
         // Every provider: link to where its usage limits / billing / credit
-        // balance lives (most relevant console page per provider).
-        ProviderConsoleLink(config.kind)
+        // balance lives. Gated by showHelp — navigation is help, not data.
+        if (showHelp) {
+            ProviderConsoleLink(config.kind)
+        }
 
-        // Groq/Mistral(regular key): monitoring itself consumes request quota —
-        // disclose the EFFECTIVE ping rate (user interval, floored at 60s by
-        // the adapters' quota protection).
-        if (config.kind == ProviderKind.GROQ || config.kind == ProviderKind.MISTRAL) {
+        // Groq/Mistral(regular key): monitoring itself consumes request quota.
+        // Gated by showHelp — this is an educational disclaimer about
+        // monitoring mechanics, not data.
+        if (showHelp && (config.kind == ProviderKind.GROQ || config.kind == ProviderKind.MISTRAL)) {
             Spacer(Modifier.height(4.dp))
             val effectiveSec = maxOf(config.pollIntervalSeconds, 60)
             val cadence = when {
@@ -360,7 +362,7 @@ private fun ProviderWindowRow(window: ReportWindow, showHelp: Boolean) {
                     )
                 }
             }
-            if (window.resetEstimated) {
+            if (window.resetEstimated && showHelp) {
                 Text(
                     "Timer estimated — provider did not return a reset value. This may indicate the window resets on next request or a connectivity issue.",
                     style = MaterialTheme.typography.labelSmall,
