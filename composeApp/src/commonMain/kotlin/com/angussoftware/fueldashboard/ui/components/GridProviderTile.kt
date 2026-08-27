@@ -189,10 +189,9 @@ fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
         val frameHalfStroke = frameStroke.width / 2f
         val topStart = h * 0.06f
         val bottomEnd = h * 0.94f
-        val bulbSpan = bottomEnd - topStart
 
         fun topBulbHalfW(y: Float): Float {
-            val t = ((y - topStart) / bulbSpan).coerceIn(0f, 1f)
+            val t = ((y - topStart) / (waistY - topStart)).coerceIn(0f, 1f)
             return (w * 0.42f * (1f - t) - frameHalfStroke).coerceAtLeast(0f)
         }
 
