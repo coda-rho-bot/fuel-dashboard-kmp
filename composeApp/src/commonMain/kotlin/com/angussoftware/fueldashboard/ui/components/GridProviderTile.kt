@@ -214,14 +214,14 @@ fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
         // Sand levels use CUBIC mapping to match triangular volume geometry.
         // Linear height fill in a triangle misrepresents volume: filling 50%
         // of height in an inverted triangle captures ~87% of volume (the
-        // bottom is wide). Cubic root mapping corrects this:
-        //   Top bulb: d = H * sandFraction^(1/3)   (height above waist)
-        //   Bottom bulb: h = H * (1 - (1-fill)^(1/3))  (height from bottom)
+        // bottom is wide). Square root (area-based) mapping corrects this:
+        //   Top bulb: d = H * sandFraction^(1/2)   (height above waist)
+        //   Bottom bulb: h = H * (1 - (1-fill)^(1/2))  (height from bottom)
 
         // Sand in the top bulb: volume = sandFraction of total.
         if (sandFraction > 0f) {
             val H_top = waistY - topStart
-            val dFromWaist = H_top * Math.pow(sandFraction.toDouble(), 1.0 / 3.0).toFloat()
+            val dFromWaist = H_top * Math.pow(sandFraction.toDouble(), 1.0 / 2.0).toFloat()
             val levelY = waistY - dFromWaist
             var y = levelY
             val step = (waistY - topStart) / 24f
@@ -238,7 +238,7 @@ fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
             val bottomFill = (1f - sandFraction)
             val H_bottom = bottomEnd - waistY
             // Height from bottom: h = H * (1 - (1-fill)^(1/3))
-            val hFromBottom = H_bottom * (1f - Math.pow((1f - bottomFill).toDouble(), 1.0 / 3.0).toFloat())
+            val hFromBottom = H_bottom * (1f - Math.pow((1f - bottomFill).toDouble(), 1.0 / 2.0).toFloat())
             val topOfSand = bottomEnd - hFromBottom
             var y = topOfSand
             val step = (bottomEnd - waistY) / 20f
