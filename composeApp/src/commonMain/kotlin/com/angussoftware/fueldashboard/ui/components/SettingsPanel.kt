@@ -1420,6 +1420,61 @@ private fun AddProviderDialog(
                 Spacer(Modifier.height(4.dp))
             }
 
+            // Direct link to the provider's API key page — click through to
+            // grab a key without hunting for the console.
+            if (selectedKind != ProviderKind.JUNIE && selectedKind != ProviderKind.CONNECTED_API) {
+                val uriHandler = LocalUriHandler.current
+                val keyPage = when (selectedKind) {
+                    ProviderKind.ZAI -> "https://z.ai/"
+                    ProviderKind.LETTA_CLOUD -> "https://letta.com/"
+                    ProviderKind.OPENAI -> "https://platform.openai.com/api-keys"
+                    ProviderKind.ANTHROPIC -> "https://console.anthropic.com/settings/keys"
+                    ProviderKind.DEEPSEEK -> "https://platform.deepseek.com/api_keys"
+                    ProviderKind.GROQ -> "https://console.groq.com/keys"
+                    ProviderKind.MISTRAL -> "https://console.mistral.ai/api-keys"
+                    ProviderKind.OPENROUTER -> "https://openrouter.ai/settings/keys"
+                    ProviderKind.GEMINI -> "https://aistudio.google.com/apikey"
+                    ProviderKind.XAI -> "https://console.x.ai/"
+                    ProviderKind.QWEN -> "https://modelstudio.alibaba.com/"
+                    ProviderKind.TOGETHER -> "https://api.together.ai/settings/api-keys"
+                    else -> null
+                }
+                if (keyPage != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Get a key: ",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            keyPage.removePrefix("https://").removePrefix("www.").trimEnd('/'),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier.clickable { uriHandler.openUri(keyPage) },
+                        )
+                    }
+                    if (selectedKind == ProviderKind.OPENAI) {
+                        Text(
+                            "For spend tracking use an ADMIN key (Settings → Organization → Admin keys) — regular keys can't read usage data.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.clickable {
+                                uriHandler.openUri("https://platform.openai.com/settings/organization/admin-keys")
+                            },
+                        )
+                    }
+                    if (selectedKind == ProviderKind.OPENROUTER) {
+                        Text(
+                            "Tip: set a credit limit on the key for a live spend gauge.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
+
             // Server URL — pre-filled with default, override for self-hosted/regional
             val defaultUrl = when (selectedKind) {
                 ProviderKind.ZAI -> "https://api.z.ai"
