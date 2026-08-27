@@ -283,7 +283,7 @@ fun GridProviderTile(
             Modifier
                 .padding(10.dp)
                 .fillMaxWidth()
-                .heightIn(min = 82.dp),
+                .heightIn(min = 140.dp),
         ) {
             // Name + availability dot
             Row(
