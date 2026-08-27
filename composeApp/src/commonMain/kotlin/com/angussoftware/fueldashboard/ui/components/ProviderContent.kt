@@ -151,6 +151,29 @@ fun ProviderContent(
             GeminiStudioLinks()
         }
 
+        // OpenAI: credit balance is browser-session-only (live-verified:
+        // /v1/dashboard/billing/credit_grants rejects API keys; org billing
+        // endpoints 404). Point at the billing page.
+        if (config.kind == ProviderKind.OPENAI) {
+            val uriHandler = LocalUriHandler.current
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Credit balance: ",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "platform.openai.com billing",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri("https://platform.openai.com/settings/organization/billing")
+                    },
+                )
+            }
+        }
+
         // OpenRouter: account balance is not exposed to regular API keys.
         if (config.kind == ProviderKind.OPENROUTER) {
             val uriHandler = LocalUriHandler.current
