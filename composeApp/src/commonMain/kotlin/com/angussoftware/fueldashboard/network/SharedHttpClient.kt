@@ -19,7 +19,7 @@ object SharedHttpClient {
             json(json)
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 10_000  // 10s
+            requestTimeoutMillis = 20_000  // 20s — must exceed connect timeout (15s) per review 1845
             connectTimeoutMillis = 15_000  // 15s — Cloudflare tunnel on corporate networks can exceed 5s
             socketTimeoutMillis = 15_000   // 15s
         }
