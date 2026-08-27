@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -156,16 +155,12 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
 @Composable
 fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
     val frameColor = MaterialTheme.colorScheme.outline
-    // Sand transitions purple -> cyan as time drains: purple when full
-    // (sand in the top bulb, plenty of time) to cyan when empty (all sand
-    // fallen, time nearly expired). This is a TIME gauge, visually distinct
-    // from the needle's green-amber-red fuel gradient.
-    // Purple 0xFF9C27B0 at sandFraction=1, Cyan 0xFF00BCD4 at sandFraction=0.
-    val sandColor = lerp(
-        Color(0xFF00BCD4), // cyan — empty (bottom)
-        Color(0xFF9C27B0), // purple — full (top)
-        sandFraction ?: 0f,
-    )
+    // Sand uses the SAME timerColor system as the list view's TimerBar:
+    // purple (fresh, time remaining) → blue (mid) → cyan (nearly expired).
+    // sandFraction is remaining/total; timerColor takes elapsed fraction,
+    // so we pass (1 - sandFraction). Visually distinct from the needle's
+    // green-amber-red fuel gradient.
+    val sandColor = timerColor(1f - (sandFraction ?: 0f))
     Canvas(modifier = modifier) {
         if (sandFraction == null) return@Canvas
         val w = size.width
