@@ -178,36 +178,54 @@ fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
         drawLine(frameColor, Offset(w * 0.5f, waistY), Offset(w * 0.92f, h * 0.94f), frameStroke.width, StrokeCap.Round)
         drawLine(frameColor, Offset(w * 0.08f, h * 0.94f), Offset(w * 0.92f, h * 0.94f), frameStroke.width, StrokeCap.Round)
 
+        // Sand rendering: half-widths computed from the ACTUAL triangle
+        // geometry (frame vertices), inset by the stroke half-width so sand
+        // stays flush inside the glass without overlapping the frame lines.
+        //
+        // Top bulb triangle: (0.08w, 0.06h) — (0.92w, 0.06h) — (0.5w, waistY)
+        //   At height y, interior half-width = 0.42w * (1 - (y - 0.06h) / 0.44h)
+        // Bottom bulb triangle: (0.5w, waistY) — (0.08w, 0.94h) — (0.92w, 0.94h)
+        //   At height y, interior half-width = 0.42w * ((y - waistY) / 0.44h)
+        val frameHalfStroke = frameStroke.width / 2f
+        val topStart = h * 0.06f
+        val bottomEnd = h * 0.94f
+        val bulbSpan = bottomEnd - topStart
+
+        fun topBulbHalfW(y: Float): Float {
+            val t = ((y - topStart) / bulbSpan).coerceIn(0f, 1f)
+            return (w * 0.42f * (1f - t) - frameHalfStroke).coerceAtLeast(0f)
+        }
+
+        fun bottomBulbHalfW(y: Float): Float {
+            val t = ((y - waistY) / (bottomEnd - waistY)).coerceIn(0f, 1f)
+            return (w * 0.42f * t - frameHalfStroke).coerceAtLeast(0f)
+        }
+
         // Sand in the top bulb: level from the top = sandFraction.
-        // The bulb interior at height y has half-width interpolating from
-        // 0.42w (top) to ~0 (waist).
         if (sandFraction > 0f) {
-            val levelY = h * 0.10f + (1f - sandFraction) * (waistY - h * 0.10f)
+            val levelY = topStart + (1f - sandFraction) * (waistY - topStart)
             var y = levelY
-            val step = (waistY - h * 0.10f) / 24f
+            val step = (waistY - topStart) / 24f
             while (y < waistY) {
-                val t = (y - h * 0.10f) / (waistY - h * 0.10f)          // 0 at top, 1 at waist
-                val halfW = w * (0.40f * (1f - t))
-                drawLine(sandColor, Offset(w * 0.5f - halfW, y), Offset(w * 0.5f + halfW, y), step * 1.4f, StrokeCap.Butt)
+                val halfW = topBulbHalfW(y)
+                if (halfW > 0f) {
+                    drawLine(sandColor, Offset(w * 0.5f - halfW, y), Offset(w * 0.5f + halfW, y), step * 1.4f, StrokeCap.Butt)
+                }
                 y += step
             }
         }
-        // Sand in the bottom bulb: fills from the bottom up. The bottom bulb
-        // is an INVERTED triangle (wide at bottom, narrow at waist) — the
-        // half-width at any height y grows linearly from ~0 at the waist to
-        // 0.40w at the bottom. The previous implementation had this exactly
-        // backwards (wide at waist, narrow at bottom), rendering the sand as
-        // an upside-down pyramid instead of filling the bowl.
+        // Sand in the bottom bulb: fills from the bottom up (inverted
+        // triangle — wide at bottom, narrow at waist).
         if (sandFraction < 1f) {
             val bottomFill = (1f - sandFraction)
-            val topOfSand = waistY + (h * 0.88f - waistY) * (1f - bottomFill)
+            val topOfSand = waistY + (bottomEnd - waistY) * (1f - bottomFill)
             var y = topOfSand
-            val step = (h * 0.88f - waistY) / 20f
-            while (y < h * 0.90f) {
-                // Progress from waist (0) to bottom (1) — width grows downward.
-                val t = (y - waistY) / (h * 0.88f - waistY)
-                val halfW = w * (0.40f * t)
-                drawLine(sandColor, Offset(w * 0.5f - halfW, y), Offset(w * 0.5f + halfW, y), step * 1.4f, StrokeCap.Butt)
+            val step = (bottomEnd - waistY) / 20f
+            while (y < bottomEnd) {
+                val halfW = bottomBulbHalfW(y)
+                if (halfW > 0f) {
+                    drawLine(sandColor, Offset(w * 0.5f - halfW, y), Offset(w * 0.5f + halfW, y), step * 1.4f, StrokeCap.Butt)
+                }
                 y += step
             }
         }
