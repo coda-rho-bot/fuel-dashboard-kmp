@@ -313,21 +313,30 @@ fun GridProviderTile(
                     }
                 }
                 Spacer(Modifier.height(2.dp))
-                Text(
-                    buildString {
-                        append("${report.remainingPct}% full")
-                        report.resetsAt?.let {
-                            val mins = ((it - epochMillis()) / 60_000).coerceAtLeast(0)
-                            if (mins >= 60) append(" · ${mins / 60}h ${mins % 60}m til reset")
-                            else append(" · ${mins}m til reset")
-                        }
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (report.remainingPct < 20) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
+                ) {
+                    Text(
+                        "${report.remainingPct}% full",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (report.remainingPct < 20) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    report.resetsAt?.let {
+                        val mins = ((it - epochMillis()) / 60_000).coerceAtLeast(0)
+                        val timeText = if (mins >= 60) "${mins / 60}h ${mins % 60}m til reset" else "${mins}m til reset"
+                        Text(
+                            timeText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             } else if (report?.isPrepaidCreditPool == true && report.limitDollars != null) {
                 // Prepaid balance: prominent figure
                 Text(

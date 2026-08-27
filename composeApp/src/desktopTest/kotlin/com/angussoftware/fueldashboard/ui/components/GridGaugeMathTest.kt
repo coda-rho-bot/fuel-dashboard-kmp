@@ -54,7 +54,6 @@ class GridGaugeMathTest {
         val f = sandFraction(now + 3_600_000L, 0.5, now) // 1h left of 0.5h window
         assertTrue(f != null && f <= 1f)
     }
-}
 
     @Test
     fun discretize_snapsToTenPercent() {
@@ -77,3 +76,4 @@ class GridGaugeMathTest {
     fun discretize_nullPassesThrough() {
         assertNull(discretizeSand(null))
     }
+}
