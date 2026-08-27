@@ -20,6 +20,10 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -198,41 +202,97 @@ private fun PrepaidCreditBalance(report: ProviderReport) {
 }
 
 /**
- * One-line link to the provider's most relevant console page for usage
- * limits, billing, or credit balance. Gemini has its dedicated 3-link row;
- * Junie/Connected have no console.
+ * Expandable/collapsible links section per provider — multiple relevant
+ * console pages (usage gauge, billing, rate limits, API keys, etc.) since
+ * different moments call for different pages. Collapsed by default to keep
+ * tiles compact; expands with a "Links" toggle.
  */
 @Composable
 private fun ProviderConsoleLink(kind: ProviderKind) {
-    val (label, url) = when (kind) {
-        ProviderKind.ZAI -> "usage gauge" to "https://z.ai/manage-apikey/coding-plan/personal/usage"
-        ProviderKind.LETTA_CLOUD -> "usage dashboard" to "https://platform.letta.com/settings/organization/usage"
-        ProviderKind.OPENAI -> "credit balance & billing" to "https://platform.openai.com/settings/organization/billing"
-        ProviderKind.ANTHROPIC -> "usage & billing" to "https://console.anthropic.com/settings/billing"
-        ProviderKind.DEEPSEEK -> "usage & balance" to "https://platform.deepseek.com/usage"
-        ProviderKind.GROQ -> "rate limits" to "https://console.groq.com/settings/limits"
-        ProviderKind.MISTRAL -> "usage & billing" to "https://console.mistral.ai/usage"
-        ProviderKind.OPENROUTER -> "balance & key caps" to "https://openrouter.ai/credits"
-        ProviderKind.XAI -> "usage & credits" to "https://console.x.ai/team/default/usage"
-        ProviderKind.QWEN -> "billing & usage" to "https://bailian.console.aliyun.com/"
-        ProviderKind.TOGETHER -> "usage & billing" to "https://api.together.ai/settings/organization/~current/billing"
-        ProviderKind.GEMINI, ProviderKind.JUNIE, ProviderKind.CONNECTED_API -> return
-    }
+    val links = providerLinks(kind)
+    if (links.isEmpty()) return
+    var expanded by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
-    Row(verticalAlignment = Alignment.CenterVertically) {
+
+    Column {
         Text(
-            "$label: ",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            url.removePrefix("https://").removePrefix("www.").substringBeforeLast('/'),
+            "Links (${links.size})",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             textDecoration = TextDecoration.Underline,
-            modifier = Modifier.clickable { uriHandler.openUri(url) },
+            modifier = Modifier
+                .clickable { expanded = !expanded }
+                .padding(vertical = 2.dp),
         )
+        if (expanded) {
+            links.forEach { (label, url) ->
+                Text(
+                    "  $label",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .clickable { uriHandler.openUri(url) }
+                        .padding(vertical = 1.dp, horizontal = 4.dp)
+                        .fillMaxWidth(),
+                )
+            }
+        }
     }
+}
+
+/** All useful console links per provider — usage, billing, limits, keys. */
+private fun providerLinks(kind: ProviderKind): List<Pair<String, String>> = when (kind) {
+    ProviderKind.ZAI -> listOf(
+        "Usage gauge" to "https://z.ai/manage-apikey/coding-plan/personal/usage",
+        "Billing & credits" to "https://z.ai/manage-apikey/billing",
+        "Rate limits" to "https://z.ai/manage-apikey/rate-limits",
+    )
+    ProviderKind.LETTA_CLOUD -> listOf(
+        "Usage dashboard" to "https://platform.letta.com/settings/organization/usage",
+    )
+    ProviderKind.OPENAI -> listOf(
+        "Credit balance & billing" to "https://platform.openai.com/settings/organization/billing",
+        "Usage" to "https://platform.openai.com/usage",
+        "API keys" to "https://platform.openai.com/api-keys",
+        "Admin keys (for spend tracking)" to "https://platform.openai.com/settings/organization/admin-keys",
+    )
+    ProviderKind.ANTHROPIC -> listOf(
+        "Billing" to "https://console.anthropic.com/settings/billing",
+        "Usage" to "https://console.anthropic.com/settings/usage",
+        "API keys" to "https://console.anthropic.com/settings/keys",
+    )
+    ProviderKind.DEEPSEEK -> listOf(
+        "Usage & balance" to "https://platform.deepseek.com/usage",
+        "API keys" to "https://platform.deepseek.com/api_keys",
+        "Top up" to "https://platform.deepseek.com/topup",
+    )
+    ProviderKind.GROQ -> listOf(
+        "Rate limits" to "https://console.groq.com/settings/limits",
+        "API keys" to "https://console.groq.com/keys",
+    )
+    ProviderKind.MISTRAL -> listOf(
+        "Usage" to "https://console.mistral.ai/usage",
+        "API keys" to "https://console.mistral.ai/api-keys",
+    )
+    ProviderKind.OPENROUTER -> listOf(
+        "Balance & credits" to "https://openrouter.ai/credits",
+        "API keys" to "https://openrouter.ai/settings/keys",
+        "Activity log" to "https://openrouter.ai/activity",
+    )
+    ProviderKind.XAI -> listOf(
+        "Usage explorer" to "https://console.x.ai/team/default/usage",
+        "Billing & credits" to "https://console.x.ai/team/default/billing",
+        "API keys" to "https://console.x.ai/team/default/api-keys",
+    )
+    ProviderKind.QWEN -> listOf(
+        "Model Studio console" to "https://bailian.console.aliyun.com/",
+    )
+    ProviderKind.TOGETHER -> listOf(
+        "Billing" to "https://api.together.ai/settings/organization/~current/billing",
+        "API keys" to "https://api.together.ai/settings/api-keys",
+    )
+    ProviderKind.GEMINI, ProviderKind.JUNIE, ProviderKind.CONNECTED_API -> emptyList()
 }
 
 /** Clickable links to the AI Studio pages where Gemini limits/billing live. */
