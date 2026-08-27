@@ -81,7 +81,8 @@ fun sandFraction(resetsAt: Long?, windowHours: Double, nowMs: Long = epochMillis
 fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
     val trackColor = MaterialTheme.colorScheme.outlineVariant
     val redZone = MaterialTheme.colorScheme.error
-    val needleColor = if ((remainingPct ?: 0) < 20) redZone else MaterialTheme.colorScheme.primary
+    val fuelC = com.angussoftware.fueldashboard.ui.components.fuelColor(remainingPct ?: 0)
+    val needleColor = fuelC
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val angle = needleAngleDeg(remainingPct)
 
@@ -136,9 +137,15 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
             drawCircle(color = needleColor, radius = size.height * 0.07f, center = Offset(cx, cy))
         }
     }
-    // E / F labels via tiny overlay row (Canvas text is heavy; compose labels are cleaner)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("E", style = MaterialTheme.typography.labelSmall, color = if ((remainingPct ?: 0) < 20) redZone else labelColor)
+    // E / F labels aligned under the arc endpoints: the arc box is centered
+    // with r = 0.64h, so the endpoints sit at ~25% inset from each edge.
+    // Padding the row inward keeps the labels visually under the gauge arc
+    // instead of pinned to the full tile width.
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("E", style = MaterialTheme.typography.labelSmall, color = fuelC.copy(alpha = 0.6f))
         Text("F", style = MaterialTheme.typography.labelSmall, color = labelColor)
     }
 }
@@ -147,7 +154,10 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
 @Composable
 fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
     val frameColor = MaterialTheme.colorScheme.outline
-    val sandColor = MaterialTheme.colorScheme.tertiary
+    // Sand color tracks the quota health: green when plenty of time remains,
+    // amber at half, red when nearly expired — same gradient as the list
+    // view's FuelBar (fuelColor).
+    val sandColor = fuelColor(((sandFraction ?: 0f) * 100).toInt())
     Canvas(modifier = modifier) {
         if (sandFraction == null) return@Canvas
         val w = size.width
