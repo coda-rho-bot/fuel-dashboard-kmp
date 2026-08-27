@@ -13,15 +13,15 @@ class GridGaugeMathTest {
 
     @Test
     fun needle_emptyPointsLeft_fullPointsRight() {
-        assertEquals(150f, needleAngleDeg(0))    // E — down-left
-        assertEquals(30f, needleAngleDeg(100))   // F — down-right
-        assertEquals(90f, needleAngleDeg(50))    // half — straight up
+        assertEquals(150f, needleAngleDeg(0))      // E — down-left
+        assertEquals(390f, needleAngleDeg(100))    // F — 390° ≡ 30°, down-right
+        assertEquals(270f, needleAngleDeg(50))     // half — straight UP (Canvas y-down)
     }
 
     @Test
     fun needle_clampsOutOfRange() {
         assertEquals(150f, needleAngleDeg(-5))
-        assertEquals(30f, needleAngleDeg(150))
+        assertEquals(390f, needleAngleDeg(150))
         assertEquals(150f, needleAngleDeg(null)) // no data reads as empty
     }
 

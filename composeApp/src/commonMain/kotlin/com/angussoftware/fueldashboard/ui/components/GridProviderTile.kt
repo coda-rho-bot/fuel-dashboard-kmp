@@ -50,11 +50,14 @@ import kotlin.math.sin
  */
 fun needleAngleDeg(remainingPct: Int?): Float {
     val clamped = (remainingPct ?: 0).coerceIn(0, 100)
-    return START_ANGLE_DEG + (clamped / 100f) * (END_ANGLE_DEG - START_ANGLE_DEG)
+    // +240° sweep from E (150°, down-left) OVER THE TOP to F (390°=30°,
+    // down-right). Canvas angles are y-down: 90° points DOWN, so half-full
+    // (f=0.5) lands at 270° = straight up (review 1833).
+    return START_ANGLE_DEG + (clamped / 100f) * SWEEP_DEG
 }
 
 const val START_ANGLE_DEG = 150f   // "E" — pointing down-left
-const val END_ANGLE_DEG = 30f      // "F" — pointing down-right (sweep = -120°, arc over the top)
+const val SWEEP_DEG = 240f         // over the top; END = 390° ≡ 30° ("F")
 
 /**
  * Sand fraction for the hourglass: how much sand remains in the TOP bulb
@@ -84,24 +87,28 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
 
     Canvas(modifier = modifier) {
         val stroke = Stroke(width = size.height * 0.10f, cap = StrokeCap.Round)
-        val arcSize = Size(size.width * 0.86f, size.width * 0.86f)
-        val topLeft = Offset((size.width - arcSize.width) / 2f, (size.height - arcSize.height) / 2f + arcSize.height * 0.08f)
+        // Height-driven arc box (review 1833): the canvas is short (44dp) and
+        // wide; a width-driven box overflows the bottom. Radius ≈ 0.64h keeps
+        // the full 240° arc + needle inside the canvas.
+        val r = size.height * 0.64f
+        val arcSize = Size(r * 2f, r * 2f)
+        val topLeft = Offset((size.width - arcSize.width) / 2f, (size.height - arcSize.height) / 2f)
 
-        // Full track: from E (150°) sweeping -120° to F (30°) over the top.
+        // Full track: from E (150°) sweeping +240° over the top to F (390°).
         drawArc(
             color = trackColor,
             startAngle = START_ANGLE_DEG,
-            sweepAngle = END_ANGLE_DEG - START_ANGLE_DEG,
+            sweepAngle = SWEEP_DEG,
             useCenter = false,
             topLeft = topLeft,
             size = arcSize,
             style = stroke,
         )
-        // Red zone: last 20% near E (150° down to 126°).
+        // Red zone: first 20% of the sweep from E.
         drawArc(
             color = redZone,
             startAngle = START_ANGLE_DEG,
-            sweepAngle = 0.20f * (END_ANGLE_DEG - START_ANGLE_DEG),
+            sweepAngle = 0.20f * SWEEP_DEG,
             useCenter = false,
             topLeft = topLeft,
             size = arcSize,
