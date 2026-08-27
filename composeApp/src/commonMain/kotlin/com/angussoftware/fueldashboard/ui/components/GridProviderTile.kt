@@ -211,9 +211,18 @@ fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
             return (w * 0.42f * t - frameHalfStroke).coerceAtLeast(0f)
         }
 
-        // Sand in the top bulb: level from the top = sandFraction.
+        // Sand levels use CUBIC mapping to match triangular volume geometry.
+        // Linear height fill in a triangle misrepresents volume: filling 50%
+        // of height in an inverted triangle captures ~87% of volume (the
+        // bottom is wide). Cubic root mapping corrects this:
+        //   Top bulb: d = H * sandFraction^(1/3)   (height above waist)
+        //   Bottom bulb: h = H * (1 - (1-fill)^(1/3))  (height from bottom)
+
+        // Sand in the top bulb: volume = sandFraction of total.
         if (sandFraction > 0f) {
-            val levelY = topStart + (1f - sandFraction) * (waistY - topStart)
+            val H_top = waistY - topStart
+            val dFromWaist = H_top * Math.pow(sandFraction.toDouble(), 1.0 / 3.0).toFloat()
+            val levelY = waistY - dFromWaist
             var y = levelY
             val step = (waistY - topStart) / 24f
             while (y < waistY) {
@@ -224,11 +233,13 @@ fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
                 y += step
             }
         }
-        // Sand in the bottom bulb: fills from the bottom up (inverted
-        // triangle — wide at bottom, narrow at waist).
+        // Sand in the bottom bulb: volume = (1 - sandFraction) of total.
         if (sandFraction < 1f) {
             val bottomFill = (1f - sandFraction)
-            val topOfSand = waistY + (bottomEnd - waistY) * (1f - bottomFill)
+            val H_bottom = bottomEnd - waistY
+            // Height from bottom: h = H * (1 - (1-fill)^(1/3))
+            val hFromBottom = H_bottom * (1f - Math.pow((1f - bottomFill).toDouble(), 1.0 / 3.0).toFloat())
+            val topOfSand = bottomEnd - hFromBottom
             var y = topOfSand
             val step = (bottomEnd - waistY) / 20f
             while (y < bottomEnd) {
