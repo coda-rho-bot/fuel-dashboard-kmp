@@ -145,7 +145,7 @@ fun EmptyTabState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        if (hint != null) {
+        if (showHelp && hint != null) {
             Spacer(Modifier.height(16.dp))
             Text(
                 text = hint,
