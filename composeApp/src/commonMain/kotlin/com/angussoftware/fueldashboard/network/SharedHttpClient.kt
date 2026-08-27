@@ -20,7 +20,7 @@ object SharedHttpClient {
         }
         install(HttpTimeout) {
             requestTimeoutMillis = 10_000  // 10s
-            connectTimeoutMillis = 5_000   // 5s
+            connectTimeoutMillis = 15_000  // 15s — Cloudflare tunnel on corporate networks can exceed 5s
             socketTimeoutMillis = 15_000   // 15s
         }
     }
