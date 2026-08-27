@@ -280,7 +280,7 @@ private fun DesktopLayout(
                     state.modelDrainRates.isNotEmpty() ||
                     state.wasteByProvider.isNotEmpty()
                 if (!hasUsageData) {
-                    EmptyTabState(
+                    EmptyTabState(showHelp = state.showHelp, 
                         title = "Collecting data…",
                         message = "Usage metrics appear here once the dashboard has polled your providers a few times.",
                         hint = "Add providers in Settings and wait a few minutes for the first poll cycle.",
@@ -348,7 +348,7 @@ private fun DesktopLayout(
 
             DesktopTab.INTEL -> {
                 if (state.fuelEvents.isEmpty()) {
-                    EmptyTabState(
+                    EmptyTabState(showHelp = state.showHelp, 
                         title = "Collecting data…",
                         message = "Fuel events — gauge drops, model switches, and recommendation changes — appear here once the dashboard has been running for a few minutes.",
                         modifier = Modifier.weight(1f).fillMaxHeight(),
