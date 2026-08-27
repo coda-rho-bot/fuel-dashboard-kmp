@@ -205,16 +205,16 @@ private fun PrepaidCreditBalance(report: ProviderReport) {
 @Composable
 private fun ProviderConsoleLink(kind: ProviderKind) {
     val (label, url) = when (kind) {
-        ProviderKind.ZAI -> "usage & billing" to "https://z.ai/"
-        ProviderKind.LETTA_CLOUD -> "usage & billing" to "https://letta.com/"
+        ProviderKind.ZAI -> "billing & credits" to "https://z.ai/manage-apikey/billing"
+        ProviderKind.LETTA_CLOUD -> "usage dashboard" to "https://platform.letta.com/settings/organization/usage"
         ProviderKind.OPENAI -> "credit balance & billing" to "https://platform.openai.com/settings/organization/billing"
         ProviderKind.ANTHROPIC -> "usage & billing" to "https://console.anthropic.com/settings/billing"
         ProviderKind.DEEPSEEK -> "usage & balance" to "https://platform.deepseek.com/usage"
-        ProviderKind.GROQ -> "rate limits & usage" to "https://console.groq.com/"
+        ProviderKind.GROQ -> "rate limits" to "https://console.groq.com/settings/limits"
         ProviderKind.MISTRAL -> "usage & billing" to "https://console.mistral.ai/usage"
         ProviderKind.OPENROUTER -> "balance & key caps" to "https://openrouter.ai/credits"
-        ProviderKind.XAI -> "usage & credits" to "https://console.x.ai/"
-        ProviderKind.QWEN -> "usage & billing" to "https://modelstudio.alibaba.com/"
+        ProviderKind.XAI -> "usage & credits" to "https://console.x.ai/team/default/usage"
+        ProviderKind.QWEN -> "billing & usage" to "https://modelstudio.alibaba.com/billing"
         ProviderKind.TOGETHER -> "usage & billing" to "https://api.together.ai/settings/organization/~current/billing"
         ProviderKind.GEMINI, ProviderKind.JUNIE, ProviderKind.CONNECTED_API -> return
     }
