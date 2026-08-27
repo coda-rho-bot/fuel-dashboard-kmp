@@ -13,6 +13,7 @@ import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FleetAgent
 import com.angussoftware.fueldashboard.model.FuelResponse
+import com.angussoftware.fueldashboard.model.Provider
 import com.angussoftware.fueldashboard.model.JunieBalanceData
 import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.settings.AgentSettingsStore
@@ -255,9 +256,27 @@ class EmbeddedServer(
             }
 
             get("/fuel") {
-                val state = fuelState
-                val withJunie = state?.copy(junie = junieBalanceProvider())
-                    ?: FuelResponse(junie = junieBalanceProvider())
+                // Serve the CURRENT provider adapter reports — not the stale
+                // orchestrator state. ConnectedApi clients (other dashboard
+                // instances, the mobile app) expect live provider gauges here.
+                val state = dashboardStateProvider()
+                val withJunie = state?.let { st ->
+                    val providers = st.providerReports.values
+                        .filter { it.available }
+                        .associate { report ->
+                            report.displayName to Provider(
+                                name = report.displayName,
+                                remainingPct = report.remainingPct,
+                                available = report.available,
+                                resetMs = report.resetsAt,
+                            )
+                        }
+                    FuelResponse(
+                        ts = st.lastUpdated,
+                        providers = providers,
+                        junie = junieBalanceProvider(),
+                    )
+                } ?: FuelResponse(junie = junieBalanceProvider())
                 call.respond(withJunie)
             }
 

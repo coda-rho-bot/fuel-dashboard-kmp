@@ -1,6 +1,7 @@
 package com.angussoftware.fueldashboard.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -551,24 +552,7 @@ internal fun FuelColumnContent(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (state.activeProviders.size > 1) {
-                            IconButton(
-                                onClick = {
-                                    gridView = !gridView
-                                    com.angussoftware.fueldashboard.settings.saveStringSetting(
-                                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FUEL_GRID_VIEW, gridView.toString(),
-                                    )
-                                },
-                                modifier = Modifier.size(28.dp),
-                            ) {
-                                Icon(
-                                    if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
-                                    contentDescription = if (gridView) "List view" else "Grid view",
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+
                         if (state.showHelp) {
                             Spacer(Modifier.width(4.dp))
                             HelpIcon("Last time provider data was polled. Updates every 30 seconds.")
@@ -580,6 +564,39 @@ internal fun FuelColumnContent(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
+                        }
+                    }
+                }
+
+                // Provider section header with the view toggle — consistent
+                // placement, proper spacing, same row as the section title.
+                if (state.activeProviders.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "Providers",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (state.activeProviders.size > 1) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
+                                        contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
+                                        modifier = Modifier.size(20.dp).clickable {
+                                            gridView = !gridView
+                                            com.angussoftware.fueldashboard.settings.saveStringSetting(
+                                                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FUEL_GRID_VIEW, gridView.toString(),
+                                            )
+                                        },
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
