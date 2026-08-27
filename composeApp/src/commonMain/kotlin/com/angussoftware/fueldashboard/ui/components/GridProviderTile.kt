@@ -157,7 +157,7 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
         Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("E", style = MaterialTheme.typography.labelSmall, color = fuelC.copy(alpha = 0.6f))
+        Text("E", style = MaterialTheme.typography.labelSmall, color = redZone)
         Text("F", style = MaterialTheme.typography.labelSmall, color = labelColor)
     }
 }
