@@ -508,7 +508,10 @@ internal fun FuelColumnContent(
         else -> {
             LazyColumn(
                 modifier = modifier,
-                contentPadding = PaddingValues(16.dp),
+                // Extra bottom padding so the last provider's error text
+                // (which can wrap to 2+ lines) isn't clipped by the window
+                // edge — the error messages are the tallest content.
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Alerts at the top

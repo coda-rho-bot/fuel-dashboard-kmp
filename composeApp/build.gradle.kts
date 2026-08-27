@@ -168,6 +168,12 @@ compose.desktop {
     application {
         mainClass = "com.angussoftware.fueldashboard.MainKt"
 
+        // Prefer IPv4: JVM tries IPv6 first on Windows, which fails on
+        // corporate networks with broken IPv6 routing — manifests as
+        // "connect timeout has expired" on the first outbound connection.
+        // The IPv4 fallback works but exceeds the 5s connect timeout.
+        jvmArgs += "-Djava.net.preferIPv4Stack=true"
+
         // Proguard disabled for release packaging: the app uses slf4j-simple,
         // so kotlin-logging's optional logback adapter triggers 44 unresolved-
         // reference warnings that abort ProGuard ("Please correct the above
@@ -253,3 +259,9 @@ tasks.withType<Test>().configureEach {
     systemProperty("user.home", layout.buildDirectory.dir("test-home").get().asFile.absolutePath)
 }
 
+
+
+// Dev mode (gradlew run) also prefers IPv4 for the same reason.
+tasks.withType<JavaExec>().configureEach {
+    jvmArgs("-Djava.net.preferIPv4Stack=true")
+}
