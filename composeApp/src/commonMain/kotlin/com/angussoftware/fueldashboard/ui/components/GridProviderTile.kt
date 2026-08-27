@@ -65,6 +65,17 @@ const val SWEEP_DEG = 240f         // over the top; END = 390° ≡ 30° ("F")
  * (= fraction of the quota window remaining). Clamped 0..1. Null when there
  * is no reset countdown.
  */
+/**
+ * Discretizes a continuous sand fraction into N visible states (10% steps).
+ * Snap to the nearest step so the hourglass reads like a gauge with distinct
+ * positions rather than a smooth bar — each state is visually distinguishable.
+ */
+fun discretizeSand(fraction: Float?, steps: Int = 10): Float? {
+    if (fraction == null) return null
+    val step = 1f / steps
+    return (kotlin.math.round(fraction / step) * step).coerceIn(0f, 1f)
+}
+
 fun sandFraction(resetsAt: Long?, windowHours: Double, nowMs: Long = epochMillis()): Float? {
     if (resetsAt == null || windowHours <= 0.0) return null
     val totalMs = windowHours * 3_600_000.0
@@ -228,9 +239,11 @@ fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
                 y += step
             }
         }
-        // Falling stream while running.
+        // Falling stream: visible while draining, width tapers as sand
+        // depletes (thick when much sand falling, thin near the end).
         if (sandFraction in 0.01f..0.99f) {
-            drawLine(sandColor, Offset(w * 0.5f, waistY - h * 0.02f), Offset(w * 0.5f, waistY + h * 0.10f), w * 0.05f, StrokeCap.Round)
+            val streamWidth = w * (0.03f + 0.04f * sandFraction)
+            drawLine(sandColor, Offset(w * 0.5f, waistY - h * 0.02f), Offset(w * 0.5f, waistY + h * 0.10f), streamWidth, StrokeCap.Round)
         }
     }
 }
@@ -293,7 +306,7 @@ fun GridProviderTile(
                             modifier = Modifier.fillMaxWidth().height(64.dp),
                         )
                     }
-                    val sand = sandFraction(report.resetsAt, report.windowHours)
+                    val sand = discretizeSand(sandFraction(report.resetsAt, report.windowHours))
                     if (sand != null) {
                         Spacer(Modifier.width(10.dp))
                         HourglassGauge(sandFraction = sand, modifier = Modifier.size(36.dp, 54.dp))

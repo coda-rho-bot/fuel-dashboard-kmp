@@ -55,3 +55,25 @@ class GridGaugeMathTest {
         assertTrue(f != null && f <= 1f)
     }
 }
+
+    @Test
+    fun discretize_snapsToTenPercent() {
+        // Each input snaps to the nearest 10%
+        assertEquals(1.0f, discretizeSand(0.96f)!!, 0.001f)
+        assertEquals(0.9f, discretizeSand(0.87f)!!, 0.001f)
+        assertEquals(0.5f, discretizeSand(0.47f)!!, 0.001f)
+        assertEquals(0.2f, discretizeSand(0.16f)!!, 0.001f)
+        assertEquals(0.0f, discretizeSand(0.04f)!!, 0.001f)
+    }
+
+    @Test
+    fun discretize_exactlyOnStep_unchanged() {
+        assertEquals(0.5f, discretizeSand(0.5f)!!, 0.001f)
+        assertEquals(0.0f, discretizeSand(0.0f)!!, 0.001f)
+        assertEquals(1.0f, discretizeSand(1.0f)!!, 0.001f)
+    }
+
+    @Test
+    fun discretize_nullPassesThrough() {
+        assertNull(discretizeSand(null))
+    }
