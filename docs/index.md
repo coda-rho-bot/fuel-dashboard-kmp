@@ -14,6 +14,8 @@ It runs as a Kotlin Multiplatform app (desktop + Android) with an embedded API s
 
 Source code: [github.com/coda-rho-bot/fuel-dashboard-kmp](https://github.com/coda-rho-bot/fuel-dashboard-kmp) (Apache 2.0).
 
+**13 providers monitored:** z.ai, Letta Cloud, Junie, OpenAI, Anthropic, DeepSeek, Groq, Mistral, OpenRouter, Google Gemini, xAI, Qwen (DashScope), Together AI.
+
 ## The 2-minute mental model
 
 **Fuel** is whatever limits your agents: a z.ai 5-hour token window, Letta credits, a Junie balance, an OpenRouter budget. Each provider has a quota type:

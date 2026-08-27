@@ -28,8 +28,22 @@ A provider is a fuel source you want to monitor. Each kind needs its own credent
 | **z.ai** | API key | 5h TOKENS_PCT window, burn rate, reset time |
 | **Letta Cloud** | API key | credit balance, monthly allowance |
 | **Junie** | nothing (checks locally) | AI credit balance |
-| **DeepSeek / OpenAI / Anthropic / Groq / Mistal** | API key | balance / rate info depending on provider |
+| **OpenAI** | ADMIN key (Settings → Organization → Admin keys) | monthly spend vs budget (regular keys can't read usage) |
+| **DeepSeek** | API key | live prepaid balance |
+| **OpenRouter** | API key | live account balance + per-key spend cap gauge |
+| **Anthropic** | API key | spend vs budget |
+| **Groq** | API key | requests/day + tokens/min rate windows |
+| **Mistral** | API key | rate windows (regular keys); spend (admin keys) |
+| **Google Gemini** | API key | model catalog (limits are AI Studio-only — tile links there) |
+| **xAI** | API key | prepaid credit balance |
+| **Qwen (DashScope)** | API key | monthly spend vs limit, rate windows |
+| **Together AI** | API key (billing scope) | monthly usage vs budget |
 | **Connected API** | server URL + API key | monitor another dashboard's orchestrator |
+
+Notes: every tile shows honest data only — providers without a balance API
+get a direct link to where the balance lives. Monitoring that consumes
+request quota (Groq, Mistral regular keys) is disclosed on the tile, and
+the check frequency is per-provider configurable (30s–1h).
 
 z.ai is the primary fuel for the fleet — start there.
 

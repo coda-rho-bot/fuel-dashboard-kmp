@@ -40,7 +40,7 @@ Requires JDK 21+. First build downloads dependencies (slow); subsequent starts a
 
 ## Multi-Provider System
 
-The dashboard supports 9 provider types simultaneously, each with its own adapter and fuel budgeting strategy. The embedded orchestrator recommends models across providers based on tier selection and current fuel state.
+The dashboard supports 13 provider types simultaneously, each with its own adapter and fuel budgeting strategy. The embedded orchestrator recommends models across providers based on tier selection and current fuel state.
 
 ## Major Features
 
@@ -112,7 +112,7 @@ Configure provider credentials and dashboard settings on first launch.
 composeApp/src/
 ├── commonMain/kotlin/.../fueldashboard/
 │   ├── model/         — API data classes
-│   ├── network/       — Ktor HTTP client + provider adapters (z.ai, OpenAI, Anthropic, DeepSeek, Groq, Mistral, Letta Cloud, Junie, orchestrator)
+│   ├── network/       — Ktor HTTP client + provider adapters (z.ai, Letta, Junie, OpenAI, Anthropic, DeepSeek, Groq, Mistral, OpenRouter, Gemini, xAI, Qwen, Together, orchestrator)
 │   ├── presentation/  — ViewModel with StateFlow + polling
 │   ├── settings/      — ThemeController + fuel settings storage
 │   ├── storage/       — Local history + burn rate calculator

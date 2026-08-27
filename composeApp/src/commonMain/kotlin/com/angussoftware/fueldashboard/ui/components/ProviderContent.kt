@@ -151,52 +151,9 @@ fun ProviderContent(
             GeminiStudioLinks()
         }
 
-        // OpenAI: credit balance is browser-session-only (live-verified:
-        // /v1/dashboard/billing/credit_grants rejects API keys; org billing
-        // endpoints 404). Point at the billing page.
-        if (config.kind == ProviderKind.OPENAI) {
-            val uriHandler = LocalUriHandler.current
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Credit balance: ",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "platform.openai.com billing",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.clickable {
-                        uriHandler.openUri("https://platform.openai.com/settings/organization/billing")
-                    },
-                )
-            }
-        }
-
-        // OpenRouter: account balance is not exposed to regular API keys.
-        if (config.kind == ProviderKind.OPENROUTER) {
-            val uriHandler = LocalUriHandler.current
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Account balance & key caps: ",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "openrouter.ai/credits",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.clickable { uriHandler.openUri("https://openrouter.ai/credits") },
-                )
-                Text(
-                    " — set a key credit limit for a live gauge",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        // Every provider: link to where its usage limits / billing / credit
+        // balance lives (most relevant console page per provider).
+        ProviderConsoleLink(config.kind)
 
         // Groq/Mistral(regular key): monitoring itself consumes request quota —
         // disclose the EFFECTIVE ping rate (user interval, floored at 60s by
@@ -237,6 +194,44 @@ private fun PrepaidCreditBalance(report: ProviderReport) {
     ) {
         Text(formatRoot("$%.2f", balance), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = contentColor)
         Text("prepaid credit remaining", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = subColor)
+    }
+}
+
+/**
+ * One-line link to the provider's most relevant console page for usage
+ * limits, billing, or credit balance. Gemini has its dedicated 3-link row;
+ * Junie/Connected have no console.
+ */
+@Composable
+private fun ProviderConsoleLink(kind: ProviderKind) {
+    val (label, url) = when (kind) {
+        ProviderKind.ZAI -> "usage & billing" to "https://z.ai/"
+        ProviderKind.LETTA_CLOUD -> "usage & billing" to "https://letta.com/"
+        ProviderKind.OPENAI -> "credit balance & billing" to "https://platform.openai.com/settings/organization/billing"
+        ProviderKind.ANTHROPIC -> "usage & billing" to "https://console.anthropic.com/settings/billing"
+        ProviderKind.DEEPSEEK -> "usage & balance" to "https://platform.deepseek.com/usage"
+        ProviderKind.GROQ -> "rate limits & usage" to "https://console.groq.com/"
+        ProviderKind.MISTRAL -> "usage & billing" to "https://console.mistral.ai/usage"
+        ProviderKind.OPENROUTER -> "balance & key caps" to "https://openrouter.ai/credits"
+        ProviderKind.XAI -> "usage & credits" to "https://console.x.ai/"
+        ProviderKind.QWEN -> "usage & billing" to "https://modelstudio.alibaba.com/"
+        ProviderKind.TOGETHER -> "usage & billing" to "https://api.together.ai/settings/organization/~current/billing"
+        ProviderKind.GEMINI, ProviderKind.JUNIE, ProviderKind.CONNECTED_API -> return
+    }
+    val uriHandler = LocalUriHandler.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "$label: ",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            url.removePrefix("https://").removePrefix("www.").substringBeforeLast('/'),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable { uriHandler.openUri(url) },
+        )
     }
 }
 
