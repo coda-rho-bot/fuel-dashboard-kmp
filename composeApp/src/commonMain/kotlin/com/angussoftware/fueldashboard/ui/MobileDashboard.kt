@@ -31,6 +31,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
@@ -289,6 +296,14 @@ private fun MobileFuelContent(
         }
         // Main content — card-based provider sections
         else -> {
+            // Grid/list view toggle (persisted, same setting as desktop).
+            var gridView by remember {
+                mutableStateOf(
+                    com.angussoftware.fueldashboard.settings.loadStringSetting(
+                        com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FUEL_GRID_VIEW, "false",
+                    ).toBoolean(),
+                )
+            }
             LazyColumn(
                 modifier = modifier,
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -338,7 +353,54 @@ private fun MobileFuelContent(
                     )
                 }
 
-                // Provider sections — each wrapped in a Card
+                // Provider section header with the view toggle (same as desktop)
+                if (state.activeProviders.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "Providers",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (state.activeProviders.size > 1) {
+                                Icon(
+                                    if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
+                                    contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
+                                    modifier = Modifier.size(20.dp).clickable {
+                                        gridView = !gridView
+                                        com.angussoftware.fueldashboard.settings.saveStringSetting(
+                                            com.angussoftware.fueldashboard.settings.FuelSettingsKeys.FUEL_GRID_VIEW, gridView.toString(),
+                                        )
+                                    },
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Provider sections — grid or card list
+                if (gridView) {
+                    item {
+                        androidx.compose.foundation.layout.FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            state.activeProviders.forEach { config ->
+                                com.angussoftware.fueldashboard.ui.components.GridProviderTile(
+                                    config = config,
+                                    report = state.providerReports[config.id],
+                                    modifier = Modifier.width(160.dp),
+                                )
+                            }
+                        }
+                    }
+                } else {
                 items(state.activeProviders, key = { it.id }) { config ->
                     val report = state.providerReports[config.id]
                     val error = state.providerErrors[config.id]
@@ -349,6 +411,7 @@ private fun MobileFuelContent(
                         error = error,
                         showHelp = state.showHelp,
                     )
+                }
                 }
             }
         }
