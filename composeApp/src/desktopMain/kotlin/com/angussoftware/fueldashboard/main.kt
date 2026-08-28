@@ -548,8 +548,16 @@ fun main() = application {
     // remembered between runs.
     val hudVisible = DesktopStatusSurfaces.hudVisible
     val hudState = rememberWindowState(
-        width = 280.dp,
-        height = 200.dp,
+        width = androidx.compose.ui.unit.Dp(
+            com.angussoftware.fueldashboard.settings.loadStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_WIDTH, "380",
+            ).toFloat(),
+        ),
+        height = androidx.compose.ui.unit.Dp(
+            com.angussoftware.fueldashboard.settings.loadStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_HEIGHT, "260",
+            ).toFloat(),
+        ),
         position = androidx.compose.ui.window.WindowPosition(
             androidx.compose.ui.unit.Dp(
                 com.angussoftware.fueldashboard.settings.loadStringSetting(
@@ -591,6 +599,16 @@ fun main() = application {
                         com.angussoftware.fueldashboard.settings.saveStringSetting(
                             com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_Y,
                             hudState.position.y.value.toString(),
+                        )
+                    }
+                    override fun componentResized(e: java.awt.event.ComponentEvent?) {
+                        com.angussoftware.fueldashboard.settings.saveStringSetting(
+                            com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_WIDTH,
+                            hudState.size.width.value.toString(),
+                        )
+                        com.angussoftware.fueldashboard.settings.saveStringSetting(
+                            com.angussoftware.fueldashboard.settings.FuelSettingsKeys.HUD_HEIGHT,
+                            hudState.size.height.value.toString(),
                         )
                     }
                 }
