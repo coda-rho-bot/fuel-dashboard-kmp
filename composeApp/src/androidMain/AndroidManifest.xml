@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".FuelDashboardApplication"
@@ -29,6 +30,18 @@
             android:name=".FuelStatusService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Stop action for the persistent notification (both service and
+             worker modes) + boot restore. BOOT_COMPLETED is a protected
+             system broadcast, so exported=true is safe here. -->
+        <receiver
+            android:name=".FuelStatusReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.angussoftware.fueldashboard.STOP_STATUS" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

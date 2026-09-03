@@ -1,27 +1,19 @@
 package com.angussoftware.fueldashboard
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import androidx.core.app.NotificationCompat
-import com.angussoftware.fueldashboard.model.FuelStatusModel
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
-import com.angussoftware.fueldashboard.settings.loadStringSetting
 import com.angussoftware.fueldashboard.settings.saveStringSetting
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import com.angussoftware.fueldashboard.util.formatRoot
 
 /**
  * Foreground service: persistent, expandable notification with quota
@@ -32,7 +24,18 @@ import com.angussoftware.fueldashboard.util.formatRoot
  * same DashboardState the UI shows, so numbers always match.
  *
  * Collapsed: headline (most critical provider). Expanded: one line per
- * provider + credit pools. Tap → app. Action → stop service.
+ * provider + credit pools. Tap → app. Action → stop (via FuelStatusReceiver).
+ *
+ * ## Android 15+ dataSync budget
+ *
+ * Android 15 (API 35) limits dataSync foreground services to 6 hours per
+ * 24-hour period while the app is backgrounded. When the budget is spent the
+ * system calls [onTimeout] and the service has a few seconds to call
+ * stopSelf() or the system crashes the process. We stop gracefully and hand
+ * background updates to [FuelStatusWorker] (15-min WorkManager polls updating
+ * a normal notification — no foreground service needed to keep a
+ * notification alive). Opening the app restarts this service, which both
+ * restores real-time updates and resets the 6-hour budget.
  */
 class FuelStatusService : Service() {
 
@@ -40,8 +43,13 @@ class FuelStatusService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        isRunning = true
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
+        if (intent?.action == FuelNotification.ACTION_STOP) {
             saveStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_ENABLED, "false")
             stopSelf()
             return START_NOT_STICKY
@@ -59,11 +67,11 @@ class FuelStatusService : Service() {
             return START_NOT_STICKY
         }
 
-        createChannel()
+        FuelNotification.createChannel(this)
 
         // Enter foreground immediately with a placeholder; real data replaces
         // it as soon as the state flow emits.
-        startAsForeground(buildNotification(null))
+        startAsForeground(FuelNotification.build(this, null))
 
         // Collect exactly once — onStartCommand can fire repeatedly (e.g.
         // START_STICKY restarts, repeated startService calls) and each
@@ -73,8 +81,10 @@ class FuelStatusService : Service() {
                 FuelViewModel.shared.let { vm ->
                     vm.startPolling()
                     vm.state.collect { state ->
-                        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                        nm.notify(NOTIFICATION_ID, buildNotification(FuelStatusModel.from(state)))
+                        FuelNotification.notify(
+                            this@FuelStatusService,
+                            com.angussoftware.fueldashboard.model.FuelStatusModel.from(state),
+                        )
                     }
                 }
             }
@@ -84,6 +94,24 @@ class FuelStatusService : Service() {
 
     private lateinit var collectorJob: kotlinx.coroutines.Job
 
+    /**
+     * Android 15+ (API 35): the dataSync runtime budget is exhausted. The
+     * system gives us a few seconds to stop; failing to do so crashes the
+     * process with RemoteServiceException ("A foreground service of type
+     * dataSync did not stop within its timeout"). Stop gracefully and hand
+     * off to WorkManager so the notification keeps updating in the
+     * background at reduced cadence.
+     */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        FuelViewModel.shared.stopPolling()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        // Budget is exhausted for this 24h window — a dataSync FGS start
+        // would throw ForegroundServiceStartNotAllowedException until the
+        // user opens the app (which resets the timer). Worker takes over.
+        FuelStatusWorker.startBackgroundMode(this)
+        stopSelf()
+    }
+
     override fun onDestroy() {
         // Stop the shared ViewModel's polling loop — scope.cancel() only
         // cancels the service's state-collector coroutine, not the polling
@@ -92,135 +120,52 @@ class FuelStatusService : Service() {
         // notification is dismissed.
         FuelViewModel.shared.stopPolling()
         scope.cancel()
+        isRunning = false
         super.onDestroy()
     }
 
-    private fun startAsForeground(notification: Notification) {
+    private fun startAsForeground(notification: android.app.Notification) {
         if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            startForeground(FuelNotification.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
-            startForeground(NOTIFICATION_ID, notification)
+            startForeground(FuelNotification.NOTIFICATION_ID, notification)
         }
-    }
-
-    private fun createChannel() {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                "Fuel status",
-                NotificationManager.IMPORTANCE_LOW, // silent, no badge spam
-            ).apply {
-                description = "Persistent quota and credit status"
-                setShowBadge(false)
-            },
-        )
-    }
-
-    private fun buildNotification(model: FuelStatusModel?): Notification {
-        val launch = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val stop = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, FuelStatusService::class.java).setAction(ACTION_STOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        // Fixed app title; data lives in the body / expanded HUD — the
-        // headline provider no longer masquerades as the notification title.
-        val title = getString(R.string.fuel_status)
-        val body: CharSequence = model?.collapsedBodyText(getString(R.string.loading_status))
-            ?: getString(R.string.loading_status)
-
-        // Choose small icon: fuel drop or transparent (hide from status bar)
-        // while keeping the notification at IMPORTANCE_LOW (not minimized).
-        val showIcon = loadStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_SHOW_ICON, "true").toBoolean()
-        val smallIcon = if (showIcon) {
-            R.drawable.ic_stat_fuel
-        } else {
-            R.drawable.ic_status_transparent
-        }
-
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(smallIcon)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setContentIntent(launch)
-            .addAction(0, getString(R.string.stop), stop)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-
-        // Expanded view: mini HUD — one progress-bar row per provider,
-        // credit totals beneath. Falls back to plain big text if the model
-        // is empty.
-        if (model != null && model.hasAnyData) {
-            val expanded = android.widget.RemoteViews(packageName, R.layout.notification_status_expanded)
-            expanded.removeAllViews(R.id.provider_rows)
-            for (line in model.quotaLines) {
-                val row = android.widget.RemoteViews(packageName, R.layout.notification_provider_row)
-                row.setTextViewText(R.id.provider_name, line.name)
-                val cd = FuelStatusModel.formatCountdown(line.resetsAt)
-                row.setTextViewText(
-                    R.id.provider_detail,
-                    if (cd != null) "${line.remainingPct ?: 0}% · $cd" else "${line.remainingPct ?: 0}%",
-                )
-                // Quota remaining gauge
-                row.setProgressBar(R.id.provider_progress, 100, line.remainingPct ?: 0, false)
-                // Time remaining gauge (window countdown)
-                val timePct = line.timeRemainingPct()
-                row.setProgressBar(R.id.timer_progress, 100, timePct ?: 0, false)
-                // Show/hide timer bar — hide if no window data
-                row.setViewVisibility(
-                    R.id.timer_progress,
-                    if (timePct != null) android.view.View.VISIBLE else android.view.View.GONE,
-                )
-                expanded.addView(R.id.provider_rows, row)
-            }
-            val creditsText = model.creditLines.mapNotNull { c ->
-                when {
-                    c.creditsTotal != null -> "${c.name}: ${c.creditsTotal} cr"
-                    c.junieBalance != null -> "${c.name}: $${formatRoot("%.2f", c.junieBalance)}"
-                    else -> null
-                }
-            }.joinToString("  ·  ")
-            expanded.setTextViewText(R.id.credits_text, creditsText)
-            val mins = (System.currentTimeMillis() - model.lastUpdated) / 60_000
-            expanded.setTextViewText(
-                R.id.updated_text,
-                if (model.lastUpdated > 0) getString(R.string.updated_ago, mins) else "",
-            )
-            builder.setCustomBigContentView(expanded)
-                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-        } else {
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
-        }
-
-        return builder.build()
     }
 
     companion object {
-        private const val CHANNEL_ID = "fuel_status"
-        private const val NOTIFICATION_ID = 1001
-        private const val ACTION_STOP = "com.angussoftware.fueldashboard.STOP_STATUS"
+        /** True while the foreground service is alive (same process only). */
+        @Volatile
+        var isRunning: Boolean = false
+            private set
 
-        /** Start the persistent notification (idempotent). */
+        /**
+         * Start the persistent notification (idempotent). If the platform
+         * refuses a background foreground-service start (Android 12+ bg
+         * restrictions, or exhausted dataSync budget on 15+), fall back to
+         * WorkManager background mode instead of crashing.
+         *
+         * Catches IllegalStateException (the common ancestor of
+         * ServiceStartNotAllowedException / ForegroundServiceStartNotAllowed-
+         * Exception, API 31+) so the catch resolves on all supported API
+         * levels — those exceptions can only be thrown on 31+, where the
+         * ancestor type is guaranteed present.
+         */
         fun start(context: Context) {
-            context.startForegroundService(Intent(context, FuelStatusService::class.java))
+            try {
+                context.startForegroundService(Intent(context, FuelStatusService::class.java))
+            } catch (e: IllegalStateException) {
+                FuelStatusWorker.startBackgroundMode(context)
+            }
         }
 
         fun stop(context: Context) {
             context.stopService(Intent(context, FuelStatusService::class.java))
+            FuelStatusWorker.cancel(context)
         }
 
         fun isEnabled(): Boolean =
-            loadStringSetting(FuelSettingsKeys.STATUS_NOTIFICATION_ENABLED, "false").toBoolean()
+            com.angussoftware.fueldashboard.settings.loadStringSetting(
+                FuelSettingsKeys.STATUS_NOTIFICATION_ENABLED, "false",
+            ).toBoolean()
     }
 }

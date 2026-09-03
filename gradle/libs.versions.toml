@@ -4,6 +4,7 @@ android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
 androidx-activity = "1.13.0"
+androidx-work = "2.10.1"
 composeMultiplatform = "1.9.0"
 kotlin = "2.3.21"
 kover = "0.9.8"
@@ -50,6 +51,7 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 
 # AndroidX
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "androidx-work" }
 
 # QR Code
 qrcode-kotlin = { module = "io.github.g0dkar:qrcode-kotlin", version.ref = "qrcode-kotlin" }

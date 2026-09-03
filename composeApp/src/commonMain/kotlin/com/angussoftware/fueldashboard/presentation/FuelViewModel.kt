@@ -435,6 +435,15 @@ class FuelViewModel {
         pollJob = null
     }
 
+    /**
+     * One-shot refresh for background workers (Android WorkManager): runs a
+     * single refresh cycle under the same mutex as the poll loop and returns.
+     * Unlike [startPolling], it does not schedule any follow-up work.
+     */
+    suspend fun pollOnce() {
+        refresh()
+    }
+
     fun refreshNow() {
         scope.launch { refresh() }
     }

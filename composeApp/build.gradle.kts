@@ -118,6 +118,7 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.work.runtime)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.zxing.android.embedded)
 

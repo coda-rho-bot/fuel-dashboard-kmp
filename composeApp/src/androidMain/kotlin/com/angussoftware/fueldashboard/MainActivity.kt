@@ -162,4 +162,21 @@ class MainActivity : ComponentActivity() {
         // then opens the app: polling restarts with the UI.
         FuelViewModel.shared.startPolling()
     }
+
+    override fun onStart() {
+        super.onStart()
+        // Restore real-time status updates: if the persistent notification
+        // is enabled but the foreground service isn't running (e.g. Android
+        // 15+ stopped it after the 6-hour dataSync budget, or the process
+        // was restarted in the background), promote back to the foreground
+        // service — a foreground start is always allowed and resets the
+        // 6-hour budget. This also cancels the WorkManager fallback that
+        // was updating the notification every 15 minutes.
+        if (FuelStatusService.isEnabled() && !FuelStatusService.isRunning) {
+            FuelStatusService.start(this) // hardened: falls back to worker mode
+        }
+        if (FuelStatusService.isRunning) {
+            FuelStatusWorker.cancel(this)
+        }
+    }
 }
