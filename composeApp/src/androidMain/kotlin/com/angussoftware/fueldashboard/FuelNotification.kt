@@ -55,7 +55,7 @@ object FuelNotification {
         val stop = PendingIntent.getBroadcast(
             context,
             1,
-            Intent(context, FuelStatusReceiver::class.java).setAction(ACTION_STOP),
+            Intent(context, FuelStatusStopReceiver::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 

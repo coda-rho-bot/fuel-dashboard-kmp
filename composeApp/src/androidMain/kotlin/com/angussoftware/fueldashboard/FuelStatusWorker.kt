@@ -30,6 +30,20 @@ class FuelStatusWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        // If the user revoked POST_NOTIFICATIONS (13+), the notification is
+        // invisible and polling would be silent battery drain — disable the
+        // feature entirely, same as the service does.
+        if (Build.VERSION.SDK_INT >= 33 &&
+            applicationContext.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            com.angussoftware.fueldashboard.settings.saveStringSetting(
+                com.angussoftware.fueldashboard.settings.FuelSettingsKeys.STATUS_NOTIFICATION_ENABLED,
+                "false",
+            )
+            cancel(applicationContext)
+            return Result.success()
+        }
         return try {
             val vm = FuelViewModel.shared
             vm.pollOnce()

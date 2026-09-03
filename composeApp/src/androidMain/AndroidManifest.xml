@@ -31,17 +31,23 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- Stop action for the persistent notification (both service and
-             worker modes) + boot restore. BOOT_COMPLETED is a protected
-             system broadcast, so exported=true is safe here. -->
+        <!-- Boot restore: system-only broadcast (protected), so exported
+             is required and safe. Restore runs in worker mode — dataSync
+             FGS starts from BOOT_COMPLETED are banned on Android 15+
+             targets. -->
         <receiver
-            android:name=".FuelStatusReceiver"
+            android:name=".FuelStatusBootReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.angussoftware.fueldashboard.STOP_STATUS" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Notification stop action: explicit-component PendingIntents
+             from this app only — not exported, no intent-filter. -->
+        <receiver
+            android:name=".FuelStatusStopReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

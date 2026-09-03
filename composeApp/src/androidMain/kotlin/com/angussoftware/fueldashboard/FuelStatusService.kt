@@ -70,8 +70,24 @@ class FuelStatusService : Service() {
         FuelNotification.createChannel(this)
 
         // Enter foreground immediately with a placeholder; real data replaces
-        // it as soon as the state flow emits.
-        startAsForeground(FuelNotification.build(this, null))
+        // it as soon as the state flow emits. Wrapped: a system START_STICKY
+        // restart with an exhausted dataSync budget (Android 15+) can also
+        // hit the background-start restriction — fall back to worker mode
+        // and do not stick, or the platform would restart-loop the crash.
+        try {
+            startAsForeground(FuelNotification.build(this, null))
+        } catch (e: IllegalStateException) {
+            FuelStatusWorker.startBackgroundMode(this)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        // FGS mode and worker mode are exclusive — any pending background
+        // poll (scheduled before promotion, or left over from the app-open
+        // race where isRunning was still false) dies the moment the service
+        // actually enters the foreground. Doing this here covers every
+        // promotion path, not just MainActivity.onStart.
+        FuelStatusWorker.cancel(this)
 
         // Collect exactly once — onStartCommand can fire repeatedly (e.g.
         // START_STICKY restarts, repeated startService calls) and each
@@ -104,7 +120,10 @@ class FuelStatusService : Service() {
      */
     override fun onTimeout(startId: Int, fgsType: Int) {
         FuelViewModel.shared.stopPolling()
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        // DETACH (not REMOVE): the notification hands off seamlessly — the
+        // worker re-posts the same ID on its first run, so there is no
+        // flicker where the status vanishes and reappears.
+        stopForeground(STOP_FOREGROUND_DETACH)
         // Budget is exhausted for this 24h window — a dataSync FGS start
         // would throw ForegroundServiceStartNotAllowedException until the
         // user opens the app (which resets the timer). Worker takes over.
