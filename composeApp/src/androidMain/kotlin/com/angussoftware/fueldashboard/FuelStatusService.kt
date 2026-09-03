@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
  * same DashboardState the UI shows, so numbers always match.
  *
  * Collapsed: headline (most critical provider). Expanded: one line per
- * provider + credit pools. Tap → app. Action → stop (via FuelStatusReceiver).
+ * provider + credit pools. Tap → app. Action → stop (via FuelStatusStopReceiver).
  *
  * ## Android 15+ dataSync budget
  *

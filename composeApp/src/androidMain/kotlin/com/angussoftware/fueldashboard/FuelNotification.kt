@@ -19,7 +19,7 @@ import com.angussoftware.fueldashboard.util.formatRoot
  * [FuelStatusWorker] (background mode after the FGS dataSync budget is
  * exhausted — a normal notification persists without a foreground service).
  *
- * The stop action targets [FuelStatusReceiver] in both modes so stopping
+ * The stop action targets [FuelStatusStopReceiver] in both modes so stopping
  * works identically whether the service or the worker owns the notification.
  */
 object FuelNotification {
