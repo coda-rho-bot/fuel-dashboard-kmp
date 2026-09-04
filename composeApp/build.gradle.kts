@@ -203,7 +203,15 @@ compose.desktop {
             packageVersion = project.version.toString().replace("-beta.", "~beta.")
             description = "Fuel Dashboard for Letta — AI provider fuel monitoring"
             vendor = "Angus Software"
+            linux {
+                // App icon for the .desktop launcher + hicolor icons the deb
+                // installs — without it jpackage falls back to the generic
+                // Compose icon and taskbar pinning shows the wrong artwork.
+                iconFile.set(rootProject.file("composeApp/src/desktopMain/resources/icon.png"))
+            }
             windows {
+                // Embeds the app icon (converted to .ico) in the portable exe.
+                iconFile.set(rootProject.file("composeApp/src/desktopMain/resources/icon.png"))
                 menuGroup = "Angus Software"
                 upgradeUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                 // jpackage on Windows requires numeric-only version components —
