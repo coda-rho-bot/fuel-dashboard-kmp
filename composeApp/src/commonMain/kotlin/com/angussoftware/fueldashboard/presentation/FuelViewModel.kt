@@ -1041,11 +1041,16 @@ class FuelViewModel {
     /**
      * Effective poll interval for one provider: the configured interval with
      * exponential failure backoff applied (x2 per consecutive failure, x32
-     * cap) and a 30-minute ceiling. Pure — unit-testable.
+     * cap) and a 30-minute backoff ceiling. A base interval above 30 minutes
+     * is honored as configured (the ceiling constrains BACKOFF, not the
+     * user's chosen cadence). Pure — unit-testable.
      */
-    internal fun effectiveIntervalMs(baseIntervalSec: Int, consecutiveFailures: Int): Long =
-        (baseIntervalSec.coerceAtLeast(15) * 1000L * (1L shl consecutiveFailures.coerceAtMost(5)))
+    internal fun effectiveIntervalMs(baseIntervalSec: Int, consecutiveFailures: Int): Long {
+        val base = baseIntervalSec.coerceAtLeast(15) * 1000L
+        if (base >= 30 * 60_000L) return base
+        return (base * (1L shl consecutiveFailures.coerceAtMost(5)))
             .coerceAtMost(30 * 60_000L)
+    }
 
     // Per-provider poll scheduling: last time each provider was actually
     // polled, used to honor ProviderConfig.pollIntervalSeconds inside the

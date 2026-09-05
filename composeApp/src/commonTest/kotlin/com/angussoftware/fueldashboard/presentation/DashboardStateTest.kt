@@ -39,9 +39,11 @@ class DashboardStateTest {
         // under the 30-min ceiling (30s x 32 = 16 min).
         assertEquals(30_000L * 32, vm.effectiveIntervalMs(30, 5))
         assertEquals(30_000L * 32, vm.effectiveIntervalMs(30, 9))
-        // …and the result never exceeds 30 minutes (60s x 32 = 32 min is
-        // clamped; a 1h base is clamped even without backoff).
+        // …and the backoff never exceeds 30 minutes — but a user-configured
+        // base above 30 min is honored as-is (the ceiling constrains
+        // backoff, not the chosen cadence).
         assertEquals(30 * 60_000L, vm.effectiveIntervalMs(60, 6))
-        assertEquals(30 * 60_000L, vm.effectiveIntervalMs(3600, 0))
+        assertEquals(3_600_000L, vm.effectiveIntervalMs(3600, 0))
+        assertEquals(3_600_000L, vm.effectiveIntervalMs(3600, 4))
     }
 }
