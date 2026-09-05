@@ -94,8 +94,11 @@ class MistralProviderAdapter(
 
         // Regular keys (console.mistral.ai) get 401 on /v1/admin/* — admin
         // endpoints need a Backoffice admin key. Fallback: harvest rate
-        // headers from a chat ping. Self-throttled like the Groq adapter.
-        internal const val MIN_FETCH_INTERVAL_MS = 60_000L
+        // headers from a chat ping. Self-throttled like the Groq adapter —
+        // 15 min, not 60s: the ping is a real completion that burns tokens
+        // and decrements the monitored RPM window, so at 60s the monitor
+        // alone cost 1,440 completions/day.
+        internal const val MIN_FETCH_INTERVAL_MS = 15 * 60_000L
 
         /**
          * Keys in the usage response that are arrays of usage entries (token counts)
@@ -125,25 +128,69 @@ class MistralProviderAdapter(
     private var cachedFallbackReport: ProviderReport? = null
     private var lastFallbackFetchMs: Long = 0L
 
+    // Definitive auth rejection on /v1/admin/* (401/403): a regular
+    // console key — retrying the admin endpoints every poll is a guaranteed
+    // 1,440 wasted requests/day. Set ONLY on 401/403 (a transient 5xx does
+    // NOT set it — the admin path stays armed in case an admin key appears).
+    @Volatile
+    private var adminEndpointsBlocked = false
+
+    // Ping-model cache (hourly, same as Groq): the fallback re-listed all
+    // models on every poll just to pick a ping model.
+    private var cachedPingModel: String? = null
+    private var pingModelResolvedAtMs: Long = 0L
+
+    /** Outcome of one admin-endpoint probe, distinguishing auth rejection. */
+    private sealed interface AdminProbe {
+        data class Available(val usage: UsageData) : AdminProbe
+        data object AuthRejected : AdminProbe
+        data object Unavailable : AdminProbe
+    }
+
     override suspend fun poll(): ProviderReport {
-        // 1. Fetch usage data (primary — for spend tracking)
-        val usage = fetchUsage()
-
-        if (usage == null) {
-            // Admin endpoints unavailable — regular (console) API keys get
-            // 401 on /v1/admin/* (admin keys are Backoffice-only). Fall back
-            // to rate-limit harvesting via a minimal chat ping.
-            return fallbackPoll()
+        // 1. Fetch usage data (primary — for spend tracking). Skip the probe
+        //    entirely once we know this key can't reach admin endpoints.
+        if (!adminEndpointsBlocked) {
+            when (val probe = probeUsage()) {
+                is AdminProbe.Available -> {
+                    // 2. Fetch spend-limit status (supplementary — budget cap)
+                    val spendLimit = fetchSpendLimit()
+                    // 3. Fetch rate limits (supplementary — faucet display)
+                    val rateLimit = fetchRateLimit()
+                    // 4. Build report
+                    return buildReport(probe.usage, spendLimit, rateLimit)
+                }
+                AdminProbe.AuthRejected -> {
+                    adminEndpointsBlocked = true
+                    return fallbackPoll()
+                }
+                AdminProbe.Unavailable -> return fallbackPoll()
+            }
         }
+        return fallbackPoll()
+    }
 
-        // 2. Fetch spend-limit status (supplementary — budget cap status)
-        val spendLimit = fetchSpendLimit()
-
-        // 3. Fetch rate limits (supplementary — faucet display)
-        val rateLimit = fetchRateLimit()
-
-        // 4. Build report
-        return buildReport(usage, spendLimit, rateLimit)
+    /**
+     * Probes /v1/admin/usage once, classifying the outcome. Auth rejection
+     * (401/403) is definitive for this key; other failures are transient.
+     */
+    private suspend fun probeUsage(): AdminProbe {
+        return try {
+            val response: HttpResponse = client.get("$baseUrl$USAGE_PATH") {
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+            }
+            when {
+                response.status.value == 401 || response.status.value == 403 ->
+                    AdminProbe.AuthRejected
+                !response.status.isSuccess() -> AdminProbe.Unavailable
+                else -> {
+                    val bodyText = response.bodyAsText()
+                    parseUsageData(bodyText)?.let { AdminProbe.Available(it) } ?: AdminProbe.Unavailable
+                }
+            }
+        } catch (_: Exception) {
+            AdminProbe.Unavailable
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -175,15 +222,7 @@ class MistralProviderAdapter(
      */
     private suspend fun fetchRateHeaderFallback(): ProviderReport? {
         return try {
-            val modelsResponse: HttpResponse = client.get("$baseUrl$MODELS_PATH") {
-                header(HttpHeaders.Authorization, "Bearer $apiKey")
-            }
-            if (!modelsResponse.status.isSuccess()) return null
-            val model = SharedHttpClient.json.parseToJsonElement(modelsResponse.bodyAsText())
-                .let { (it as? JsonObject)?.get("data") as? kotlinx.serialization.json.JsonArray }
-                ?.mapNotNull { m -> ((m as? JsonObject)?.get("id") as? kotlinx.serialization.json.JsonPrimitive)?.content }
-                ?.firstOrNull { it.startsWith("mistral-") && !it.contains("embed") && !it.contains("ocr") }
-                ?: return null
+            val model = pingModel() ?: return null
 
             val response: HttpResponse = client.post("$baseUrl$CHAT_PATH") {
                 header(HttpHeaders.Authorization, "Bearer $apiKey")
@@ -223,24 +262,45 @@ class MistralProviderAdapter(
         }
     }
 
+    /**
+     * Resolves the ping model for the fallback chat header-harvest, cached
+     * hourly (model ids churn slowly; the old code re-listed all models on
+     * every poll — 1,440 catalog downloads/day for one id).
+     */
+    private suspend fun pingModel(): String? {
+        val now = com.angussoftware.fueldashboard.util.epochMillis()
+        cachedPingModel?.let { cached ->
+            if (now - pingModelResolvedAtMs < 3_600_000L) return cached
+        }
+        val resolved = try {
+            val modelsResponse: HttpResponse = client.get("$baseUrl$MODELS_PATH") {
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+            }
+            if (!modelsResponse.status.isSuccess()) return null
+            SharedHttpClient.json.parseToJsonElement(modelsResponse.bodyAsText())
+                .let { (it as? JsonObject)?.get("data") as? kotlinx.serialization.json.JsonArray }
+                ?.mapNotNull { m -> ((m as? JsonObject)?.get("id") as? kotlinx.serialization.json.JsonPrimitive)?.content }
+                ?.firstOrNull { it.startsWith("mistral-") && !it.contains("embed") && !it.contains("ocr") }
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        cachedPingModel = resolved
+        pingModelResolvedAtMs = now
+        return resolved
+    }
+
     // -----------------------------------------------------------------------
     // Usage API
     // -----------------------------------------------------------------------
 
     /**
-     * Fetches month-to-date spend from the /v1/admin/usage endpoint.
-     *
-     * Returns null if the API call fails.
+     * Parses the /v1/admin/usage response body into [UsageData]. Pure —
+     * HTTP and status classification live in [probeUsage]. Returns null on
+     * unparseable bodies.
      */
-    private suspend fun fetchUsage(): UsageData? {
+    private fun parseUsageData(bodyText: String): UsageData? {
         return try {
-            val response: HttpResponse = client.get("$baseUrl$USAGE_PATH") {
-                header(HttpHeaders.Authorization, "Bearer $apiKey")
-            }
-
-            if (!response.status.isSuccess()) return null
-
-            val body: JsonObject = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val body: JsonObject = json.parseToJsonElement(bodyText).jsonObject
 
             // Build price index from the `prices` array.
             val priceIndex = buildPriceIndex(body)

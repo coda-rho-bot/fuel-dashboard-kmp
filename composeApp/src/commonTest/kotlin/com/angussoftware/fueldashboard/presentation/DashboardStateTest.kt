@@ -26,4 +26,22 @@ class DashboardStateTest {
         assertEquals("junie_license", FuelSettingsKeys.JUNIE_LICENSE)
         assertEquals("junie_last_checked", FuelSettingsKeys.JUNIE_LAST_CHECKED)
     }
+
+    @Test
+    fun failureBackoffDoublesIntervalAndCapsAt30Minutes() {
+        val vm = FuelViewModel()
+        // Healthy: the configured interval.
+        assertEquals(60_000L, vm.effectiveIntervalMs(60, 0))
+        // Each consecutive failure doubles the interval.
+        assertEquals(120_000L, vm.effectiveIntervalMs(60, 1))
+        assertEquals(240_000L, vm.effectiveIntervalMs(60, 2))
+        // Multiplier caps at x32 — visible with a base where x32 stays
+        // under the 30-min ceiling (30s x 32 = 16 min).
+        assertEquals(30_000L * 32, vm.effectiveIntervalMs(30, 5))
+        assertEquals(30_000L * 32, vm.effectiveIntervalMs(30, 9))
+        // …and the result never exceeds 30 minutes (60s x 32 = 32 min is
+        // clamped; a 1h base is clamped even without backoff).
+        assertEquals(30 * 60_000L, vm.effectiveIntervalMs(60, 6))
+        assertEquals(30 * 60_000L, vm.effectiveIntervalMs(3600, 0))
+    }
 }

@@ -633,8 +633,10 @@ class FuelViewModel {
         closeAdapters()
         // Reset per-provider poll scheduling: the immediate post-save refresh
         // must treat every provider as due, or tiles stay blank until each
-        // provider's interval elapses (review 1815).
+        // provider's interval elapses (review 1815). Failure backoff resets
+        // too — a settings save is an explicit user retry.
         lastPolledMs.clear()
+        consecutiveFailures.clear()
 
         _state.update { it.copy(
             settings = newSettings,
@@ -1036,10 +1038,22 @@ class FuelViewModel {
      */
     private fun pollIntervalMs(): Long = 30_000L
 
+    /**
+     * Effective poll interval for one provider: the configured interval with
+     * exponential failure backoff applied (x2 per consecutive failure, x32
+     * cap) and a 30-minute ceiling. Pure — unit-testable.
+     */
+    internal fun effectiveIntervalMs(baseIntervalSec: Int, consecutiveFailures: Int): Long =
+        (baseIntervalSec.coerceAtLeast(15) * 1000L * (1L shl consecutiveFailures.coerceAtMost(5)))
+            .coerceAtMost(30 * 60_000L)
+
     // Per-provider poll scheduling: last time each provider was actually
     // polled, used to honor ProviderConfig.pollIntervalSeconds inside the
     // 30s global loop.
     private val lastPolledMs = mutableMapOf<String, Long>()
+
+    /** Consecutive poll failures per provider — drives exponential backoff. */
+    private val consecutiveFailures = mutableMapOf<String, Int>()
 
     private suspend fun refresh() = refreshMutex.withLock {
         // Snapshot adapters to avoid ConcurrentModificationException if
@@ -1058,11 +1072,15 @@ class FuelViewModel {
         // Honor per-provider intervals: only poll adapters whose interval
         // has elapsed since their last poll. Skipped providers keep their
         // existing report (reports persist in state between refreshes).
+        // Consecutive failures back off exponentially (x2 per failure, cap
+        // 30 min): a revoked key or dead endpoint otherwise gets hammered
+        // at full cadence indefinitely — 1,440+ wasted requests/day against
+        // an account that is usually already rate-limited or suspended.
         val nowMs = epochMillis()
         val dueAdapters = adapterSnapshot.filter { (providerId, _) ->
             val intervalSec = _state.value.settings.providers
                 .firstOrNull { it.id == providerId }?.pollIntervalSeconds ?: 60
-            val intervalMs = (intervalSec.coerceAtLeast(15)) * 1000L
+            val intervalMs = effectiveIntervalMs(intervalSec, consecutiveFailures[providerId] ?: 0)
             val last = lastPolledMs[providerId]
             last == null || nowMs - last >= intervalMs
         }
@@ -1093,8 +1111,14 @@ class FuelViewModel {
 
         for ((providerId, result) in reportResults) {
             result
-                .onSuccess { reports[providerId] = it }
-                .onFailure { errors[providerId] = it.message ?: "Unknown error" }
+                .onSuccess {
+                    reports[providerId] = it
+                    consecutiveFailures[providerId] = 0
+                }
+                .onFailure {
+                    errors[providerId] = it.message ?: "Unknown error"
+                    consecutiveFailures[providerId] = (consecutiveFailures[providerId] ?: 0) + 1
+                }
         }
 
         // Extract orchestrator data from any connected API adapter

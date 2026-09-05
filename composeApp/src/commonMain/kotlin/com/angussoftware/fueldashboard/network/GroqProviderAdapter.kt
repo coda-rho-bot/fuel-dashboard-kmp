@@ -73,9 +73,13 @@ class GroqProviderAdapter(
             "llama-3.1-8b-instant",
         )
 
-        // One network fetch per minute (the loop polls every 30s — serve
-        // cache in between so an open dashboard costs <= 1 request/min).
-        internal const val MIN_FETCH_INTERVAL_MS = 60_000L
+        // One network fetch per 15 minutes. The fetch is a real chat
+        // completion that decrements the very RPD quota this gauge displays
+        // (and burns ~10-30 tokens), so at 60s the monitor alone cost
+        // 1,440 requests/day — enough to exhaust free-tier RPD by itself.
+        // RPD/TDS move slowly at monitoring granularity; users who accept
+        // the cost can tighten per-provider pollIntervalSeconds.
+        internal const val MIN_FETCH_INTERVAL_MS = 15 * 60_000L
 
         // Ping model re-resolved hourly.
         internal const val MODEL_CACHE_TTL_MS = 3_600_000L
