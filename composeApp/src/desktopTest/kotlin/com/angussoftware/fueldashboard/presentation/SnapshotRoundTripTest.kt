@@ -86,7 +86,50 @@ class SnapshotRoundTripTest {
             FuelIntelligence.FuelEvent(2_000L, FuelIntelligence.FuelEventType.FUEL_DROP, "Fuel dropped 4.0%"),
             FuelIntelligence.FuelEvent(3_000L, FuelIntelligence.FuelEventType.MODEL_SWITCH, "Switched to glm-4.7"),
         ),
+        decisions = com.angussoftware.fueldashboard.model.DecisionsResponse(
+            decisions = listOf(
+                com.angussoftware.fueldashboard.model.Decision(
+                    id = 9L,
+                    agentId = "agent-1",
+                    modelHandle = "glm-4.7",
+                    provider = "z.ai",
+                    tier = "standard",
+                    complexity = "low",
+                    utilizationRatio = 0.4,
+                    headroom = 60,
+                    reason = "routine work",
+                    timestamp = 1_760_000_050_000L,
+                ),
+            ),
+        ),
+        alerts = com.angussoftware.fueldashboard.model.AlertsResponse(
+            alerts = listOf("WARNING z.ai below 20%"),
+        ),
+        junieBalance = 38.25,
+        junieLicense = "JetBrains Trial",
+        junieLastChecked = 1_760_000_060_000L,
     )
+
+    @Test
+    fun roundTrip_decisionsAlertsJuniePreserved() {
+        // Connected-mode single-fetch consolidation: decisions, alerts, and
+        // the Junie balance must survive the snapshot round-trip (they used
+        // to arrive via separate /decisions, /alerts, /fuel calls).
+        val json = DashboardSnapshot.build(fullState()).toString()
+        val parsed = assertNotNull(RemoteDashboardFetcher.parse(json), "snapshot unparseable")
+
+        val decision = assertNotNull(parsed.decisions.firstOrNull(), "decisions lost in round-trip")
+        assertEquals("glm-4.7", decision.modelHandle)
+        assertEquals(60, decision.headroom)
+        assertEquals(1_760_000_050_000L, decision.timestamp)
+
+        assertEquals(1, parsed.alerts.size, "alerts lost in round-trip")
+        assertEquals("WARNING z.ai below 20%", parsed.alerts.first())
+
+        // junie section present in raw JSON for the adapter's lastFuel path
+        assertTrue(json.contains("\"junie\""), "junie section missing from snapshot")
+        assertTrue(json.contains("38.25"), "junie balance value missing from snapshot")
+    }
 
     @Test
     fun roundTrip_meteredUsagePreserved() {

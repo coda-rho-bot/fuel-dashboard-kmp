@@ -1,5 +1,6 @@
 package com.angussoftware.fueldashboard.presentation
 
+import com.angussoftware.fueldashboard.model.Decision
 import com.angussoftware.fueldashboard.network.FuelApiClient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -21,6 +22,10 @@ internal class RemoteDashboardSnapshot(
     val intelligence: IntelligenceData?,
     /** Provider gauges from the remote dashboard (quota % + reset windows). */
     val providers: List<RemoteProviderGauge> = emptyList(),
+    /** Recent decisions (additive snapshot section; empty on older servers). */
+    val decisions: List<Decision> = emptyList(),
+    /** Active alerts (additive snapshot section; empty on older servers). */
+    val alerts: List<String> = emptyList(),
 )
 
 /**
@@ -61,10 +66,38 @@ internal object RemoteDashboardFetcher {
                 metered = mapMetered(root),
                 intelligence = mapIntelligence(root),
                 providers = mapProviders(root),
+                decisions = mapDecisions(root),
+                alerts = mapAlerts(root),
             )
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** Decisions array (additive section; absent on pre-consolidation servers). */
+    private fun mapDecisions(root: kotlinx.serialization.json.JsonObject): List<Decision> {
+        val arr = root["decisions"]?.jsonArray ?: return emptyList()
+        return arr.mapNotNull { el ->
+            val o = el.jsonObject
+            Decision(
+                id = o["id"]?.jsonPrimitive?.longOrNull ?: 0L,
+                agentId = o["agent_id"]?.jsonPrimitive?.contentOrNull ?: "",
+                modelHandle = o["model_handle"]?.jsonPrimitive?.contentOrNull ?: "",
+                provider = o["provider"]?.jsonPrimitive?.contentOrNull ?: "",
+                tier = o["tier"]?.jsonPrimitive?.contentOrNull ?: "",
+                complexity = o["complexity"]?.jsonPrimitive?.contentOrNull ?: "",
+                utilizationRatio = o["utilization_ratio"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+                headroom = o["headroom"]?.jsonPrimitive?.intOrNull ?: 0,
+                reason = o["reason"]?.jsonPrimitive?.contentOrNull ?: "",
+                timestamp = o["timestamp"]?.jsonPrimitive?.longOrNull ?: 0L,
+            )
+        }
+    }
+
+    /** Alerts array of plain strings (additive section). */
+    private fun mapAlerts(root: kotlinx.serialization.json.JsonObject): List<String> {
+        val arr = root["alerts"]?.jsonArray ?: return emptyList()
+        return arr.mapNotNull { it.jsonPrimitive.contentOrNull }
     }
 
     /**

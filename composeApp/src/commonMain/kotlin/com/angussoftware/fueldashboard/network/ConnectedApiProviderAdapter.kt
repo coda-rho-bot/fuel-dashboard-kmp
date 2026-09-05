@@ -3,22 +3,35 @@ package com.angussoftware.fueldashboard.network
 import com.angussoftware.fueldashboard.model.AgentsResponse
 import com.angussoftware.fueldashboard.model.AlertsResponse
 import com.angussoftware.fueldashboard.model.DecisionsResponse
+import com.angussoftware.fueldashboard.model.FleetAgent
 import com.angussoftware.fueldashboard.model.FuelResponse
+import com.angussoftware.fueldashboard.model.JunieBalanceData
 import com.angussoftware.fueldashboard.model.ProviderAdapter
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.model.ReportWindow
+import com.angussoftware.fueldashboard.presentation.RemoteDashboardFetcher
+import com.angussoftware.fueldashboard.presentation.RemoteDashboardSnapshot
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * Adapter for the "Connected API" (orchestrator) provider kind.
  *
- * Wraps [FuelApiClient] as a [ProviderAdapter] so the orchestrator
- * is treated as just another provider in the multi-provider list.
+ * Wraps [FuelApiClient] as a [ProviderAdapter] so the orchestrator is
+ * treated as just another provider in the multi-provider list.
  *
- * The adapter polls the orchestrator's /fuel endpoint and also fetches
- * supplementary data (decisions, agents, alerts) in the same call.
- * After [poll], the ViewModel reads [lastFuel], [lastDecisions],
- * [lastAgents], and [lastAlerts] to populate the supplementary panels.
+ * SINGLE network fetch per poll: /dashboard is the complete dashboard
+ * state (gauges, decisions, agents, alerts, metered, waste) — the old
+ * 4-call-per-poll pattern (fuel + decisions + agents + alerts) plus the
+ * ViewModel's separate /dashboard fetch made 5 requests per refresh where
+ * 1 suffices. The parsed snapshot is shared with the ViewModel via
+ * [lastSnapshot]; supplementary panels read [lastFuel], [lastDecisions],
+ * [lastAgents], [lastAlerts] as before.
  */
 class ConnectedApiProviderAdapter(
     override val providerId: String,
@@ -48,51 +61,94 @@ class ConnectedApiProviderAdapter(
     var lastAlerts: AlertsResponse = AlertsResponse()
         private set
 
+    /** The parsed /dashboard snapshot from the last poll — shared, not re-fetched. */
+    @Volatile
+    internal var lastSnapshot: RemoteDashboardSnapshot? = null
+        private set
+
     override suspend fun poll(): ProviderReport {
-        val fuel = client.getFuel()
-        val decisions = runCatching { client.getDecisions(20) }.getOrElse { DecisionsResponse() }
-        val agents = runCatching { client.getAgents() }.getOrElse { AgentsResponse() }
-        val alerts = runCatching { client.getAlerts() }.getOrElse { AlertsResponse() }
+        val body = client.getDashboardSnapshot()
+            ?: throw IllegalStateException("Remote dashboard unreachable: $baseUrl")
+        val snapshot = RemoteDashboardFetcher.parse(body)
+            ?: throw IllegalStateException("Remote dashboard response unparseable: $baseUrl")
 
-        // Store supplementary data for ViewModel to read
-        lastFuel = fuel
-        lastDecisions = decisions
-        lastAgents = agents
-        lastAlerts = alerts
+        lastSnapshot = snapshot
+        lastDecisions = DecisionsResponse(decisions = snapshot.decisions)
+        lastAlerts = AlertsResponse(alerts = snapshot.alerts)
+        lastAgents = AgentsResponse(agents = mapAgents(body))
+        lastFuel = mapFuel(body)
 
-        // Aggregate all orchestrator providers into windows
-        val windows = mutableListOf<ReportWindow>()
-        var overallRemaining: Int? = null
-
-        for ((providerName, provider) in fuel.providers) {
-            if (provider.remainingPct != null) {
-                val pct = provider.remainingPct
-                // Pick the first available overall percentage as the headline
-                if (overallRemaining == null) overallRemaining = pct
-
-                windows.add(
-                    ReportWindow(
-                        name = providerName,
-                        remainingPct = pct,
-                        resetsAt = provider.resetMs,
-                        windowHours = 0.0,
-                    ),
+        // Aggregate all orchestrator gauges into windows
+        val windows = snapshot.providers.mapNotNull { p ->
+            p.remainingPct?.let { pct ->
+                ReportWindow(
+                    name = p.name,
+                    remainingPct = pct,
+                    resetsAt = p.resetsAt,
+                    windowHours = p.windowHours,
                 )
             }
         }
+        val headline = windows.firstOrNull { it.remainingPct != null }
 
         return ProviderReport(
             providerId = providerId,
             displayName = displayName,
             type = ProviderType.WINDOW_CREDIT,
-            remainingPct = overallRemaining,
+            remainingPct = headline?.remainingPct,
+            resetsAt = headline?.resetsAt,
+            windowHours = headline?.windowHours ?: 0.0,
             windows = windows,
-            rawDisplay = if (fuel.providers.isNotEmpty()) {
-                fuel.providers.entries.joinToString(", ") { (name, p) ->
-                    "$name: ${p.remainingPct ?: "—"}%"
-                }
+            rawDisplay = if (windows.isNotEmpty()) {
+                windows.joinToString(", ") { "${it.name}: ${it.remainingPct}%" }
             } else "",
         )
+    }
+
+    /**
+     * Maps the snapshot's agents section (name → {id, status, session_model})
+     * into FleetAgent rows. Fields the section doesn't carry keep their
+     * defaults — the common UI renders name/model only.
+     */
+    private fun mapAgents(body: String): List<FleetAgent> {
+        return try {
+            val root = Json { ignoreUnknownKeys = true }.parseToJsonElement(body).jsonObject
+            val agents = root["agents"]?.jsonObject ?: return emptyList()
+            agents.entries.mapNotNull { (name, v) ->
+                val o = v.jsonObject
+                FleetAgent(
+                    agentId = o["id"]?.jsonPrimitive?.contentOrNull ?: "",
+                    name = name,
+                    currentModel = o["session_model"]?.jsonPrimitive?.contentOrNull ?: "",
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * FuelResponse for legacy consumers. The snapshot carries the Junie
+     * balance section (the old /fuel endpoint's job) — parse it here so the
+     * ViewModel's Junie sync path keeps working; provider-level gauges live
+     * in the snapshot windows instead of the legacy providers map.
+     */
+    private fun mapFuel(body: String): FuelResponse {
+        return try {
+            val root = Json { ignoreUnknownKeys = true }.parseToJsonElement(body).jsonObject
+            val junieObj = root["junie"]?.jsonObject
+            FuelResponse(
+                junie = junieObj?.let { j ->
+                    JunieBalanceData(
+                        balance = j["balance"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+                        license = j["license"]?.jsonPrimitive?.contentOrNull,
+                        lastChecked = j["last_checked"]?.jsonPrimitive?.longOrNull,
+                    )
+                },
+            )
+        } catch (_: Exception) {
+            FuelResponse()
+        }
     }
 
     override fun close() = Unit

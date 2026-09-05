@@ -2,6 +2,8 @@ package com.angussoftware.fueldashboard.presentation
 
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -150,6 +152,38 @@ object DashboardSnapshot {
             put("last_poll_at", state.usageIngestion.lastPollAt)
             state.usageIngestion.lastError?.let { put("last_error", it) }
             put("total_ingested", state.usageIngestion.totalIngested)
+        })
+
+        // ── Decisions + alerts (connected-mode single-fetch parity) ────
+        // Lets Remote Dashboard consumers derive these panels from the one
+        // /dashboard fetch instead of separate /decisions and /alerts calls.
+        put("decisions", buildJsonArray {
+            state.decisions.decisions.take(20).forEach { d ->
+                add(buildJsonObject {
+                    put("id", d.id)
+                    put("agent_id", d.agentId)
+                    put("model_handle", d.modelHandle)
+                    put("provider", d.provider)
+                    put("tier", d.tier)
+                    put("complexity", d.complexity)
+                    put("utilization_ratio", d.utilizationRatio)
+                    put("headroom", d.headroom)
+                    put("reason", d.reason)
+                    put("timestamp", d.timestamp)
+                })
+            }
+        })
+        put("alerts", buildJsonArray {
+            state.alerts.alerts.forEach { add(JsonPrimitive(it)) }
+        })
+
+        // ── Junie balance (connected-mode single-fetch parity) ──────────
+        // The legacy /fuel endpoint carried this; mobile's Junie card sync
+        // reads it via the connected adapter's lastFuel.
+        put("junie", buildJsonObject {
+            state.junieBalance?.let { put("balance", it) }
+            state.junieLicense?.let { put("license", it) }
+            state.junieLastChecked?.let { put("last_checked", it) }
         })
     }
 

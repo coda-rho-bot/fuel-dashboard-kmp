@@ -942,14 +942,6 @@ class FuelViewModel {
      * repositories on Android). Returns null when not in connected mode or
      * the fetch fails.
      */
-    private suspend fun fetchConnectedDashboardSnapshot(): RemoteDashboardSnapshot? {
-        val entry = adapters.entries.firstOrNull {
-            it.value is com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter
-        } ?: return null
-        val config = _state.value.settings.providers.firstOrNull { it.id == entry.key } ?: return null
-        return RemoteDashboardFetcher.fetch(config.resolvedServerUrl(), config.apiKey)
-    }
-
     // --- Internals ---
 
     private fun activateAdapters(settings: MultiProviderSettings) {
@@ -1210,7 +1202,17 @@ class FuelViewModel {
         // and populate the metered / intelligence state locally — mobile has
         // no local repos, so this is the ONLY source of usage/waste/events
         // data on Android.
-        val remoteSnapshot = fetchConnectedDashboardSnapshot()
+        // Single /dashboard fetch: the connected adapter's poll already
+        // fetched and parsed the complete snapshot (consolidated from the
+        // old 4-sub-fetch + separate snapshot fetch = 5 requests/refresh).
+        // Reuse it — zero extra requests, and it honors the provider's
+        // poll interval instead of firing every 30s tick.
+        val connectedAdapterEntry = adapterSnapshot.firstOrNull {
+            it.second is com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter
+        }
+        val remoteSnapshot = connectedAdapterEntry
+            ?.let { it.second as com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter }
+            ?.lastSnapshot
         val remoteMetered = remoteSnapshot?.metered
         val remoteIntelligence = remoteSnapshot?.intelligence
 
