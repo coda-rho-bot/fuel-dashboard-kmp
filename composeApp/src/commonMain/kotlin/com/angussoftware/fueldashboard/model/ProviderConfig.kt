@@ -46,6 +46,17 @@ data class ProviderConfig(
     val monthlyBudgetUsd: Double = 0.0,
     /** How often this provider is polled, in seconds. Default 60. */
     val pollIntervalSeconds: Int = 60,
+    /**
+     * Display-only: no local polling. Set when this provider was imported
+     * via settings sync alongside a Remote Dashboard (CONNECTED_API)
+     * provider — the phone would otherwise re-poll every account the
+     * desktop already polls 24/7, doubling quota burn against the same
+     * accounts. Tiles hydrate from the remote /dashboard snapshot instead.
+     * Cleared when the Remote Dashboard is removed or the provider is
+     * edited (explicit user intent to poll locally). Defaults false and is
+     * omitted from QR sync payloads when false (encodeDefaults=false).
+     */
+    val dormant: Boolean = false,
 ) {
     /**
      * Resolved display name: custom name > provider's default.

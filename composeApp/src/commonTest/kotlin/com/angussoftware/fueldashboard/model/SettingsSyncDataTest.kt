@@ -2,6 +2,8 @@ package com.angussoftware.fueldashboard.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SettingsSyncDataTest {
@@ -301,6 +303,33 @@ class SettingsSyncDataTest {
 
         val version = minimumInformationDensityFor(syncData.toQrData())
         assertTrue(version <= 20, "Agents QR version $version exceeds the reliably-scannable bound (20)")
+    }
+
+    @Test
+    fun dormantProviderRoundTripsAndFalseCostsZeroQrBytes() {
+        // dormant=true must survive a QR round-trip (synced receiver relies
+        // on it), and dormant=false must add NOTHING to the QR payload
+        // (encodeDefaults=false) — the QR version budget is tight.
+        val base = SettingsSyncData(
+            providers = listOf(
+                ProviderConfig(id = "zai-1", kind = ProviderKind.ZAI, apiKey = "k"),
+            ),
+        )
+        val dormant = base.copy(
+            providers = base.providers.map { it.copy(dormant = true) },
+        )
+
+        val restoredDormant = SettingsSyncData.fromQrData(dormant.toQrData())
+        assertTrue(restoredDormant?.providers?.first()?.dormant == true, "dormant=true must survive QR round-trip")
+
+        val restoredBase = SettingsSyncData.fromQrData(base.toQrData())
+        assertTrue(restoredBase?.providers?.first()?.dormant == false, "absent field defaults to dormant=false")
+
+        // Byte-neutrality: decompressed JSON with dormant=false must not
+        // contain the key at all (default omitted).
+        val json = Base45.decode(base.toQrData())?.let { decompress(it) }
+        assertNotNull(json)
+        assertFalse(json.contains("\"dormant\""), "dormant=false must not be serialized into QR payloads: $json")
     }
 }
 

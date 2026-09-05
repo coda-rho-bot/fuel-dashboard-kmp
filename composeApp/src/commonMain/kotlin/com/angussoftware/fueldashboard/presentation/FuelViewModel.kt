@@ -638,8 +638,20 @@ class FuelViewModel {
         lastPolledMs.clear()
         consecutiveFailures.clear()
 
+        // Wake dormant providers when no Remote Dashboard remains: dormant
+        // only makes sense alongside a CONNECTED_API source. Removing the
+        // Remote Dashboard (or any settings path that drops it) restores
+        // direct polling so tiles don't sit display-only with no source.
+        val settings = if (
+            newSettings.providers.any { it.kind == ProviderKind.CONNECTED_API && it.isConfigured }
+        ) {
+            newSettings
+        } else {
+            newSettings.copy(providers = newSettings.providers.map { it.copy(dormant = false) })
+        }
+
         _state.update { it.copy(
-            settings = newSettings,
+            settings = settings,
             isLoading = true,
             providerReports = emptyMap(),
             providerErrors = emptyMap(),
@@ -652,8 +664,8 @@ class FuelViewModel {
             checkingProviderIds = emptySet(),
         ) }
 
-        if (newSettings.hasAnyConfig) {
-            activateAdapters(newSettings)
+        if (settings.hasAnyConfig) {
+            activateAdapters(settings)
             startPolling()
         }
     }
@@ -695,7 +707,10 @@ class FuelViewModel {
         val current = _state.value.settings
         updateSettings(
             current.copy(
-                providers = current.providers.map { if (it.id == updated.id) updated else it },
+                // Editing a dormant provider is explicit intent to manage it
+                // locally — wake it (the Remote Dashboard keeps its own
+                // copy either way).
+                providers = current.providers.map { if (it.id == updated.id) updated.copy(dormant = false) else it },
             ),
         )
     }
@@ -823,7 +838,19 @@ class FuelViewModel {
         }
         // Merge: take synced providers AND add/update a Remote Dashboard provider with the server API key
         if (!isAgentsOnly) {
-            val providers = syncData.providers.toMutableList()
+            val hasServer = syncData.serverUrl != null
+            val providers = syncData.providers.map { p ->
+                // When a Remote Dashboard comes along, direct providers are
+                // display-only on this device: the phone re-polling every
+                // account the desktop already polls doubles quota burn
+                // against the same accounts. Tiles hydrate from the remote
+                // snapshot instead (see refresh's dormant hydration).
+                if (hasServer && p.kind != com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API) {
+                    p.copy(dormant = true)
+                } else {
+                    p
+                }
+            }.toMutableList()
             syncData.serverUrl?.let { url ->
                 val key = syncData.serverApiKey.orEmpty()
                 // Remove any existing CONNECTED_API and add fresh one
@@ -928,6 +955,10 @@ class FuelViewModel {
     private fun activateAdapters(settings: MultiProviderSettings) {
         for (config in settings.providers) {
             if (!config.isConfigured) continue
+            // Dormant providers are display-only (synced alongside a Remote
+            // Dashboard) — no local adapter, no local polling. Their tiles
+            // hydrate from the remote snapshot in refresh().
+            if (config.dormant) continue
             val adapter = createAdapter(config) ?: continue
             adapters[config.id] = adapter
         }
@@ -1212,6 +1243,40 @@ class FuelViewModel {
                     resetsAt = headline?.resetsAt ?: existing.resetsAt,
                     windowHours = headline?.windowHours?.takeIf { it > 0 } ?: existing.windowHours,
                     windows = windows,
+                )
+            }
+        }
+
+        // Dormant-provider hydration: synced direct providers (no local
+        // adapter by design — the phone must not re-poll accounts the
+        // desktop already polls) get their tiles from the same remote
+        // snapshot. Zero extra requests: the gauges are already in hand.
+        if (remoteSnapshot != null && remoteSnapshot.providers.isNotEmpty()) {
+            val byId = remoteSnapshot.providers.associateBy { it.id }
+            for (config in _state.value.settings.providers) {
+                if (!config.dormant) continue
+                val gauge = byId[config.id] ?: continue
+                reports[config.id] = ProviderReport(
+                    providerId = config.id,
+                    displayName = gauge.name.ifBlank { config.resolvedDisplayName() },
+                    type = ProviderType.WINDOW_CREDIT,
+                    remainingPct = gauge.remainingPct,
+                    resetsAt = gauge.resetsAt,
+                    windowHours = gauge.windowHours,
+                    available = gauge.remainingPct != null,
+                    windows = listOf(
+                        ReportWindow(
+                            name = gauge.name.ifBlank { config.resolvedDisplayName() },
+                            remainingPct = gauge.remainingPct,
+                            resetsAt = gauge.resetsAt,
+                            windowHours = gauge.windowHours,
+                        ),
+                    ),
+                    rawDisplay = if (gauge.remainingPct != null) {
+                        "${gauge.remainingPct}% via Remote Dashboard"
+                    } else {
+                        "via Remote Dashboard"
+                    },
                 )
             }
         }
