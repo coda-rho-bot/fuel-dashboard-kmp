@@ -2,6 +2,7 @@ package com.angussoftware.fueldashboard.presentation
 
 import com.angussoftware.fueldashboard.database.FuelSnapshotRecord
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.toInstant
 import com.angussoftware.fueldashboard.database.UsageRecord
 import com.angussoftware.fueldashboard.util.formatRoot
 
@@ -251,14 +252,24 @@ object FuelIntelligence {
         return (measured + reconstructed).sortedBy { it.windowEnd }
     }
 
-    /** Rolls observed tiles into local-day averages. */
-    fun dailyWaste(tiles: List<WasteTile>): List<DailyWaste> {
-        val tz = kotlinx.datetime.TimeZone.currentSystemDefault()
+    /**
+     * Rolls observed tiles into local-day averages.
+     *
+     * dayStart is the TRUE local-midnight epoch of the day the window ended
+     * in. (The old implementation computed `epochDays × 86_400_000`, which is
+     * UTC midnight of the local day index — every row rendered one day in the
+     * past for negative-UTC-offset timezones.)
+     */
+    fun dailyWaste(tiles: List<WasteTile>): List<DailyWaste> =
+        dailyWaste(tiles, kotlinx.datetime.TimeZone.currentSystemDefault())
+
+    fun dailyWaste(tiles: List<WasteTile>, tz: kotlinx.datetime.TimeZone): List<DailyWaste> {
         return tiles
-            .groupBy { kotlinx.datetime.Instant.fromEpochMilliseconds(it.windowEnd).toLocalDateTime(tz).date.toEpochDays().toLong() }
-            .map { (dayKey, dayTiles) ->
+            .groupBy { kotlinx.datetime.Instant.fromEpochMilliseconds(it.windowEnd).toLocalDateTime(tz).date }
+            .map { (day, dayTiles) ->
                 DailyWaste(
-                    dayStart = dayKey * 86_400_000,
+                    dayStart = kotlinx.datetime.LocalDateTime(day.year, day.month, day.dayOfMonth, 0, 0)
+                        .toInstant(tz).toEpochMilliseconds(),
                     windows = dayTiles.size,
                     observed = dayTiles.count { !it.estimated },
                     estimated = dayTiles.count { it.estimated },

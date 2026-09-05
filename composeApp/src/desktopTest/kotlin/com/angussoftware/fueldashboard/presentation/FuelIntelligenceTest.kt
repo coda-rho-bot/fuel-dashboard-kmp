@@ -2,6 +2,7 @@ package com.angussoftware.fueldashboard.presentation
 
 import com.angussoftware.fueldashboard.database.FuelSnapshotRecord
 import com.angussoftware.fueldashboard.database.UsageRecord
+import kotlinx.datetime.toLocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -311,6 +312,33 @@ class FuelIntelligenceTest {
     }
 
     private fun minute(m: Long) = m * 60_000L
+
+    /**
+     * Regression: dayStart must be the TRUE local-midnight epoch of the day
+     * the window ended in. The old implementation (epochDays × 86_400_000)
+     * produced UTC midnight, rendering every waste row one day in the past
+     * for negative-UTC-offset timezones.
+     */
+    @Test
+    fun dailyWasteDayStartIsLocalMidnightInNegativeOffsetTimezone() {
+        // America/Chicago (CDT = UTC-5). A window ending 2026-09-05 03:00 UTC
+        // = 2026-09-04 22:00 local → belongs to local day Sep 4 → dayStart
+        // must be Sep 4 00:00 CDT = 2026-09-04T05:00Z = 1_788_498_000_000 ms.
+        val windowEndUtcMs = 1_788_577_200_000L // 2026-09-05T03:00:00Z
+        val expectedLocalMidnightMs = 1_788_498_000_000L // 2026-09-04T05:00:00Z
+        val tiles = listOf(
+            FuelIntelligence.WasteTile(windowEnd = windowEndUtcMs, wastedPct = 40.0),
+        )
+        val daily = FuelIntelligence.dailyWaste(tiles, kotlinx.datetime.TimeZone.of("America/Chicago"))
+        assertEquals(1, daily.size)
+        assertEquals(expectedLocalMidnightMs, daily[0].dayStart)
+        // Sanity: formatting dayStart back in Chicago must yield Sep 4.
+        val local = kotlinx.datetime.Instant.fromEpochMilliseconds(daily[0].dayStart)
+            .toLocalDateTime(kotlinx.datetime.TimeZone.of("America/Chicago"))
+        assertEquals(9, local.monthNumber)
+        assertEquals(4, local.dayOfMonth)
+        assertEquals(0, local.hour)
+    }
 
     /** Extracts the drop percentage from "Fuel dropped 5.0% ..." descriptions. */
     private fun parseDropPct(description: String): Double =

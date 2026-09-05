@@ -149,10 +149,13 @@ data class IntelligenceData(
 )
 
 /**
- * z.ai GLM Coding Plan credit multipliers (per docs.z.ai/devpack/overview).
- * Credits = input×inputMult + output×outputMult (cached input charged at the
- * cached rate; we conservatively use the full input rate until metered data
- * distinguishes cached tokens). Requests for GLM-5.2/5.1 auto-route to 5.3.
+ * z.ai GLM Coding Plan credit multipliers.
+ * Credits = (input×inputMult + cachedIn×cachedMult + output×outputMult) / 10,000
+ * — the /10,000 divisor is part of the official formula (docs.z.ai
+ * /devpack/teamplan "Credit Calculation"; plan scale sanity: Team Standard
+ * = 15,000 credits / 5h). Cached input is charged at the cached rate; we
+ * conservatively use the full input rate until metered data distinguishes
+ * cached tokens. Requests for GLM-5.2/5.1 auto-route to 5.3.
  * Off-peak (Mon–Fri 14:00–18:00 UTC+8) charges 50%; blended average used.
  */
 object ZaiCreditMultipliers {
@@ -176,7 +179,7 @@ object ZaiCreditMultipliers {
 
     fun cost(model: String, inputTokens: Long, outputTokens: Long): Double? {
         val m = models[normalize(model)] ?: return null
-        return inputTokens * m.input + outputTokens * m.output
+        return (inputTokens * m.input + outputTokens * m.output) / 10_000.0
     }
 }
 
@@ -1231,8 +1234,13 @@ class FuelViewModel {
         val metered = onGetMeteredUsage?.invoke()
         val intelligence = onGetIntelligence?.invoke()
 
-        // Use primary provider for the legacy projection (backward compat)
-        val realBurnRate = providerBurnRates.firstOrNull()?.burnRatePerHr
+        // Use the PRIMARY provider's burn rate for the legacy projection.
+        // Keyed by providerId — providerBurnRates comes from an unordered
+        // SELECT DISTINCT, so firstOrNull() could pair this provider's gauge
+        // with a different provider's burn rate. Fall back to the first
+        // non-null rate only when the primary has none.
+        val realBurnRate = providerBurnRates.find { it.providerId == primaryProviderId }?.burnRatePerHr
+            ?: providerBurnRates.firstNotNullOfOrNull { it.burnRatePerHr }
         var fuelProjection: FuelProjection? = null
         if (tokensPct != null) {
             fuelProjection = onGetProjection?.invoke(tokensPct, resetAt, realBurnRate ?: 0.0)
