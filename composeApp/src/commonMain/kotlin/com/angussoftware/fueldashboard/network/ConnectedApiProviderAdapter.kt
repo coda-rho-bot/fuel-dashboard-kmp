@@ -138,7 +138,10 @@ class ConnectedApiProviderAdapter(
             val root = Json { ignoreUnknownKeys = true }.parseToJsonElement(body).jsonObject
             val junieObj = root["junie"]?.jsonObject
             FuelResponse(
-                junie = junieObj?.let { j ->
+                // Empty junie object (server with no Junie state) → null,
+                // not balance=0.0 — a phantom $0.00 card would persist on
+                // the receiver (review 1965).
+                junie = junieObj?.takeIf { it.isNotEmpty() }?.let { j ->
                     JunieBalanceData(
                         balance = j["balance"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
                         license = j["license"]?.jsonPrimitive?.contentOrNull,

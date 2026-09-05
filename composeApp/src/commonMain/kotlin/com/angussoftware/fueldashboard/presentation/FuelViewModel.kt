@@ -936,12 +936,6 @@ class FuelViewModel {
         _state.update { it.copy(lastUpdated = epochMillis()) }
     }
 
-    /**
-     * Connected-mode data parity: fetch the Remote Dashboard's /dashboard
-     * snapshot (mobile's only source of metered/intelligence data — no local
-     * repositories on Android). Returns null when not in connected mode or
-     * the fetch fails.
-     */
     // --- Internals ---
 
     private fun activateAdapters(settings: MultiProviderSettings) {

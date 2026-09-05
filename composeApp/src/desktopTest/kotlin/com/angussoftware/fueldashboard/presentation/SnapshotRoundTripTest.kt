@@ -132,6 +132,20 @@ class SnapshotRoundTripTest {
     }
 
     @Test
+    fun roundTrip_noJunieState_omitsSectionAndParsesNull() {
+        // Regression (review 1965): a server with no Junie state must not
+        // emit an empty junie object — it would parse as balance=0.0 and
+        // plant a phantom $0.00 card on the receiver.
+        val state = fullState().copy(junieBalance = null, junieLicense = null, junieLastChecked = null)
+        val json = DashboardSnapshot.build(state).toString()
+        assertTrue(!json.contains("\"junie\""), "empty junie section must be omitted: $json")
+        // And the adapter-side guard: an empty object (older server) → null
+        val withEmptyObj = json.trimEnd('}') + ",\"junie\":{}}"
+        val parsed = RemoteDashboardFetcher.parse(withEmptyObj)
+        assertNotNull(parsed, "empty junie object must not break parsing")
+    }
+
+    @Test
     fun roundTrip_meteredUsagePreserved() {
         val json = DashboardSnapshot.build(fullState()).toString()
         val parsed = RemoteDashboardFetcher.parse(json)

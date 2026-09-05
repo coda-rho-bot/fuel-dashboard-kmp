@@ -179,12 +179,17 @@ object DashboardSnapshot {
 
         // ── Junie balance (connected-mode single-fetch parity) ──────────
         // The legacy /fuel endpoint carried this; mobile's Junie card sync
-        // reads it via the connected adapter's lastFuel.
-        put("junie", buildJsonObject {
-            state.junieBalance?.let { put("balance", it) }
-            state.junieLicense?.let { put("license", it) }
-            state.junieLastChecked?.let { put("last_checked", it) }
-        })
+        // reads it via the connected adapter's lastFuel. Only emitted when
+        // there IS Junie state — an always-present empty object would parse
+        // as balance=0.0 downstream and plant a phantom $0.00 card (review
+        // 1965).
+        if (state.junieBalance != null || state.junieLicense != null || state.junieLastChecked != null) {
+            put("junie", buildJsonObject {
+                state.junieBalance?.let { put("balance", it) }
+                state.junieLicense?.let { put("license", it) }
+                state.junieLastChecked?.let { put("last_checked", it) }
+            })
+        }
     }
 
     private fun kotlinx.serialization.json.JsonObjectBuilder.metered(rows: List<MeteredUsageDisplay>) {
