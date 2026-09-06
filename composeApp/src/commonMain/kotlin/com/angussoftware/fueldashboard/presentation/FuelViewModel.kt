@@ -204,6 +204,15 @@ fun unknownCostModels(rows: List<MeteredUsageDisplay>): List<String> =
         .distinct()
 
 /**
+ * Whether a metered-usage row should show the "cr ?" marker (known-missing
+ * cost for a GLM-family model). Same scope rule as [unknownCostModels]:
+ * non-GLM handles are out of the cost table's scope, not drift.
+ */
+fun shouldShowCostUnknown(label: String, creditCost: Double?, inputTokens: Long, outputTokens: Long): Boolean =
+    creditCost == null && inputTokens + outputTokens > 0 &&
+        label.trim().startsWith("glm", ignoreCase = true)
+
+/**
  * Classifies how a provider's quota works — determines UI treatment.
  * - RATE_WINDOW: Self-healing. Hitting 0 means throttling, not running out.
  *   Examples: z.ai 5h TOKENS_PCT, Letta daily, Letta 4hr.

@@ -94,4 +94,14 @@ class ZaiCreditCostTest {
             MeteredUsageDisplay("local:qwen-32b", 10, 5, 1, creditCost = null),
         )).isEmpty())
     }
+
+    @Test
+    fun costUnknownMarkerFollowsSameScopeRules() {
+        // GLM + unknown + tokens → marker; everything else stays quiet.
+        assertTrue(shouldShowCostUnknown("glm-future", null, 100, 50))
+        assertFalse(shouldShowCostUnknown("junie:gpt-5.6-terra", null, 100, 50)) // non-GLM (review 6089)
+        assertFalse(shouldShowCostUnknown("unknown", null, 100, 50)) // sentinel rows
+        assertFalse(shouldShowCostUnknown("glm-future", 1.0, 100, 50)) // cost known
+        assertFalse(shouldShowCostUnknown("glm-future", null, 0, 0)) // no tokens
+    }
 }

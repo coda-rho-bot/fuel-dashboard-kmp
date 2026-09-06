@@ -179,11 +179,17 @@ private fun MeteredUsageRow(
                     append("${formatTokens(usage.inputTokens)} in / ${formatTokens(usage.outputTokens)} out")
                     append("  ·  ${usage.requestCount} req")
                     // Cost-visibility rule: a known model always shows credits; a
-                    // model missing from the cost table says so explicitly — silent
-                    // omission is how cost tables rot without anyone noticing.
+                    // GLM-family model missing from the cost table says so
+                    // explicitly — silent omission is how cost tables rot.
+                    // Non-GLM handles (junie:*, claude-*, "unknown" sentinel rows,
+                    // ...) are out of the table's scope by design, not drift, so
+                    // they stay unmarked — review 6089: a permanent "cr ?" on
+                    // out-of-scope rows drowns the real drift signal.
                     when {
                         usage.creditCost != null -> append("  ·  ${formatCredits(usage.creditCost)} cr")
-                        showCost && usage.inputTokens + usage.outputTokens > 0 -> append("  ·  cr ?")
+                        showCost && com.angussoftware.fueldashboard.presentation.shouldShowCostUnknown(
+                            usage.label, usage.creditCost, usage.inputTokens, usage.outputTokens,
+                        ) -> append("  ·  cr ?")
                     }
                 },
                 style = MaterialTheme.typography.bodySmall,
