@@ -157,7 +157,7 @@ class AdapterFixtureTest {
         val sand = com.angussoftware.fueldashboard.ui.components.sandFraction(
             session.resetsAt, session.windowHours, nowMs = now,
         )
-        assertEquals(1.0 / 7.0, sand!!, 0.01)
+        assertEquals((1.0 / 7.0).toFloat(), sand!!, 0.01f)
 
         // No reset time → null reset, no window length (gauges render null)
         val noReset = adapter.mapToProviderReport(
