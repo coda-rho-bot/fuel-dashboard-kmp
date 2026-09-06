@@ -5,7 +5,6 @@ import com.angussoftware.fueldashboard.engine.FuelConfig
 import com.angussoftware.fueldashboard.engine.FuelModel
 import com.angussoftware.fueldashboard.engine.FuelProviderConfig
 import com.angussoftware.fueldashboard.engine.ProviderStateInfo
-import com.angussoftware.fueldashboard.engine.decideModel
 import com.angussoftware.fueldashboard.model.AgentConfig
 import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.model.AgentsResponse
