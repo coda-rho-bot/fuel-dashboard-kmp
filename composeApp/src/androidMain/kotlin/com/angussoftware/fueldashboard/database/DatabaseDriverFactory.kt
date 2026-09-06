@@ -6,10 +6,13 @@ import com.angussoftware.fueldashboard.FuelDashboardApplication
 
 actual class DatabaseDriverFactory {
     actual fun createDriver(): SqlDriver {
-        return AndroidSqliteDriver(
+        val driver = AndroidSqliteDriver(
             schema = FuelDatabase.Schema,
             context = FuelDashboardApplication.context,
             name = "fuel-decisions.db",
         )
+        // Same ensure-block pattern as desktop — see PerformanceIndexes.kt
+        ensurePerformanceIndexes(driver)
+        return driver
     }
 }

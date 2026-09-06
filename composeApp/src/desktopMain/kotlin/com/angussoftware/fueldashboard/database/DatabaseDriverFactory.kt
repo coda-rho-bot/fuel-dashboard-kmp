@@ -24,6 +24,7 @@ actual class DatabaseDriverFactory {
         ensureConversationTitlesTable(driver)
         ensureIngestedRunsTable(driver)
         ensureAgentModelHistoryTable(driver)
+        ensurePerformanceIndexes(driver)
         return driver
     }
 

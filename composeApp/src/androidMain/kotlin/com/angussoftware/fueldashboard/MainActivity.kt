@@ -60,13 +60,18 @@ class MainActivity : ComponentActivity() {
 
     private fun wireFuelCallbacks() {
         val viewModel = FuelViewModel.shared
-        val driver = DatabaseDriverFactory().createDriver()
-        val repo = FuelSnapshotRepository(driver)
+        // Process-owned persistence (Architecture review H2): the shared
+        // layer creates ONE driver for the app lifetime (per-Activity
+        // drivers leaked an open SQLite helper each recreation) and runs
+        // the daily retention sweep Android never had.
+        val db = com.angussoftware.fueldashboard.database.AndroidDatabaseLayer.get(applicationContext)
+        val repo = db.repository
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         viewModel.onLogFuelSnapshot = { tokensPct, _, activeAgentCount, activeModels, resetAt ->
             scope.launch {
                 repo.insert(tokensPct, null, activeAgentCount, activeModels, resetAt)
+                db.maybeCleanup()
             }
         }
 

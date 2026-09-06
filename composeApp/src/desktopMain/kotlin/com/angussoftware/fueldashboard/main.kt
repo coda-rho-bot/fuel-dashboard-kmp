@@ -273,11 +273,16 @@ fun main() = application {
             fuelSnapshotRepo.insert(tokensPct, sessionPct, activeAgentCount, activeModels, resetAt)
             // Cleanup runs at most once a day (this callback fires every ~30s
             // with each poll — cleanup() on every snapshot was a hidden
-            // full-table scan 2880×/day).
+            // full-table scan 2880×/day). The sweep covers ALL retained
+            // tables: snapshots (7d), usage_records (90d — its cleanup
+            // existed but had zero callers), decisions (90d — no cleanup
+            // existed at all; architecture review H3).
             val now = System.currentTimeMillis()
             if (now - lastSnapshotCleanup > 24 * 3_600_000L) {
                 lastSnapshotCleanup = now
-                fuelSnapshotRepo.cleanup()
+                runCatching { fuelSnapshotRepo.cleanup() }
+                runCatching { usageRepo.cleanup() }
+                runCatching { repository.cleanup() }
             }
         }
     }

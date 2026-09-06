@@ -150,6 +150,9 @@ ORDER BY SUM(input_tokens) DESC;
 deleteOldUsageRecords:
 DELETE FROM usage_records WHERE timestamp < :cutoff;
 
+deleteOldDecisions:
+DELETE FROM decisions WHERE timestamp < :cutoff;
+
 CREATE TABLE IF NOT EXISTS conversation_titles (
     conversation_id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,
