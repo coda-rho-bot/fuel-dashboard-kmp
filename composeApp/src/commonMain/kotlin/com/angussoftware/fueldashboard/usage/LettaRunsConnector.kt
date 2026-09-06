@@ -246,14 +246,18 @@ class LettaRunsConnector(
     // tombstoned with a "(deleted)" title and never fetched again.
     private val titleFetchFailures = mutableMapOf<String, Int>()
 
-    private fun recordTitleFailure(conversationId: String): Boolean {
-        val count = (titleFetchFailures[conversationId] ?: 0) + 1
-        titleFetchFailures[conversationId] = count
-        return count >= TITLE_FAILURE_TOMBSTONE
-    }
+    // Mutex-guarded (review 1983): the map is touched from two coroutine
+    // contexts (managerScope backfill + serverScope display gap-fill) —
+    // an unguarded HashMap risks lost increments and rare resize corruption.
+    private suspend fun recordTitleFailure(conversationId: String): Boolean =
+        titleFetchMutex.withLock {
+            val count = (titleFetchFailures[conversationId] ?: 0) + 1
+            titleFetchFailures[conversationId] = count
+            count >= TITLE_FAILURE_TOMBSTONE
+        }
 
-    private fun recordTitleSuccess(conversationId: String) {
-        titleFetchFailures.remove(conversationId)
+    private suspend fun recordTitleSuccess(conversationId: String) {
+        titleFetchMutex.withLock { titleFetchFailures.remove(conversationId) }
     }
 
     override suspend fun ensureConversationTitles(conversationIds: List<String>) {
