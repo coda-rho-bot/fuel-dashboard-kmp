@@ -107,6 +107,68 @@ class AdapterFixtureTest {
         assertEquals(0, report.remainingPct)
     }
 
+    @Test
+    fun zai_missingTokensLimit_headlineUnknownNotFabricated100() {
+        // Adversarial review H4: TOKENS_LIMIT absent must NOT fabricate a
+        // 100%-full headline — that invents data for the waste tiles and
+        // advisor regime. Only the session window is reported.
+        val adapter = ZaiProviderAdapter("zai-test", "fake-key")
+        val response = ZaiQuotaResponse(
+            success = true,
+            data = ZaiQuotaData(
+                limits = listOf(
+                    ZaiQuotaLimit(type = "SESSION_LIMIT", percentage = 30, nextResetTime = null),
+                ),
+            ),
+        )
+        val report = adapter.mapToProviderReport(response)
+
+        assertTrue(report.available) // session window present
+        assertNull(report.remainingPct, "headline must be unknown when TOKENS_LIMIT is absent")
+        assertNull(report.resetsAt)
+    }
+
+    @Test
+    fun zai_sessionWindow_derivesTrueWeeklyLength_notHardcoded5h() {
+        // Adversarial review H3: the session quota resets ~weekly; a hardcoded
+        // windowHours=5.0 pinned the hourglass full for days. With a reset
+        // 7 days out, the session window must carry ~168h; with no reset
+        // time, no fabricated horizon.
+        val adapter = ZaiProviderAdapter("zai-test", "fake-key")
+        val now = com.angussoftware.fueldashboard.util.epochMillis()
+        val weeklyReset = now + 7 * 24 * 3_600_000L
+        val response = ZaiQuotaResponse(
+            success = true,
+            data = ZaiQuotaData(
+                limits = listOf(
+                    ZaiQuotaLimit(type = "TOKENS_LIMIT", percentage = 50, nextResetTime = now + 3_600_000L),
+                    ZaiQuotaLimit(type = "SESSION_LIMIT", percentage = 10, nextResetTime = weeklyReset),
+                ),
+            ),
+        )
+        val report = adapter.mapToProviderReport(response)
+        val session = report.windows.first { it.name == "Session" }
+        assertEquals(weeklyReset, session.resetsAt)
+        assertEquals(168.0, session.windowHours, 1.0) // ~7 days, not 5h
+        assertFalse(session.resetEstimated)
+
+        // No reset time → no window length, no fabricated reset horizon
+        val noReset = adapter.mapToProviderReport(
+            ZaiQuotaResponse(
+                success = true,
+                data = ZaiQuotaData(
+                    limits = listOf(
+                        ZaiQuotaLimit(type = "TOKENS_LIMIT", percentage = 50, nextResetTime = null),
+                        ZaiQuotaLimit(type = "SESSION_LIMIT", percentage = 10, nextResetTime = null),
+                    ),
+                ),
+            ),
+        )
+        val sessionNoReset = noReset.windows.first { it.name == "Session" }
+        assertNull(sessionNoReset.resetsAt, "no fabricated reset for session window")
+        assertEquals(0.0, sessionNoReset.windowHours)
+    }
+
     // -----------------------------------------------------------------------
     // DeepSeek
     // -----------------------------------------------------------------------

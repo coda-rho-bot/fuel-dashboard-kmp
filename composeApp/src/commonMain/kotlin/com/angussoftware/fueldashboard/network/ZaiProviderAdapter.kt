@@ -74,9 +74,12 @@ class ZaiProviderAdapter(
         val now = epochMillis()
         val windows = mutableListOf<ReportWindow>()
 
-        // Parse token limit
-        val tokensUsedPct = tokensLimit?.percentage ?: 0
-        val tokensRemaining = (100 - tokensUsedPct).coerceIn(0, 100)
+        // Parse token limit. When the API omits TOKENS_LIMIT the headline
+        // must be UNKNOWN (null), not a fabricated 100% — "100% fuel" from a
+        // missing field feeds the waste tiles, advisor regime, and alert
+        // suppression with invented data (adversarial review H4).
+        val tokensUsedPct: Int? = tokensLimit?.percentage
+        val tokensRemaining: Int? = tokensUsedPct?.let { (100 - it).coerceIn(0, 100) }
         // Fallback: if API doesn't return nextResetTime, compute from window size
         val tokenResetTime = tokensLimit?.nextResetTime
         val resetMs = tokenResetTime ?: (now + WINDOW_MS)
@@ -86,7 +89,7 @@ class ZaiProviderAdapter(
             windows.add(
                 ReportWindow(
                     name = "5h Token Window",
-                    remainingPct = tokensRemaining,
+                    remainingPct = tokensRemaining ?: 100,
                     resetsAt = resetMs,
                     windowHours = WINDOW_HOURS,
                     resetEstimated = tokenResetEstimated,
@@ -98,12 +101,21 @@ class ZaiProviderAdapter(
             val sessionUsed = sessionLimit.percentage
             val sessionRemaining = (100 - sessionUsed).coerceIn(0, 100)
             val sessionResetTime = sessionLimit.nextResetTime
+            // The session quota resets on a ~WEEKLY cadence — hardcoding
+            // windowHours=5.0 pinned the hourglass full and timeRemainingPct
+            // at 100 for days (adversarial review H3). Derive the true
+            // window length from the reset time; when unknown, report no
+            // window length (gauges render null) and NO fabricated reset.
+            val sessionWindowHours = sessionResetTime?.let { reset ->
+                ((reset - now).coerceAtLeast(0) / 3_600_000.0)
+                    .takeIf { it > 0 && it < 24.0 * 45 } // sane: <45 days
+            }
             windows.add(
                 ReportWindow(
                     name = "Session",
                     remainingPct = sessionRemaining,
-                    resetsAt = sessionResetTime ?: (now + WINDOW_MS),
-                    windowHours = WINDOW_HOURS,
+                    resetsAt = sessionResetTime,
+                    windowHours = sessionWindowHours ?: 0.0,
                     resetEstimated = sessionResetTime == null,
                 ),
             )
@@ -114,12 +126,12 @@ class ZaiProviderAdapter(
             displayName = displayName,
             type = providerType,
             remainingPct = tokensRemaining,
-            resetsAt = resetMs,
-            windowHours = WINDOW_HOURS,
+            resetsAt = if (tokensLimit != null) resetMs else null,
+            windowHours = if (tokensLimit != null) WINDOW_HOURS else 0.0,
             resetEstimated = tokenResetEstimated,
             available = windows.isNotEmpty(),
             windows = windows,
-            rawDisplay = "tokens:${tokensUsedPct}%" +
+            rawDisplay = (tokensUsedPct?.let { "tokens:$it%" } ?: "tokens:—") +
                 (sessionLimit?.let { " session:${it.percentage}%" } ?: ""),
         )
     }

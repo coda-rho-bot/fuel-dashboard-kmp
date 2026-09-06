@@ -78,6 +78,61 @@ class FuelAdvisorTest {
     }
 
     @Test
+    fun thresholdOscillationCountsAsOneEvent() {
+        // Adversarial review H1: a provider parked at 5↔6% for an evening at
+        // 60s polling produced dozens of crossings — each previously counted
+        // as a separate exhaustion, reaching PRESSURE_EXHAUSTION_COUNT from
+        // one bad evening. With hysteresis + clustering it is ONE event.
+        val snaps = buildList {
+            add(snap(now - 10 * hour, 40.0))
+            var t = now - 9 * hour
+            var low = true
+            repeat(60) { // one minute polls for an hour, oscillating
+                add(snap(t, if (low) 5.0 else 6.0))
+                t += 60_000L
+                low = !low
+            }
+            add(snap(now - 8 * hour, 70.0)) // real recovery
+            add(snap(now, 70.0))
+        }
+        val regime = FuelAdvisor.quotaRegime(snaps, now, resetAt = now + 3 * hour)
+        assertEquals(1, regime.exhaustions, "boundary oscillation is one exhaustion event")
+    }
+
+    @Test
+    fun bandedRecoveryWithinClusterWindowMergesIntoSameEvent() {
+        // Recovery well above the band (>8%) that does not LAST 6h before
+        // dropping again merges into the same event — a brief bounce is not
+        // a separate exhaustion.
+        val snaps = listOf(
+            snap(now - 20 * hour, 4.0),
+            snap(now - 19 * hour, 4.0),
+            snap(now - 18 * hour, 30.0), // banded recovery
+            snap(now - 14 * hour, 4.0),  // dropped again within 6h → same event
+            snap(now - 13 * hour, 70.0),
+            snap(now, 70.0),
+        )
+        val regime = FuelAdvisor.quotaRegime(snaps, now, resetAt = now + 3 * hour)
+        assertEquals(1, regime.exhaustions, "short-lived recovery merges into the exhaustion event")
+    }
+
+    @Test
+    fun sustainedRecoveryPastClusterWindowCountsSeparateEvent() {
+        // Same bounce, but the recovery lasts >= 6h before re-exhausting —
+        // genuinely two distinct events.
+        val snaps = listOf(
+            snap(now - 30 * hour, 4.0),
+            snap(now - 29 * hour, 30.0),  // banded recovery at t-29h
+            snap(now - 22 * hour, 50.0),  // still recovered 7h later (past cluster)
+            snap(now - 21 * hour, 3.0),   // new exhaustion
+            snap(now - 20 * hour, 70.0),
+            snap(now, 70.0),
+        )
+        val regime = FuelAdvisor.quotaRegime(snaps, now, resetAt = now + 3 * hour)
+        assertEquals(2, regime.exhaustions)
+    }
+
+    @Test
     fun quotaRegimeProjectsRemainingFalling() {
         // remaining 80 → 60 over 2h = burning 10%/hr; 2h to reset:
         // projected remaining = 60 − 10×2 = 40

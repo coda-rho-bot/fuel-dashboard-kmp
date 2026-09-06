@@ -90,6 +90,11 @@ object FuelAdvisor {
      *  tokensPct in fuel_snapshots is REMAINING % (0 = exhausted, 100 = full). */
     const val EXHAUSTION_THRESHOLD_PCT = 5.0
 
+    /** Recovery must exceed the threshold by this band to count — integer
+     *  rounding and sliding-window ebb at the boundary must not oscillate
+     *  one event into dozens (adversarial review H1). */
+    const val EXHAUSTION_HYSTERESIS_PCT = 3.0
+
     /** >= this many exhaustions in the analysis span = persistent pressure. */
     const val PRESSURE_EXHAUSTION_COUNT = 4
 
@@ -114,15 +119,37 @@ object FuelAdvisor {
         val withPct = snapshots.mapNotNull { s -> s.tokensPct?.let { s.timestamp to it } }
             .sortedBy { it.first }
 
-        // Exhaustion events: remaining falls to/below threshold. Clustering keys
-        // on RECOVERY above the threshold (a poll gap within an exhausted
-        // plateau must not split one event into many), with a time cap.
+        // Exhaustion events: remaining falls to/below threshold. Clustering
+        // (adversarial review H1): remainingPct is integer-rounded and the
+        // sliding window ebbs — a provider parked at 5↔6% for one evening
+        // produces dozens of threshold crossings, each previously counted as
+        // a separate "exhaustion", inflating to false PersistentPressure
+        // advice. Two guards: (a) hysteresis — a recovery must exceed the
+        // threshold by [EXHAUSTION_HYSTERESIS_PCT] to count at all; (b) time
+        // clustering — even a banded recovery only splits the event if it
+        // lasts [EXHAUSTION_CLUSTER_MS]; a drop returning within the cluster
+        // window merges into the same exhaustion.
         var exhaustions = 0
         var inExhaustion = false
-        for ((_, pct) in withPct) {
-            val exhausted = pct <= EXHAUSTION_THRESHOLD_PCT
-            if (exhausted && !inExhaustion) exhaustions++
-            inExhaustion = exhausted
+        var recoveredAtMs: Long? = null
+        for ((ts, pct) in withPct) {
+            if (pct <= EXHAUSTION_THRESHOLD_PCT) {
+                if (!inExhaustion) {
+                    val recovered = recoveredAtMs
+                    if (recovered == null || ts - recovered >= EXHAUSTION_CLUSTER_MS) {
+                        exhaustions++
+                    }
+                    inExhaustion = true
+                    recoveredAtMs = null
+                }
+            } else if (inExhaustion) {
+                if (pct > EXHAUSTION_THRESHOLD_PCT + EXHAUSTION_HYSTERESIS_PCT) {
+                    recoveredAtMs = ts
+                    inExhaustion = false
+                }
+                // Recovery inside the hysteresis band (5↔6-8 oscillation)
+                // stays inside the ongoing exhaustion event.
+            }
         }
 
         // Burn rate from the last 2h of data
