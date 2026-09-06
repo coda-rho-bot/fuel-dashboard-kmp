@@ -631,6 +631,9 @@ class FuelViewModel {
     private fun applySettings(newSettings: MultiProviderSettings) {
         stopPolling()
         closeAdapters()
+        // Invalidate any in-flight refresh built on the old configuration
+        // (see configGeneration) BEFORE mutating adapter state.
+        configGeneration.incrementAndGet()
         // Reset per-provider poll scheduling: the immediate post-save refresh
         // must treat every provider as due, or tiles stay blank until each
         // provider's interval elapses (review 1815). Failure backoff resets
@@ -1077,7 +1080,16 @@ class FuelViewModel {
     /** Consecutive poll failures per provider — drives exponential backoff. */
     private val consecutiveFailures = mutableMapOf<String, Int>()
 
+    /**
+     * Bumped on every applySettings. refresh() captures it at start and
+     * discards its results (logging + state write) if it changed mid-flight —
+     * kills the ghost-provider race where an in-flight refresh resurrects
+     * just-removed providers into state, seeding them forever.
+     */
+    private val configGeneration = java.util.concurrent.atomic.AtomicLong(0)
+
     private suspend fun refresh() = refreshMutex.withLock {
+        val generationAtStart = configGeneration.get()
         // Snapshot adapters to avoid ConcurrentModificationException if
         // applySettings mutates the map during iteration.
         val adapterSnapshot = adapters.toList()
@@ -1120,6 +1132,15 @@ class FuelViewModel {
                 }
             }
         }.awaitAll()
+
+        // Generation guard (1 of 2): if settings changed while our polls were
+        // in flight (applySettings runs OUTSIDE refreshMutex), this refresh's
+        // results belong to a superseded configuration — skip the logging
+        // side effects; the final state write re-checks (2 of 2) inside the
+        // CAS loop, which closes the race completely: if applySettings wins
+        // the CAS first, our update lambda re-runs against the new state and
+        // the generation check discards the stale write (ghost-provider fix).
+        if (configGeneration.get() != generationAtStart) return
 
         val reports = mutableMapOf<String, ProviderReport>()
         val errors = mutableMapOf<String, String>()
@@ -1368,8 +1389,19 @@ class FuelViewModel {
         val dataPoints = primaryBurnRate?.history?.size ?: 0
         val burnRate = primaryBurnRate?.burnRatePerHr
 
-        _state.update { it.copy(
-            providerReports = reports,
+        _state.update { current ->
+            // Generation guard (2 of 2): a refresh that crossed a settings
+            // change must not resurrect removed providers (ghost tiles +
+            // phantom DB writes). MutableStateFlow.update is a CAS loop —
+            // re-checking here makes the discard atomic with the write.
+            if (configGeneration.get() != generationAtStart) {
+                current.copy(isLoading = false)
+            } else {
+                current.copy(
+            // Merge, not replace: fresh polls win per-key; non-polled and
+            // out-of-band writes (e.g. checkJunieCredits) survive instead of
+            // being clobbered by the next refresh's wholesale copy.
+            providerReports = current.providerReports + reports,
             providerErrors = errors,
             fuel = fuel,
             decisions = decisions,
@@ -1394,7 +1426,9 @@ class FuelViewModel {
             wasteByProvider = intelligence?.wasteByProvider ?: remoteIntelligence?.wasteByProvider ?: emptyList(),
             fuelEvents = intelligence?.fuelEvents ?: remoteIntelligence?.fuelEvents ?: emptyList(),
             fuelAdvice = intelligence?.advice ?: remoteIntelligence?.advice,
-        ) }
+                )
+            }
+        }
 
         // Merge orchestrator agents into acpAgents so they show in the AgentPanel
         // (works on both desktop and mobile — desktop gets ACP agents via main.kt,
