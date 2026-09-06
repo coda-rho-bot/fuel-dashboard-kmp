@@ -129,30 +129,37 @@ class AdapterFixtureTest {
     }
 
     @Test
-    fun zai_sessionWindow_derivesTrueWeeklyLength_notHardcoded5h() {
-        // Adversarial review H3: the session quota resets ~weekly; a hardcoded
-        // windowHours=5.0 pinned the hourglass full for days. With a reset
-        // 7 days out, the session window must carry ~168h; with no reset
-        // time, no fabricated horizon.
+    fun zai_sessionWindow_fixedWeeklyLength_notDerivedFromTimeRemaining() {
+        // Review 1975: windowHours is the TOTAL window duration in every
+        // consumer (sandFraction = remaining/total). Deriving it from
+        // resetsAt-now made total ≡ remaining → hourglass pinned 100% all
+        // week. The weekly quota's length is a type constant (168h; docs:
+        // "resets every 7 days"). Mid-window: reset 1 day out (6d into the
+        // week) must still report 168h — sand ≈ 14%.
         val adapter = ZaiProviderAdapter("zai-test", "fake-key")
         val now = com.angussoftware.fueldashboard.util.epochMillis()
-        val weeklyReset = now + 7 * 24 * 3_600_000L
+        val oneDayOutReset = now + 24 * 3_600_000L
         val response = ZaiQuotaResponse(
             success = true,
             data = ZaiQuotaData(
                 limits = listOf(
                     ZaiQuotaLimit(type = "TOKENS_LIMIT", percentage = 50, nextResetTime = now + 3_600_000L),
-                    ZaiQuotaLimit(type = "SESSION_LIMIT", percentage = 10, nextResetTime = weeklyReset),
+                    ZaiQuotaLimit(type = "SESSION_LIMIT", percentage = 10, nextResetTime = oneDayOutReset),
                 ),
             ),
         )
         val report = adapter.mapToProviderReport(response)
         val session = report.windows.first { it.name == "Session" }
-        assertEquals(weeklyReset, session.resetsAt)
-        assertEquals(168.0, session.windowHours, 1.0) // ~7 days, not 5h
+        assertEquals(oneDayOutReset, session.resetsAt)
+        assertEquals(168.0, session.windowHours, 0.001) // weekly length, not 1h
         assertFalse(session.resetEstimated)
+        // Mid-week: sand = 24h remaining / 168h window ≈ 14%
+        val sand = com.angussoftware.fueldashboard.ui.components.sandFraction(
+            session.resetsAt, session.windowHours, nowMs = now,
+        )
+        assertEquals(1.0 / 7.0, sand!!, 0.01)
 
-        // No reset time → no window length, no fabricated reset horizon
+        // No reset time → null reset, no window length (gauges render null)
         val noReset = adapter.mapToProviderReport(
             ZaiQuotaResponse(
                 success = true,

@@ -43,6 +43,8 @@ class ZaiProviderAdapter(
         private const val QUOTA_PATH = "/api/monitor/usage/quota/limit"
         private const val WINDOW_HOURS = 5.0
         private const val WINDOW_MS = (5 * 60 * 60 * 1000).toLong() // 5 hours
+        /** Session (weekly) quota window length — docs: "resets every 7 days". */
+        private const val SESSION_WINDOW_HOURS = 168.0
     }
 
     override suspend fun poll(): ProviderReport {
@@ -101,22 +103,22 @@ class ZaiProviderAdapter(
             val sessionUsed = sessionLimit.percentage
             val sessionRemaining = (100 - sessionUsed).coerceIn(0, 100)
             val sessionResetTime = sessionLimit.nextResetTime
-            // The session quota resets on a ~WEEKLY cadence — hardcoding
-            // windowHours=5.0 pinned the hourglass full and timeRemainingPct
-            // at 100 for days (adversarial review H3). Derive the true
-            // window length from the reset time; when unknown, report no
-            // window length (gauges render null) and NO fabricated reset.
-            val sessionWindowHours = sessionResetTime?.let { reset ->
-                ((reset - now).coerceAtLeast(0) / 3_600_000.0)
-                    .takeIf { it > 0 && it < 24.0 * 45 } // sane: <45 days
-            }
+            // The session quota is the WEEKLY limit — "resets every 7 days"
+            // (docs.z.ai/devpack/overview). The window LENGTH is a type
+            // constant, NOT derivable from resetsAt (deriving it makes
+            // total ≡ remaining → hourglass pinned at 100% all week; review
+            // 1975). A resetsAt outside sane bounds is treated as absent.
+            val sessionResetValid = sessionResetTime?.let { reset ->
+                val ms = reset - now
+                ms in 0..(45L * 24 * 3_600_000) // sane: 0..45 days out
+            } == true
             windows.add(
                 ReportWindow(
                     name = "Session",
                     remainingPct = sessionRemaining,
-                    resetsAt = sessionResetTime,
-                    windowHours = sessionWindowHours ?: 0.0,
-                    resetEstimated = sessionResetTime == null,
+                    resetsAt = if (sessionResetValid) sessionResetTime else null,
+                    windowHours = if (sessionResetValid) SESSION_WINDOW_HOURS else 0.0,
+                    resetEstimated = !sessionResetValid,
                 ),
             )
         }
