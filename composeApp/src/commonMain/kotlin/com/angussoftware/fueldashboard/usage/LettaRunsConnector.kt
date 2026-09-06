@@ -100,6 +100,13 @@ class LettaRunsConnector(
             return UsageSourceConnector.PollResult(0, listOf("runs parse failed: ${e.message}"))
         }
 
+        // Full batch = possible overflow: more runs completed between polls
+        // than one page holds; older ones scrolled past unobserved. Surface
+        // it so the undercount is visible (see RUNS_BATCH).
+        if (runs.size >= RUNS_BATCH) {
+            errors.add("runs batch full ($RUNS_BATCH) — possible missed runs; consider faster polling")
+        }
+
         for (run in runs) {
             if (run.completed_at == null) continue // still executing — usage not final
             val createdAt = run.created_at?.let { parseIsoMillis(it) } ?: continue
@@ -117,6 +124,17 @@ class LettaRunsConnector(
                 // Fetch failed AFTER claiming — release the claim so a later
                 // poll retries instead of permanently skipping this run.
                 ingestionRepository.releaseRun(id, run.id)
+                continue
+            }
+
+            // Non-2xx bodies (429/5xx error pages) decode "successfully" into
+            // all-null fields — that previously flowed into the zero-token
+            // continue below, permanently dropping the run's tokens with no
+            // error and no retry (efficiency audit HIGH-2). All-null is an
+            // error body: release and retry like any fetch failure.
+            if (usage.prompt_tokens == null && usage.completion_tokens == null && usage.total_tokens == null) {
+                ingestionRepository.releaseRun(id, run.id)
+                errors.add("usage body had no token fields for ${run.id} (non-2xx or schema change)")
                 continue
             }
 
@@ -220,6 +238,24 @@ class LettaRunsConnector(
     private val titleFetchMutex = kotlinx.coroutines.sync.Mutex()
     private val inFlightTitleFetches = mutableSetOf<String>()
 
+    // Consecutive title-fetch failures per conversation. Deleted conversations
+    // 404 forever; without a circuit breaker they were re-fetched every 30s
+    // refresh + every 30-min backfill, indefinitely (efficiency audit
+    // HIGH-3: up to ~2,880 dead requests/day per unresolvable conversation).
+    // After TITLE_FAILURE_TOMBSTONE consecutive failures the conversation is
+    // tombstoned with a "(deleted)" title and never fetched again.
+    private val titleFetchFailures = mutableMapOf<String, Int>()
+
+    private fun recordTitleFailure(conversationId: String): Boolean {
+        val count = (titleFetchFailures[conversationId] ?: 0) + 1
+        titleFetchFailures[conversationId] = count
+        return count >= TITLE_FAILURE_TOMBSTONE
+    }
+
+    private fun recordTitleSuccess(conversationId: String) {
+        titleFetchFailures.remove(conversationId)
+    }
+
     override suspend fun ensureConversationTitles(conversationIds: List<String>) {
         val known = usageRepository.getConversationTitles().keys
         val toFetch = titleFetchMutex.withLock {
@@ -233,15 +269,24 @@ class LettaRunsConnector(
                 val body = try {
                     httpFetch("/v1/conversations/$id")
                 } catch (e: Exception) {
+                    if (recordTitleFailure(id)) {
+                        // Tombstone: permanently unresolvable (deleted) —
+                        // stops the forever-retry cycle.
+                        usageRepository.upsertConversationTitle(id, "$id (deleted)")
+                    }
                     continue
                 }
             val conv = try {
                 json.decodeFromString(LettaConversation.serializer(), body)
             } catch (e: Exception) {
+                if (recordTitleFailure(id)) {
+                    usageRepository.upsertConversationTitle(id, "$id (deleted)")
+                }
                 continue
             }
             val summary = conv.summary?.trim().takeUnless { it.isNullOrEmpty() }
                 usageRepository.upsertConversationTitle(conv.id, summary ?: fallbackTitle(conv.agent_id, conv.created_at))
+                recordTitleSuccess(id)
             }
         } finally {
             titleFetchMutex.withLock { inFlightTitleFetches.removeAll(toFetch) }
@@ -261,16 +306,24 @@ class LettaRunsConnector(
             val body = try {
                 httpFetch("/v1/conversations/$convId")
             } catch (e: Exception) {
-                continue // non-fatal: try again next cycle
+                if (recordTitleFailure(convId)) {
+                    // Tombstoned — drops out of "untitled" forever
+                    usageRepository.upsertConversationTitle(convId, "$convId (deleted)")
+                }
+                continue
             }
             val conv = try {
                 json.decodeFromString(LettaConversation.serializer(), body)
             } catch (e: Exception) {
+                if (recordTitleFailure(convId)) {
+                    usageRepository.upsertConversationTitle(convId, "$convId (deleted)")
+                }
                 continue
             }
             val summary = conv.summary?.trim().takeUnless { it.isNullOrEmpty() }
             val title = summary ?: fallbackTitle(conv.agent_id, conv.created_at)
             usageRepository.upsertConversationTitle(conv.id, title)
+            recordTitleSuccess(conv.id)
         }
     }
 
@@ -292,8 +345,15 @@ class LettaRunsConnector(
     }
 
     companion object {
-        private const val RUNS_BATCH = 200
+        // Runs per poll. No pagination cursor exists on the runs list — if
+        // more than this many runs complete between 5-min polls (parallel
+        // fleets can), older ones scroll past and are lost (undercount in
+        // exactly the high-usage scenarios that matter most). 500 narrows
+        // the burst window 2.5x; a full batch is reported as an error so
+        // the overflow is visible instead of silent.
+        private const val RUNS_BATCH = 500
         private const val CONVERSATION_TITLE_PAGES = 5 // up to 1000 conversations
         private const val TITLE_BACKFILL_BATCH = 50 // direct-ID fetches per cycle
+        private const val TITLE_FAILURE_TOMBSTONE = 3 // consecutive fails → "(deleted)"
     }
 }
