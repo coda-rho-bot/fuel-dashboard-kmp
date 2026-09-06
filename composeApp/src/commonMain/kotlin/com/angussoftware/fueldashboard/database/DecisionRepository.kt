@@ -59,4 +59,13 @@ class DecisionRepository(driver: SqlDriver) {
             )
         }
     }
+
+    /**
+     * Retention sweep — decisions had NO cleanup at all (architecture review
+     * H3): months of fleet telemetry accumulated unbounded with one row per
+     * recommendation change AND per process restart.
+     */
+    fun cleanup(olderThanMs: Long = 90L * 24 * 3_600_000) {
+        queries.deleteOldDecisions(epochMillis() - olderThanMs)
+    }
 }
