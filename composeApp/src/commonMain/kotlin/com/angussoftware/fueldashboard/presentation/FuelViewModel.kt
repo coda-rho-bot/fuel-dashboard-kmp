@@ -187,6 +187,18 @@ fun zaiCreditCost(model: String, inputTokens: Long, outputTokens: Long): Double?
     ZaiCreditMultipliers.cost(model, inputTokens, outputTokens)
 
 /**
+ * Models whose metered usage carries no credit cost because they're absent
+ * from the cost table. Multipliers come from z.ai's published docs (no
+ * discovery API), so the table is hand-maintained — this is the drift
+ * signal that says when it needs an update, instead of silently
+ * under-reporting credits.
+ */
+fun unknownCostModels(rows: List<MeteredUsageDisplay>): List<String> =
+    rows.filter { it.creditCost == null && it.inputTokens + it.outputTokens > 0 }
+        .map { it.label }
+        .distinct()
+
+/**
  * Classifies how a provider's quota works — determines UI treatment.
  * - RATE_WINDOW: Self-healing. Hitting 0 means throttling, not running out.
  *   Examples: z.ai 5h TOKENS_PCT, Letta daily, Letta 4hr.

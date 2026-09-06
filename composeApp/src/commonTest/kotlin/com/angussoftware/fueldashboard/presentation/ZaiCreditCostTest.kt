@@ -57,4 +57,30 @@ class ZaiCreditCostTest {
         assertFalse(ZaiCreditMultipliers.known("claude-3"))
         assertTrue(ZaiCreditMultipliers.known("glm-4.7"))
     }
+
+    @Test
+    fun unknownCostModelsFlagsOnlyZeroCostRowsWithTokens() {
+        val rows = listOf(
+            MeteredUsageDisplay("glm-5.3", 1000, 200, 3, creditCost = 1.0), // known — not flagged
+            MeteredUsageDisplay("glm-new", 500, 100, 2, creditCost = null), // unknown with tokens — flagged
+            MeteredUsageDisplay("glm-4.7", 0, 0, 1, creditCost = null), // zero tokens — not flagged
+            MeteredUsageDisplay("another-new", 10, 5, 1, creditCost = null), // flagged
+        )
+
+        assertEquals(listOf("glm-new", "another-new"), unknownCostModels(rows))
+    }
+
+    @Test
+    fun unknownCostModelsDeduplicatesAndIgnoresKnownOnlyLists() {
+        assertEquals(
+            listOf("glm-future"),
+            unknownCostModels(listOf(
+                MeteredUsageDisplay("glm-future", 100, 0, 1, creditCost = null),
+                MeteredUsageDisplay("glm-future", 0, 50, 1, creditCost = null),
+            )),
+        )
+        assertTrue(unknownCostModels(listOf(
+            MeteredUsageDisplay("glm-5.3", 1000, 200, 3, creditCost = 1.0),
+        )).isEmpty())
+    }
 }

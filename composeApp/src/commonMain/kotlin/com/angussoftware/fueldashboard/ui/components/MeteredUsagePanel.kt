@@ -122,6 +122,23 @@ fun MeteredUsagePanel(
         val maxModelTokens = (byModel.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1)
         PagedRows(byModel) { MeteredUsageRow(it, maxModelTokens, showCost = true) }
 
+        // Cost-table drift signal: usage rows for models absent from the cost
+        // table carry no credits — surface the gap instead of under-reporting
+        // silently. (Multipliers come from z.ai's published docs; there is no
+        // discovery API, so the table is maintained by hand and needs to say
+        // when it's stale.)
+        val unknownCostModels =
+            com.angussoftware.fueldashboard.presentation.unknownCostModels(byModel)
+        if (unknownCostModels.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "⚠ ${unknownCostModels.size} model(s) missing from the z.ai cost table — " +
+                    "credits not counted: ${unknownCostModels.joinToString(", ")}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
         if (byConversation.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
             Text(
@@ -161,7 +178,13 @@ private fun MeteredUsageRow(
                 text = buildString {
                     append("${formatTokens(usage.inputTokens)} in / ${formatTokens(usage.outputTokens)} out")
                     append("  ·  ${usage.requestCount} req")
-                    usage.creditCost?.let { append("  ·  ${formatCredits(it)} cr") }
+                    // Cost-visibility rule: a known model always shows credits; a
+                    // model missing from the cost table says so explicitly — silent
+                    // omission is how cost tables rot without anyone noticing.
+                    when {
+                        usage.creditCost != null -> append("  ·  ${formatCredits(usage.creditCost)} cr")
+                        showCost && usage.inputTokens + usage.outputTokens > 0 -> append("  ·  cr ?")
+                    }
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
