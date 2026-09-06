@@ -62,12 +62,12 @@ class ZaiCreditCostTest {
     fun unknownCostModelsFlagsOnlyZeroCostRowsWithTokens() {
         val rows = listOf(
             MeteredUsageDisplay("glm-5.3", 1000, 200, 3, creditCost = 1.0), // known — not flagged
-            MeteredUsageDisplay("glm-new", 500, 100, 2, creditCost = null), // unknown with tokens — flagged
+            MeteredUsageDisplay("glm-new", 500, 100, 2, creditCost = null), // unknown GLM with tokens — flagged
             MeteredUsageDisplay("glm-4.7", 0, 0, 1, creditCost = null), // zero tokens — not flagged
-            MeteredUsageDisplay("another-new", 10, 5, 1, creditCost = null), // flagged
+            MeteredUsageDisplay("another-new", 10, 5, 1, creditCost = null), // non-GLM — out of scope, not flagged
         )
 
-        assertEquals(listOf("glm-new", "another-new"), unknownCostModels(rows))
+        assertEquals(listOf("glm-new"), unknownCostModels(rows))
     }
 
     @Test
@@ -81,6 +81,17 @@ class ZaiCreditCostTest {
         )
         assertTrue(unknownCostModels(listOf(
             MeteredUsageDisplay("glm-5.3", 1000, 200, 3, creditCost = 1.0),
+        )).isEmpty())
+    }
+
+    @Test
+    fun unknownCostModelsExcludesNonGlmModelsReportedByUniversalTool() {
+        // report_usage is universal — any model string can appear. Non-GLM
+        // handles are out of the z.ai table's scope, not drift.
+        assertTrue(unknownCostModels(listOf(
+            MeteredUsageDisplay("claude-sonnet-5", 1000, 200, 3, creditCost = null),
+            MeteredUsageDisplay("gpt-5.6-luna", 500, 100, 2, creditCost = null),
+            MeteredUsageDisplay("local:qwen-32b", 10, 5, 1, creditCost = null),
         )).isEmpty())
     }
 }

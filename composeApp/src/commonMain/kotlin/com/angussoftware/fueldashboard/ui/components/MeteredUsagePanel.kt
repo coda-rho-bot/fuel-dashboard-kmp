@@ -132,7 +132,7 @@ fun MeteredUsagePanel(
         if (unknownCostModels.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "⚠ ${unknownCostModels.size} model(s) missing from the z.ai cost table — " +
+                text = "⚠ ${unknownCostModels.size} GLM model(s) missing from the z.ai cost table — " +
                     "credits not counted: ${unknownCostModels.joinToString(", ")}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,

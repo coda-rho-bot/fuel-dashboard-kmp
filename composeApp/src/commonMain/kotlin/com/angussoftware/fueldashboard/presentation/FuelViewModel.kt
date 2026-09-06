@@ -187,15 +187,20 @@ fun zaiCreditCost(model: String, inputTokens: Long, outputTokens: Long): Double?
     ZaiCreditMultipliers.cost(model, inputTokens, outputTokens)
 
 /**
- * Models whose metered usage carries no credit cost because they're absent
- * from the cost table. Multipliers come from z.ai's published docs (no
+ * Models whose metered usage carries no credit cost although they look like
+ * z.ai GLM-family models. Multipliers come from z.ai's published docs (no
  * discovery API), so the table is hand-maintained — this is the drift
  * signal that says when it needs an update, instead of silently
  * under-reporting credits.
+ *
+ * Non-GLM models (claude-*, gpt-*, local handles reported via report_usage)
+ * are out of the table's scope by design, not drift — they are excluded so
+ * the warning only fires when a plausible z.ai model is actually missing.
  */
 fun unknownCostModels(rows: List<MeteredUsageDisplay>): List<String> =
     rows.filter { it.creditCost == null && it.inputTokens + it.outputTokens > 0 }
-        .map { it.label }
+        .map { it.label.trim() }
+        .filter { it.startsWith("glm", ignoreCase = true) }
         .distinct()
 
 /**
