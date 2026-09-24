@@ -25,11 +25,47 @@ internal actual suspend fun runSwitchCommand(
     }
 
     try {
-        // Read before waiting: a command that fills the pipe buffer would
-        // block forever if we waited first.
-        val output = process.inputStream.bufferedReader().use { it.readText() }
-        if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
+        // Bounded tail-read on a separate thread. Two hazards for streaming
+        // commands (`yes`):
+        //  1. readText() blocks until EOF, which only comes when the process
+        //     dies — so the timeout watchdog must be able to kill the process
+        //     without waiting for the read (hence the separate thread).
+        //  2. An unbounded read accumulates output at pipe speed and blows the
+        //     heap before the timeout fires (the OOM closes the stream, the
+        //     command SIGPIPEs, and the run is misreported as a normal exit).
+        // Keeping only the last MAX_OUTPUT_BYTES preserves what summary()
+        // actually uses (the tail) while draining the pipe so the process
+        // never blocks on a full buffer.
+        val outputReader = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val outputFuture = outputReader.submit<String> {
+            val br = process.inputStream.bufferedReader()
+            val lines = ArrayDeque<String>()
+            var total = 0
+            while (true) {
+                val line = br.readLine() ?: break
+                lines.addLast(line)
+                total += line.length + 1
+                while (total > MAX_OUTPUT_BYTES && lines.size > 1) {
+                    total -= lines.removeFirst().length + 1
+                }
+            }
+            lines.joinToString("\n")
+        }
+        val timedOut = !process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+        if (timedOut) {
             process.destroyForcibly()
+        }
+        val output = try {
+            // Bound the post-kill drain too: destroyForcibly should end the
+            // stream promptly, but don't wait on a rogue grandchild process.
+            outputFuture.get(5, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            outputReader.shutdownNow()
+            ""
+        } finally {
+            outputReader.shutdown()
+        }
+        if (timedOut) {
             return@withContext SwitchCommandResult(exitCode = null, output = output, timedOut = true)
         }
         SwitchCommandResult(exitCode = process.exitValue(), output = output)
@@ -38,5 +74,8 @@ internal actual suspend fun runSwitchCommand(
         SwitchCommandResult(exitCode = null, output = "${e::class.simpleName}: ${e.message}")
     }
 }
+
+/** Cap on retained command output; only the tail is ever displayed. */
+private const val MAX_OUTPUT_BYTES = 64 * 1024
 
 internal actual val switchCommandsSupported: Boolean = true

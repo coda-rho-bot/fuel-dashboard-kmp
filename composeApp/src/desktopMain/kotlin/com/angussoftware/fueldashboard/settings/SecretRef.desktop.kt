@@ -6,6 +6,9 @@ import java.util.concurrent.TimeUnit
 /** How long a helper command may take before it is treated as unresolvable. */
 private const val COMMAND_TIMEOUT_SECONDS = 20L
 
+/** Credentials are short; a helper streaming past this is misbehaving, not producing a key. */
+private const val MAX_CREDENTIAL_BYTES = 8 * 1024
+
 /**
  * Resolves a credential reference on desktop.
  *
@@ -46,10 +49,33 @@ private fun runCommandForSecret(command: String): String? {
     }.getOrNull() ?: return null
 
     return try {
-        val output = process.inputStream.bufferedReader().use { it.readText() }
-        if (!process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        // Bounded tail-read on a separate thread: a helper that streams
+        // forever would otherwise block past the timeout (readText() ends
+        // only at EOF), and an unbounded read would blow the heap before the
+        // watchdog fires. Credentials are short — cap the retained bytes.
+        val reader = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val outputFuture = reader.submit<String> {
+            val br = process.inputStream.bufferedReader()
+            val sb = StringBuilder()
+            while (true) {
+                val line = br.readLine() ?: break
+                sb.appendLine(line)
+                if (sb.length > MAX_CREDENTIAL_BYTES) break
+            }
+            sb.toString()
+        }
+        val timedOut = !process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        if (timedOut) {
             process.destroyForcibly()
+            reader.shutdownNow()
             return null
+        }
+        val output = try {
+            outputFuture.get(5, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            ""
+        } finally {
+            reader.shutdown()
         }
         // A non-zero exit means the helper could not produce a credential; its
         // partial stdout must not be mistaken for one.
