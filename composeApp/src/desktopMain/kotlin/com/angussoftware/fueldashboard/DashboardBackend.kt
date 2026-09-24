@@ -97,6 +97,14 @@ class DashboardBackend private constructor(
             val viewModel = FuelViewModel()
             val themeController = ThemeController
 
+            // ── Provider polling ──────────────────────────────────────────────────
+            // The GUI starts polling from App.kt's LaunchedEffect and Android from
+            // MainActivity; in headless mode nothing composes, so the backend owns
+            // it. startPolling() is idempotent, so the GUI's later call is a no-op.
+            if (viewModel.state.value.settings.hasAnyConfig) {
+                viewModel.startPolling()
+            }
+
             // ── Database (decision history + agent registry) ─────────────────────
             val dbDriver = DatabaseDriverFactory().createDriver()
             val repository = DecisionRepository(dbDriver)
