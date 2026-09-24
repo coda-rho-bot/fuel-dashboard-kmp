@@ -107,6 +107,16 @@ class EmbeddedServer(
 
     private var server: KtorServer<*, *>? = null
 
+    /**
+     * True when [start] actually bound the port.
+     *
+     * [start] deliberately swallows a failed bind so the GUI still comes up
+     * with a visible error rather than dying at launch, but a headless
+     * process has no window to show: without this, a port clash leaves a
+     * service that looks healthy and serves nothing.
+     */
+    val isRunning: Boolean get() = server != null
+
     /** Public server URL (tunnel or LAN) — set by main.kt, used for sync data. */
     var serverUrl: String? = null
 
