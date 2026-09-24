@@ -661,7 +661,10 @@ class FuelViewModel(
      * half-built agreement streak, and the trigger is safer starting from a
      * clean slate than from a partially-counted descent.
      */
-    private val switchTriggerState = mutableMapOf<String, SwitchCommandTrigger.State>()
+    // ConcurrentHashMap: written from the refresh coroutine and the manual
+    // switch scope.launch (both Dispatchers.IO) — a plain map can lose writes
+    // or corrupt under concurrent access.
+    private val switchTriggerState = java.util.concurrent.ConcurrentHashMap<String, SwitchCommandTrigger.State>()
 
     /**
      * Callback to get per-provider burn rates and projections.
@@ -1069,10 +1072,18 @@ class FuelViewModel(
                 // and `file:` would read a local path of the sender's choosing
                 // and send its contents to a provider. Literal keys sync as
                 // they always have.
+                //
+                // CLAUDE_CODE's serverUrl is stripped for the same reason as
+                // a `file:` reference: this kind authenticates with the
+                // machine-local Claude Code OAuth token, so an imported
+                // serverUrl would direct that credential at a host of the
+                // sender's choosing. The default (api.anthropic.com) is the
+                // only destination a synced CLAUDE_CODE provider may have.
                 val safe = p.copy(
                     activateCommand = "",
                     swapAwayBelowPct = 0,
                     apiKey = if (SecretRef.isReference(p.apiKey)) "" else p.apiKey,
+                    serverUrl = if (p.kind == com.angussoftware.fueldashboard.model.ProviderKind.CLAUDE_CODE) "" else p.serverUrl,
                 )
                 if (hasServer && safe.kind != com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API) {
                     safe.copy(dormant = true)
@@ -1728,8 +1739,10 @@ class FuelViewModel(
             lastUpdated = epochMillis(),
             // Re-read each poll: the file is rewritten underneath us whenever
             // the provider is switched, so a cached value would go stale
-            // exactly when it matters most.
-            claudeCodeFleet = readClaudeCodeFleet(),
+            // exactly when it matters most. Goes through the fleetReader seam
+            // (not the top-level function) so injected test readers are
+            // honoured and tests never touch a real ~/.claude.
+            claudeCodeFleet = fleetReader(),
             claudeCodeRoute = routeReader()?.let { route ->
                 route.copy(
                     matchedProviderId = ClaudeCodeRoute.matchProvider(

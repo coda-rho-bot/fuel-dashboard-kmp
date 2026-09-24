@@ -421,7 +421,20 @@ class EmbeddedServer(
                     onImportSettings.invoke(syncData)
                 } else {
                     // Apply providers + add Remote Dashboard
-                    val providers = syncData.providers.toMutableList()
+                    //
+                    // Defense-in-depth: even this legacy partial-apply path must
+                    // never persist a switch command, a credential reference, or
+                    // a CLAUDE_CODE serverUrl — the same fields the full import
+                    // path strips. If the callback isn't wired the payload still
+                    // came over the network, so it is still untrusted.
+                    val providers = syncData.providers.map { p ->
+                        p.copy(
+                            activateCommand = "",
+                            swapAwayBelowPct = 0,
+                            apiKey = if (com.angussoftware.fueldashboard.settings.SecretRef.isReference(p.apiKey)) "" else p.apiKey,
+                            serverUrl = if (p.kind == com.angussoftware.fueldashboard.model.ProviderKind.CLAUDE_CODE) "" else p.serverUrl,
+                        )
+                    }.toMutableList()
                     syncData.serverUrl?.let { url ->
                         providers.removeAll { it.kind == com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API }
                         providers.add(
