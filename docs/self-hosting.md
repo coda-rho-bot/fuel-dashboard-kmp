@@ -13,6 +13,55 @@ The desktop app **is** the orchestrator: provider polling, usage ingestion, the 
 | Settings | Java prefs `~/.java/.userPrefs/fuel-dashboard/` |
 | MCP | Streamable HTTP at `/mcp` (same Bearer auth) |
 
+## Provider credentials
+
+By default a provider's API key is stored verbatim in the settings above —
+`java.util.prefs`, which on Linux is a plaintext XML file. If you keep
+credentials in a vault, a keychain or a secrets manager, copying them in here
+gives that up.
+
+The key field accepts a **reference** instead of a value. References are
+resolved when the key is needed and never written back to settings.
+
+| Value | Meaning |
+|-------|---------|
+| `sk-...` | the credential itself — the default, unchanged |
+| `env:NAME` | read environment variable `NAME` |
+| `file:/path` | read a file's contents, trimmed (`~` expands) |
+| `cmd:my-helper --flag` | run a command and take its stdout |
+
+`cmd:` is the general escape hatch: anything readable from a shell can be
+driven through it, so no particular secrets product needs supporting. It
+mirrors Claude Code's own `apiKeyHelper`, so an existing helper script works
+unchanged.
+
+```
+cmd:vault read -field=key secret/zai
+cmd:pass show providers/openai
+cmd:op read op://vault/openai/credential
+file:/run/secrets/openai_key
+```
+
+Notes:
+
+- The command is split on whitespace and run directly — there is **no shell**,
+  so pipes, redirects and globs are not interpreted. Point it at a script if
+  you need those.
+- `stderr` is not captured. Helpers print diagnostics there ("vault is
+  sealed"), and folding that into the value would send an error message to the
+  provider as an API key.
+- A non-zero exit yields no credential rather than a partial one, and the
+  provider tile says why instead of polling with no key and reporting an
+  opaque 401.
+- Nothing is cached, so a rotated secret or a freshly unlocked vault takes
+  effect on the next poll without restarting.
+- References are **stripped from settings sync in both directions**. A `cmd:`
+  arriving from another device would be executed by the receiving machine, and
+  a `file:` would read a local path of the sender's choosing; a reference is
+  machine-specific anyway. Set it locally on each machine.
+- Desktop only. Mobile resolves literals and reports a reference as
+  unresolvable rather than polling without a key.
+
 ## HTTP API
 
 All data endpoints require `Authorization: Bearer <api key>`. `/health` is open for uptime monitors.
