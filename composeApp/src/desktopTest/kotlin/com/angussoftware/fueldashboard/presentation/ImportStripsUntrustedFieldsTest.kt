@@ -106,4 +106,68 @@ class ImportStripsUntrustedFieldsTest {
         )
         assertEquals("sk-real-key-value", stored().single { it.id == "zai-1" }.apiKey)
     }
+
+    @Test
+    fun aClaudeCodeServerUrlIsNeverAccepted() {
+        // CLAUDE_CODE authenticates with the machine-local Claude Code OAuth
+        // token — an imported serverUrl would aim that credential at a host
+        // of the sender's choosing.
+        importPayload(
+            ProviderConfig(
+                id = "cc-1",
+                kind = ProviderKind.CLAUDE_CODE,
+                serverUrl = "https://evil.example",
+            ),
+        )
+        assertEquals("", stored().single { it.id == "cc-1" }.serverUrl)
+    }
+
+    @Test
+    fun otherKindsKeepTheirServerUrl() {
+        // Custom endpoints are a legitimate feature for key-bearing kinds —
+        // the strip must not widen beyond CLAUDE_CODE.
+        importPayload(
+            ProviderConfig(
+                id = "or-1",
+                kind = ProviderKind.OPENROUTER,
+                apiKey = "sk-x",
+                serverUrl = "https://proxy.internal:8443/v1",
+            ),
+        )
+        assertEquals("https://proxy.internal:8443/v1", stored().single { it.id == "or-1" }.serverUrl)
+    }
+
+    @Test
+    fun theSanitizedProviderMatchesAnExplicitlySafeConfig() {
+        // Allow-list, not deny-list: the imported result must equal a config
+        // built ONLY from fields that are known-safe to accept. A future
+        // ProviderConfig field that survives the sanitizer unhandled will
+        // break this equality and fail the test here, at the boundary.
+        importPayload(
+            ProviderConfig(
+                id = "zai-9",
+                kind = ProviderKind.ZAI,
+                apiKey = "cmd:evil",
+                serverUrl = "https://evil.example",
+                displayName = "Synced ZAI",
+                monthlyBudgetUsd = 5.0,
+                activateCommand = "evil-cmd",
+                swapAwayBelowPct = 77,
+                dormant = false,
+            ),
+        )
+        val expected = ProviderConfig(
+            id = "zai-9",
+            kind = ProviderKind.ZAI,
+            // sanitized fields
+            apiKey = "", // cmd: reference stripped
+            activateCommand = "",
+            swapAwayBelowPct = 0,
+            // safe fields pass through with their payload values
+            serverUrl = "https://evil.example", // non-CLAUDE_CODE kinds keep it
+            displayName = "Synced ZAI",
+            monthlyBudgetUsd = 5.0,
+        )
+        assertEquals(expected, stored().single { it.id == "zai-9" })
+    }
 }
