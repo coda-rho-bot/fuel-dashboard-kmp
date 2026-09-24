@@ -43,8 +43,30 @@ data class ZaiQuotaData(
 
 @Serializable
 data class ZaiQuotaLimit(
+    /**
+     * `TOKENS_LIMIT`, `SESSION_LIMIT`, or `CREDIT_LIMIT`.
+     *
+     * Coding Plan accounts (`level: "pro"`) report `CREDIT_LIMIT` rows rather
+     * than the token/session pair, verified live against a pro account.
+     */
     val type: String = "",
     val percentage: Int = 0,
     @SerialName("nextResetTime")
     val nextResetTime: Long? = null,
+    /**
+     * Period descriptor on `CREDIT_LIMIT` rows: [number] of [unit].
+     *
+     * The encoding is undocumented and deliberately NOT decoded. A live pro
+     * account returned `unit: 6, number: 1` alongside a reset four days out,
+     * which rules out the obvious reading, and inventing a window length pins
+     * the hourglass at 100% forever (review 1975). Carried so the shape is
+     * recorded, unused for anything that would be wrong if the guess were.
+     */
+    val unit: Int? = null,
+    val number: Int? = null,
+    /** Total allowance for the period. */
+    val usage: Long? = null,
+    /** Consumed so far. */
+    val currentValue: Long? = null,
+    val remaining: Long? = null,
 )
