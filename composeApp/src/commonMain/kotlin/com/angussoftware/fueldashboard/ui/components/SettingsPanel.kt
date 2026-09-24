@@ -86,6 +86,7 @@ import com.angussoftware.fueldashboard.model.AgentSettings
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderConfig
 import com.angussoftware.fueldashboard.model.ProviderCategory
+import com.angussoftware.fueldashboard.engine.switchCommandsSupported
 import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.supportsMonthlyBudget
 import com.angussoftware.fueldashboard.model.SettingsSyncData
@@ -998,6 +999,10 @@ private fun ProviderConfigRow(
     var localPollInterval by remember(config.id, isEditing) {
         mutableStateOf(config.pollIntervalSeconds.toString())
     }
+    var localActivateCommand by remember(config.id, isEditing) { mutableStateOf(config.activateCommand) }
+    var localSwapAwayBelowPct by remember(config.id, isEditing) {
+        mutableStateOf(config.swapAwayBelowPct.takeIf { it > 0 }?.toString().orEmpty())
+    }
     var localMonthlyBudgetUsd by remember(config.id, isEditing) {
         mutableStateOf(config.monthlyBudgetUsd.takeIf { it > 0 }?.toString().orEmpty())
     }
@@ -1030,6 +1035,7 @@ private fun ProviderConfigRow(
                         ProviderKind.QWEN -> Icons.Default.Api
                         ProviderKind.TOGETHER -> Icons.Default.Api
                         ProviderKind.JUNIE -> Icons.Default.Api
+                        ProviderKind.CLAUDE_CODE -> Icons.Default.Cloud
                         ProviderKind.CONNECTED_API -> Icons.Default.Hub
                     },
                     contentDescription = null,
@@ -1163,7 +1169,10 @@ private fun ProviderConfigRow(
                                         if (config.kind == ProviderKind.CONNECTED_API) {
                                             "API key for the remote dashboard's server (required if the remote dashboard has auth enabled)"
                                         } else {
-                                            "Stored locally, never shared."
+                                            "Stored locally, never shared. Or reference a secret " +
+                                                "instead of pasting one: env:NAME, file:/path, or " +
+                                                "cmd:my-helper (run to print the key, like Claude " +
+                                                "Code's apiKeyHelper) — resolved on use, never saved."
                                         },
                                     )
                                 }
@@ -1236,6 +1245,74 @@ private fun ProviderConfigRow(
                     onSelected = { localPollInterval = it.toString() },
                 )
 
+                // Action hook. The only setting here that can change the state
+                // of the machine, so it is last, off unless both fields are
+                // filled, and labelled with what it actually does.
+                if (switchCommandsSupported) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = localActivateCommand,
+                        onValueChange = { localActivateCommand = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Command to switch TO this provider (optional)")
+                                if (showHelp) {
+                                    Spacer(Modifier.width(4.dp))
+                                    HelpIcon(
+                                        "How to make this provider the active one — most tools " +
+                                            "take the target as an argument, e.g. " +
+                                            "\"my-switch backup\". Setting it does two things: it " +
+                                            "adds a Swap button to this provider's card, and it " +
+                                            "makes this provider eligible as an automatic " +
+                                            "destination when another one runs low.\n\n" +
+                                            "Either way the command only runs while every Claude " +
+                                            "Code session is idle, since switching restarts them. " +
+                                            "No shell: no pipes or redirects. Every run is " +
+                                            "recorded in the decision log.",
+                                    )
+                                }
+                            }
+                        },
+                        placeholder = {
+                            Text("/path/to/script --arg", style = MaterialTheme.typography.bodySmall)
+                        },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = localSwapAwayBelowPct,
+                        onValueChange = { localSwapAwayBelowPct = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Auto-swap away below (%)")
+                                if (showHelp) {
+                                    Spacer(Modifier.width(4.dp))
+                                    HelpIcon(
+                                        "When THIS provider drops below this level, move work " +
+                                            "off it automatically. The destination is whichever " +
+                                            "other provider has a switch-to command, a readable " +
+                                            "level, and more left than this one — a provider " +
+                                            "whose level cannot be read is never chosen.\n\n" +
+                                            "Requires two agreeing polls, fires once per " +
+                                            "excursion, and waits 30 minutes between swaps. " +
+                                            "Leave empty for manual swaps only.",
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        // No longer tied to this provider's own command: the
+                        // threshold says when to LEAVE here, and what runs is
+                        // whichever provider we move to.
+                        enabled = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                     TextButton(onClick = {
                         localKey = config.apiKey
@@ -1243,6 +1320,8 @@ private fun ProviderConfigRow(
                         localUrl = config.serverUrl
                         localMonthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 }?.toString().orEmpty()
                         localPollInterval = config.pollIntervalSeconds.toString()
+                        localActivateCommand = config.activateCommand
+                        localSwapAwayBelowPct = config.swapAwayBelowPct.takeIf { it > 0 }?.toString().orEmpty()
                         isEditing = false
                     }) {
                         Text("Cancel", style = MaterialTheme.typography.labelSmall)
@@ -1254,6 +1333,15 @@ private fun ProviderConfigRow(
                             serverUrl = localUrl.trim(),
                             monthlyBudgetUsd = localMonthlyBudgetUsd.toDoubleOrNull()?.takeIf { it > 0 } ?: 0.0,
                             pollIntervalSeconds = localPollInterval.toIntOrNull()?.coerceAtLeast(15) ?: 60,
+                            activateCommand = localActivateCommand.trim(),
+                            // Independent of each other now: the threshold says
+                            // when to leave THIS provider, while the command says
+                            // how to arrive at it. A threshold on a provider with
+                            // no command of its own is perfectly sensible — it is
+                            // a provider you want to be moved off.
+                            swapAwayBelowPct = localSwapAwayBelowPct.toIntOrNull()
+                                ?.coerceIn(1, 99)
+                                ?: 0,
                         ))
                         isEditing = false
                     }) {
@@ -1380,8 +1468,11 @@ private fun AddProviderDialog(
             )
             Spacer(Modifier.height(4.dp))
 
-            // API key — required for most providers, optional for Connected API
-            if (selectedKind != ProviderKind.JUNIE) {
+            // API key — required for most providers, optional for Connected API.
+            // Claude Code has none to enter: it reads the OAuth token Claude
+            // Code already stores locally, so an empty field would just invite
+            // someone to paste a console API key that this provider ignores.
+            if (selectedKind != ProviderKind.JUNIE && selectedKind != ProviderKind.CLAUDE_CODE) {
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = { apiKey = it },
@@ -1422,7 +1513,13 @@ private fun AddProviderDialog(
 
             // Direct link to the provider's API key page — click through to
             // grab a key without hunting for the console.
-            if (selectedKind != ProviderKind.JUNIE && selectedKind != ProviderKind.CONNECTED_API) {
+            // Claude Code is excluded alongside Junie and Remote Dashboard:
+            // it authenticates with the OAuth token Claude Code already holds,
+            // so there is no key page to send anyone to.
+            if (selectedKind != ProviderKind.JUNIE &&
+                selectedKind != ProviderKind.CONNECTED_API &&
+                selectedKind != ProviderKind.CLAUDE_CODE
+            ) {
                 val uriHandler = LocalUriHandler.current
                 val keyPage = when (selectedKind) {
                     ProviderKind.ZAI -> "https://z.ai/"
@@ -1490,6 +1587,7 @@ private fun AddProviderDialog(
                 ProviderKind.QWEN -> "https://dashscope.aliyuncs.com/api"
                 ProviderKind.TOGETHER -> "https://api.together.xyz"
                 ProviderKind.JUNIE -> ""
+                ProviderKind.CLAUDE_CODE -> "https://api.anthropic.com"
                 ProviderKind.CONNECTED_API -> "http://127.0.0.1:8322"
             }
             if (selectedKind != ProviderKind.JUNIE) {
@@ -1575,6 +1673,7 @@ private fun AddProviderDialog(
                     enabled = when (selectedKind) {
                         ProviderKind.CONNECTED_API -> serverUrl.isNotBlank()
                         ProviderKind.JUNIE -> true
+                        ProviderKind.CLAUDE_CODE -> true
                         else -> apiKey.isNotBlank()
                     },
                 ) {

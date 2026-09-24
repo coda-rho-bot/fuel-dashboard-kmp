@@ -67,6 +67,7 @@ import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.model.ReportWindow
 import com.angussoftware.fueldashboard.model.SettingsSyncData
 import com.angussoftware.fueldashboard.network.canCheckJunieBalance
+import com.angussoftware.fueldashboard.engine.switchCommandsSupported
 import com.angussoftware.fueldashboard.presentation.DashboardState
 import com.angussoftware.fueldashboard.presentation.FuelViewModel
 import com.angussoftware.fueldashboard.settings.FuelSettingsKeys
@@ -283,8 +284,8 @@ private fun DesktopLayout(
                 if (!hasUsageData) {
                     EmptyTabState(showHelp = state.showHelp, 
                         title = "Collecting data…",
-                        message = "Usage metrics appear here once the dashboard has polled your providers a few times.",
-                        hint = "Add providers in Settings and wait a few minutes for the first poll cycle.",
+                        message = "Token metering is a separate feed from the provider gauges — it needs a usage source, not just providers.",
+                        hint = "Turn on a source in Settings \u2192 Usage Sources, or POST records to /v1/usage with the server API key.",
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 } else {
@@ -638,6 +639,25 @@ internal fun FuelColumnContent(
                             } else {
                                 null
                             },
+                            isServingClaudeCode =
+                                state.claudeCodeRoute?.matchedProviderId == config.id,
+                            isSettling = config.id in state.settlingProviderIds,
+                            isSwapping = config.id in state.swappingProviderIds,
+                            // Opt-in: no command configured means no control shown.
+                            onSwapNow = if (switchCommandsSupported && config.activateCommand.isNotBlank()) {
+                                { viewModel.runSwitchCommandNow(config.id) }
+                            } else {
+                                null
+                            },
+                            // Only wired when the last attempt was refused by
+                            // the fleet gate, so the override cannot be
+                            // reached without having first been told why.
+                            onSwapAnyway = if (state.switchResults[config.id]?.overridable == true) {
+                                { viewModel.runSwitchCommandNow(config.id, force = true) }
+                            } else {
+                                null
+                            },
+                            switchStatus = state.switchResults[config.id],
                         )
                     }
                 }
@@ -692,6 +712,12 @@ private fun ProviderSection(
     showHelp: Boolean,
     isChecking: Boolean,
     onCheckJunieBalance: (() -> Unit)?,
+    isServingClaudeCode: Boolean,
+    isSettling: Boolean,
+    isSwapping: Boolean,
+    onSwapNow: (() -> Unit)?,
+    onSwapAnyway: (() -> Unit)?,
+    switchStatus: com.angussoftware.fueldashboard.presentation.SwitchRunStatus?,
 ) {
     com.angussoftware.fueldashboard.ui.components.ProviderContent(
         config = config,
@@ -703,5 +729,11 @@ private fun ProviderSection(
         isChecking = isChecking,
         onCheckJunieBalance = onCheckJunieBalance,
         boxedCreditBalance = true,
+        isServingClaudeCode = isServingClaudeCode,
+        isSettling = isSettling,
+        isSwapping = isSwapping,
+        onSwapNow = onSwapNow,
+        onSwapAnyway = onSwapAnyway,
+        switchStatus = switchStatus,
     )
 }

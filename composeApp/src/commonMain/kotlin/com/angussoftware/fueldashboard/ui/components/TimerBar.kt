@@ -43,7 +43,6 @@ import kotlinx.coroutines.delay
 fun TimerBar(
     resetsAt: Long,
     windowMs: Long,
-    showHelp: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var tick by remember { mutableLongStateOf(epochMillis()) }
@@ -56,7 +55,21 @@ fun TimerBar(
 
     val now = tick
     val remainingMs = (resetsAt - now).coerceAtLeast(0L)
-    val remainingFraction = (remainingMs.toFloat() / windowMs.toFloat()).coerceIn(0f, 1f)
+
+    // A window whose total length is unknown has no meaningful progress to
+    // show: we know WHEN it resets, not how far through it we are. Dividing by
+    // zero here yielded Infinity, clamped to a permanently full bar — a
+    // confident-looking fill carrying no information. Providers that report a
+    // reset without a period (z.ai credit rows, Junie) hit this.
+    //
+    // sandFraction() already guards the same case for the grid tiles; this
+    // brings the detail view in line.
+    val lengthKnown = windowMs > 0L
+    val remainingFraction = if (lengthKnown) {
+        (remainingMs.toFloat() / windowMs.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
 
     val animatedColor by animateColorAsState(
         targetValue = timerColor(1f - remainingFraction),
@@ -79,26 +92,27 @@ fun TimerBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Medium,
             )
-            if (showHelp) {
-                Spacer(Modifier.width(4.dp))
-                HelpIcon("Time until quota resets")
-            }
+
         }
-        Spacer(Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
+        // The track is drawn either way so rows stay aligned; only the fill is
+        // withheld when there is no proportion to represent.
+        if (lengthKnown) {
+            Spacer(Modifier.height(6.dp))
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(animatedFraction)
+                    .fillMaxWidth()
                     .height(6.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(animatedColor),
-            )
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedFraction)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(animatedColor),
+                )
+            }
         }
     }
 }

@@ -14,12 +14,25 @@ import com.angussoftware.fueldashboard.model.DecisionsResponse
 import com.angussoftware.fueldashboard.model.FuelResponse
 import com.angussoftware.fueldashboard.model.MultiProviderSettings
 import com.angussoftware.fueldashboard.model.ProviderAdapter
+import com.angussoftware.fueldashboard.model.ClaudeCodeFleet
+import com.angussoftware.fueldashboard.model.ClaudeCodeRoute
 import com.angussoftware.fueldashboard.model.ProviderConfig
+import com.angussoftware.fueldashboard.network.ClaudeCodeUsageHttpException
+import com.angussoftware.fueldashboard.model.readClaudeCodeFleet
+import com.angussoftware.fueldashboard.model.readClaudeCodeRoute
+import com.angussoftware.fueldashboard.settings.SecretRef
+import com.angussoftware.fueldashboard.settings.resolveSecretRef
 import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.model.ReportWindow
 import com.angussoftware.fueldashboard.network.AnthropicProviderAdapter
+import com.angussoftware.fueldashboard.engine.SwitchCommandResult
+import com.angussoftware.fueldashboard.engine.SwapTarget
+import com.angussoftware.fueldashboard.engine.SwitchCommandTrigger
+import com.angussoftware.fueldashboard.engine.runSwitchCommand
+import com.angussoftware.fueldashboard.engine.switchCommandsSupported
+import com.angussoftware.fueldashboard.network.ClaudeCodeSubscriptionAdapter
 import com.angussoftware.fueldashboard.network.ConnectedApiProviderAdapter
 import com.angussoftware.fueldashboard.network.DeepSeekProviderAdapter
 import com.angussoftware.fueldashboard.network.GeminiProviderAdapter
@@ -241,6 +254,26 @@ data class ProviderBurnRateDisplay(
     val windowHours: Double = 0.0,
 )
 
+/**
+ * Outcome of a manual switch-command run, shown inline under the button that
+ * started it. Distinct from [DashboardState.providerErrors]: that is "polling
+ * this provider failed", this is "the swap you asked for did/did not happen".
+ */
+data class SwitchRunStatus(
+    val ok: Boolean,
+    val message: String,
+    /**
+     * True when this was the fleet gate refusing, and only then.
+     *
+     * The operator may legitimately know something the gate cannot: most
+     * often that the "busy" session is the very one being used to ask for the
+     * swap, in which case waiting for idle waits forever. Surfacing an
+     * override only after a refusal keeps it a deliberate second step rather
+     * than a checkbox someone silences once and forgets.
+     */
+    val overridable: Boolean = false,
+)
+
 data class DashboardState(
     val settings: MultiProviderSettings = MultiProviderSettings(),
     val providerReports: Map<String, ProviderReport> = emptyMap(),
@@ -264,6 +297,16 @@ data class DashboardState(
     val showThemeIcon: Boolean = true,
     val showAdvisor: Boolean = false, // advisor hidden by default (Harry, Aug 24)
     val checkingProviderIds: Set<String> = emptySet(),
+    /**
+     * Providers that answered with nothing, but not yet often enough to call
+     * it unavailable. The tile shows a spinner for these rather than an
+     * alarming badge — see [consecutiveUnavailable].
+     */
+    val settlingProviderIds: Set<String> = emptySet(),
+    /** Providers whose switch command is running right now. */
+    val swappingProviderIds: Set<String> = emptySet(),
+    /** Result of the last manual swap per provider, until the next poll clears it. */
+    val switchResults: Map<String, SwitchRunStatus> = emptyMap(),
     val fuelProjection: FuelProjection? = null,
     val modelDrainRates: List<ModelDrainRateDisplay> = emptyList(),
     val fuelHistory: List<Double> = emptyList(),
@@ -280,6 +323,14 @@ data class DashboardState(
     val wasteByProvider: List<FuelIntelligence.ProviderWaste> = emptyList(),
     val fuelEvents: List<FuelIntelligence.FuelEvent> = emptyList(),
     val fuelAdvice: FuelAdvisor.Advice? = null,
+    /**
+     * Where Claude Code is currently routed, or null when it could not be
+     * read. Null is NOT the same as [ClaudeCodeRoute.isDefaultAnthropic]:
+     * one means "we could not tell", the other means "stock Anthropic".
+     */
+    val claudeCodeRoute: ClaudeCodeRoute? = null,
+    /** Live Claude Code sessions by status, or null when unreadable. */
+    val claudeCodeFleet: ClaudeCodeFleet? = null,
 ) {
     /** All configured providers (have enough info to poll), in user order. */
     val activeProviders: List<ProviderConfig>
@@ -291,9 +342,34 @@ data class DashboardState(
 }
 
 
-class FuelViewModel {
+class FuelViewModel(
+    /**
+     * Overridden in tests; production reads this machine's Claude Code session
+     * registry.
+     *
+     * Injected because [readClaudeCodeFleet] is a top-level expect function,
+     * which left the fleet gate — the only thing standing between a switch
+     * command and a live agent turn — impossible to exercise in a test.
+     */
+    private val fleetReader: () -> ClaudeCodeFleet? = { readClaudeCodeFleet() },
+    /**
+     * Re-read after a swap to check whether it actually took effect. Injected
+     * for the same reason as [fleetReader]: the underlying reader is a
+     * top-level expect fun and this is the only way to test the verification.
+     */
+    private val routeReader: () -> ClaudeCodeRoute? = { readClaudeCodeRoute() },
+    /** Overridden in tests; production spawns the real process. */
+    private val switchRunner: suspend (String) -> SwitchCommandResult = { runSwitchCommand(it) },
+) {
 
     companion object {
+        /**
+         * Empty readings in a row before a tile stops saying "connecting" and
+         * starts saying UNAVAILABLE. Two, for the same reason the switch
+         * trigger wants two: one reading is a moment, two is a state.
+         */
+        internal const val UNAVAILABLE_STREAK = 2
+
         /**
          * Process-wide shared instance: the Android foreground notification
          * service and the Activity (and any desktop windows) share ONE
@@ -307,6 +383,20 @@ class FuelViewModel {
     private var pollJob: Job? = null
 
     private val adapters = mutableMapOf<String, ProviderAdapter>()
+
+    /**
+     * Credentials that a [SecretRef] could not resolve, by provider id.
+     *
+     * Kept so refresh can surface "your vault is locked" on the tile instead
+     * of letting the provider poll with no key and report an opaque 401.
+     *
+     * Declared HERE, beside [adapters], because the constructor calls
+     * activateAdapters -> createAdapter, which writes to this map. A property
+     * declared further down the class body is still null at that point, and
+     * the app died on startup with a NullPointerException that neither the
+     * compiler nor the test suite caught.
+     */
+    private val secretResolutionErrors = mutableMapOf<String, String>()
 
     /**
      * Serializes refresh cycles. The poll timer, manual refreshNow(), and
@@ -565,6 +655,15 @@ class FuelViewModel {
     var onLogProviderSnapshots: ((List<ProviderSnapshotInput>) -> Unit)? = null
 
     /**
+     * Switch-command trigger state per provider id, carried across polls.
+     *
+     * Deliberately in memory: persisting it would let a restart resume a
+     * half-built agreement streak, and the trigger is safer starting from a
+     * clean slate than from a partially-counted descent.
+     */
+    private val switchTriggerState = mutableMapOf<String, SwitchCommandTrigger.State>()
+
+    /**
      * Callback to get per-provider burn rates and projections.
      */
     var onGetProviderBurnRates: (() -> List<ProviderBurnRateDisplay>)? = null
@@ -635,6 +734,88 @@ class FuelViewModel {
         }
     }
 
+    /**
+     * Runs a provider's switch command right now, on an explicit click.
+     *
+     * The trigger's four guards — threshold, two-poll agreement,
+     * fire-once-per-excursion and cooldown — all exist to make an *automatic*
+     * decision trustworthy with no human in the loop. A click is that human, so
+     * this bypasses them: you can swap off a provider that is nowhere near its
+     * threshold, and twice in a row if you mean it.
+     *
+     * The fleet gate is not one of those guards and is NOT bypassed. It guards
+     * somebody else's in-flight turn, which your click does not make safe.
+     *
+     * On a run that actually happened the cooldown is armed, so the automatic
+     * trigger cannot fire again on the very next poll behind your back.
+     */
+    fun runSwitchCommandNow(
+        providerId: String,
+        /**
+         * Proceed even though sessions are still working.
+         *
+         * Reachable only from the refusal the operator has already seen, so
+         * this cannot be the first thing a click does. The automatic trigger
+         * never passes it.
+         */
+        force: Boolean = false,
+    ) {
+        if (!switchCommandsSupported) return
+        val config = _state.value.settings.providers.firstOrNull { it.id == providerId } ?: return
+        if (config.activateCommand.isBlank()) return
+        if (providerId in _state.value.swappingProviderIds) return
+
+        _state.update { it.copy(
+            swappingProviderIds = it.swappingProviderIds + providerId,
+            switchResults = it.switchResults - providerId,
+        ) }
+        scope.launch {
+            val remaining = _state.value.providerReports[providerId]
+                ?.takeIf { it.available }?.remainingPct
+            val status = runCatching {
+                val label = if (force) "manual swap (fleet gate overridden)" else "manual swap"
+                when (val run = executeSwitchCommand(config, remaining, label, force = force)) {
+                    is SwitchRun.Refused -> {
+                        // A denied user action belongs in the log as much as a
+                        // taken one: otherwise "I pressed it and nothing
+                        // happened" leaves no trace to look up later.
+                        onDecisionLogged?.invoke(
+                            "switch-command",
+                            config.activateCommand.take(120),
+                            config.id,
+                            "action",
+                            "refused",
+                            (remaining ?: 0) / 100.0,
+                            remaining ?: 0,
+                            "manual swap refused — fleet ${run.fleet?.describe() ?: "unreadable"}",
+                        )
+                        SwitchRunStatus(
+                            ok = false,
+                            message = refusalMessage(run.fleet),
+                            overridable = true,
+                        )
+                    }
+                    is SwitchRun.Ran -> {
+                        switchTriggerState[providerId] =
+                            (switchTriggerState[providerId] ?: SwitchCommandTrigger.State())
+                                .copy(armed = false, lastFiredAt = epochMillis())
+                        verifiedStatus(config, run.result)
+                    }
+                }
+            }.getOrElse {
+                SwitchRunStatus(
+                    ok = false,
+                    message = "Switch failed — ${it.message ?: it::class.simpleName}",
+                )
+            }
+
+            _state.update { it.copy(
+                swappingProviderIds = it.swappingProviderIds - providerId,
+                switchResults = it.switchResults + (providerId to status),
+            ) }
+        }
+    }
+
     // --- Settings updates ---
 
     /**
@@ -690,6 +871,9 @@ class FuelViewModel {
             burnRate = null,
             dataPointCount = 0,
             checkingProviderIds = emptySet(),
+            swappingProviderIds = emptySet(),
+            switchResults = emptyMap(),
+            settlingProviderIds = emptySet(),
         ) }
 
         if (settings.hasAnyConfig) {
@@ -873,10 +1057,27 @@ class FuelViewModel {
                 // account the desktop already polls doubles quota burn
                 // against the same accounts. Tiles hydrate from the remote
                 // snapshot instead (see refresh's dormant hydration).
-                if (hasServer && p.kind != com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API) {
-                    p.copy(dormant = true)
+                // NEVER accept a switch command from a synced payload. It is a
+                // command this machine would later execute on its own, so
+                // honouring it would turn "import settings" — a QR scan or a
+                // POST /sync — into arbitrary code execution on the importer.
+                // It is machine-specific anyway: the binary it names need not
+                // exist here. Set it locally or not at all.
+                //
+                // A credential REFERENCE is stripped for the same reason:
+                // `cmd:` would be executed by THIS machine to fetch the key,
+                // and `file:` would read a local path of the sender's choosing
+                // and send its contents to a provider. Literal keys sync as
+                // they always have.
+                val safe = p.copy(
+                    activateCommand = "",
+                    swapAwayBelowPct = 0,
+                    apiKey = if (SecretRef.isReference(p.apiKey)) "" else p.apiKey,
+                )
+                if (hasServer && safe.kind != com.angussoftware.fueldashboard.model.ProviderKind.CONNECTED_API) {
+                    safe.copy(dormant = true)
                 } else {
-                    p
+                    safe
                 }
             }.toMutableList()
             syncData.serverUrl?.let { url ->
@@ -979,81 +1180,99 @@ class FuelViewModel {
     }
 
     private fun createAdapter(config: ProviderConfig): ProviderAdapter? {
+        // Resolved once per activation, never stored. For a pasted key this is
+        // the string itself — no I/O, no process, nothing changes.
+        val ref = SecretRef.parse(config.apiKey)
+        val resolvedKey = resolveSecretRef(ref)
+        if (resolvedKey == null) {
+            secretResolutionErrors[config.id] = when (ref) {
+                is SecretRef.Command ->
+                    "Could not run ${SecretRef.describe(config.apiKey)} — is the helper on PATH and the vault unlocked?"
+                is SecretRef.Environment ->
+                    "${SecretRef.describe(config.apiKey)} is not set in this app's environment"
+                is SecretRef.FileContents ->
+                    "Could not read ${SecretRef.describe(config.apiKey)}"
+                is SecretRef.Literal -> "No API key configured"
+            }
+            return null
+        }
+        secretResolutionErrors.remove(config.id)
+
         return when (config.kind) {
             ProviderKind.ZAI -> ZaiProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.LETTA_CLOUD -> LettaCloudProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.OPENAI -> OpenAIProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.ANTHROPIC -> AnthropicProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.DEEPSEEK -> DeepSeekProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.GROQ -> GroqProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.MISTRAL -> MistralProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.OPENROUTER -> OpenRouterProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.GEMINI -> GeminiProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.XAI -> XaiProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.QWEN -> QwenProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
             )
             ProviderKind.TOGETHER -> TogetherProviderAdapter(
                 providerId = config.id,
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
                 baseUrl = config.resolvedServerUrl(),
                 monthlyBudgetUsd = config.monthlyBudgetUsd.takeIf { it > 0 },
                 customDisplayName = config.resolvedDisplayName(),
@@ -1062,11 +1281,16 @@ class FuelViewModel {
                 providerId = config.id,
                 customDisplayName = config.resolvedDisplayName(),
             )
+            ProviderKind.CLAUDE_CODE -> ClaudeCodeSubscriptionAdapter(
+                providerId = config.id,
+                baseUrl = config.resolvedServerUrl(),
+                customDisplayName = config.resolvedDisplayName(),
+            )
             ProviderKind.CONNECTED_API -> ConnectedApiProviderAdapter(
                 providerId = config.id,
                 baseUrl = config.resolvedServerUrl(),
                 customDisplayName = config.resolvedDisplayName(),
-                apiKey = config.apiKey,
+                apiKey = resolvedKey,
             )
         }
     }
@@ -1090,6 +1314,20 @@ class FuelViewModel {
      * is honored as configured (the ceiling constrains BACKOFF, not the
      * user's chosen cadence). Pure — unit-testable.
      */
+    /**
+     * Floor on how often a provider kind may be polled, whatever the user set.
+     *
+     * Claude Code's endpoint reports a 5-hour and a 7-day window. Polling it
+     * every 30s cannot resolve either one any better — the number does not
+     * move between polls — but it is 600 requests per 5-hour window, and
+     * api.anthropic.com rate-limits it. 5 minutes still gives 60 reads per
+     * window. Manual Refresh is unaffected; this only bounds the timer.
+     */
+    internal fun minPollIntervalSec(kind: ProviderKind): Int = when (kind) {
+        ProviderKind.CLAUDE_CODE -> 300
+        else -> 15
+    }
+
     internal fun effectiveIntervalMs(baseIntervalSec: Int, consecutiveFailures: Int): Long {
         val base = baseIntervalSec.coerceAtLeast(15) * 1000L
         if (base >= 30 * 60_000L) return base
@@ -1104,6 +1342,26 @@ class FuelViewModel {
 
     /** Consecutive poll failures per provider — drives exponential backoff. */
     private val consecutiveFailures = mutableMapOf<String, Int>()
+
+    /**
+     * Earliest time a provider may be polled again, when the server itself
+     * said so (HTTP Retry-After). Honoured ahead of our own cadence: asking
+     * again before then is what keeps a rate limit alive.
+     */
+    private val rateLimitedUntil = mutableMapOf<String, Long>()
+
+    /**
+     * Consecutive polls that SUCCEEDED but carried no usable reading, per
+     * provider id.
+     *
+     * A poll that throws is an error and shows as one. This counts the other
+     * case: the provider answered, and the answer was empty. Right after
+     * start that is usually just a provider that has not settled — the Claude
+     * Code usage endpoint returns a payload with no utilization for a moment
+     * — so the first one must not be announced as UNAVAILABLE. A second one
+     * in a row means it really has nothing to tell us.
+     */
+    private val consecutiveUnavailable = mutableMapOf<String, Int>()
 
     /**
      * Bumped on every applySettings. refresh() captures it at start and
@@ -1137,8 +1395,13 @@ class FuelViewModel {
         // an account that is usually already rate-limited or suspended.
         val nowMs = epochMillis()
         val dueAdapters = adapterSnapshot.filter { (providerId, _) ->
-            val intervalSec = _state.value.settings.providers
-                .firstOrNull { it.id == providerId }?.pollIntervalSeconds ?: 60
+            // A server that told us how long to wait outranks our own timer.
+            val parkedUntil = rateLimitedUntil[providerId]
+            if (parkedUntil != null && nowMs < parkedUntil) return@filter false
+
+            val config = _state.value.settings.providers.firstOrNull { it.id == providerId }
+            val configured = config?.pollIntervalSeconds ?: 60
+            val intervalSec = config?.let { maxOf(configured, minPollIntervalSec(it.kind)) } ?: configured
             val intervalMs = effectiveIntervalMs(intervalSec, consecutiveFailures[providerId] ?: 0)
             val last = lastPolledMs[providerId]
             last == null || nowMs - last >= intervalMs
@@ -1168,7 +1431,11 @@ class FuelViewModel {
         if (configGeneration.get() != generationAtStart) return
 
         val reports = mutableMapOf<String, ProviderReport>()
+        // Seed with any credential that could not be resolved, so the tile
+        // explains itself instead of showing an unconfigured provider or an
+        // opaque 401 from polling with no key.
         val errors = mutableMapOf<String, String>()
+        errors.putAll(secretResolutionErrors)
 
         // Providers skipped by their interval keep their previous report —
         // seed them so the wholesale state replace doesn't blank their tiles.
@@ -1182,10 +1449,23 @@ class FuelViewModel {
                 .onSuccess {
                     reports[providerId] = it
                     consecutiveFailures[providerId] = 0
+                    if (it.available) {
+                        consecutiveUnavailable.remove(providerId)
+                    } else {
+                        consecutiveUnavailable[providerId] =
+                            (consecutiveUnavailable[providerId] ?: 0) + 1
+                    }
                 }
                 .onFailure {
                     errors[providerId] = it.message ?: "Unknown error"
                     consecutiveFailures[providerId] = (consecutiveFailures[providerId] ?: 0) + 1
+                    // An empty reading is not what failed here — drop any
+                    // settling streak so a failure shows as a failure.
+                    consecutiveUnavailable.remove(providerId)
+                    val retryAfter = (it as? ClaudeCodeUsageHttpException)?.retryAfterMs
+                    if (retryAfter != null) {
+                        rateLimitedUntil[providerId] = epochMillis() + retryAfter
+                    }
                 }
         }
 
@@ -1347,6 +1627,7 @@ class FuelViewModel {
         // Log all provider snapshots
         if (providerSnapshots.isNotEmpty()) {
             onLogProviderSnapshots?.invoke(providerSnapshots)
+            maybeRunSwitchCommands(reports)
         }
 
         // Pick the primary provider deterministically: first configured
@@ -1427,6 +1708,17 @@ class FuelViewModel {
             // out-of-band writes (e.g. checkJunieCredits) survive instead of
             // being clobbered by the next refresh's wholesale copy.
             providerReports = current.providerReports + reports,
+            settlingProviderIds = (current.providerReports + reports)
+                .filterValues { !it.available }
+                .keys
+                .filterTo(mutableSetOf()) { (consecutiveUnavailable[it] ?: 0) < UNAVAILABLE_STREAK },
+            // A swap result describes one moment. Once the provider has
+            // reported again the line is stale, so let the fresh gauge speak
+            // instead — except for a swap still in flight, whose result has
+            // not been written yet.
+            switchResults = current.switchResults.filterKeys {
+                it !in reports.keys || it in current.swappingProviderIds
+            },
             providerErrors = errors,
             fuel = fuel,
             decisions = decisions,
@@ -1434,6 +1726,18 @@ class FuelViewModel {
             alerts = alerts,
             isLoading = false,
             lastUpdated = epochMillis(),
+            // Re-read each poll: the file is rewritten underneath us whenever
+            // the provider is switched, so a cached value would go stale
+            // exactly when it matters most.
+            claudeCodeFleet = readClaudeCodeFleet(),
+            claudeCodeRoute = routeReader()?.let { route ->
+                route.copy(
+                    matchedProviderId = ClaudeCodeRoute.matchProvider(
+                        route.baseUrl,
+                        current.settings.providers,
+                    ),
+                )
+            },
             burnRate = if (burnRate != null && burnRate > 0) burnRate else null,
             dataPointCount = dataPoints,
             fuelProjection = fuelProjection,
@@ -1503,5 +1807,179 @@ class FuelViewModel {
                 }
             }
         }
+    }
+
+
+    /**
+     * Runs any provider's switch command whose quota just crossed its
+     * threshold, and records the outcome.
+     *
+     * Reuses [onDecisionLogged] rather than adding a persistence path: that
+     * callback already writes to the decision log, which is exactly where an
+     * action the app took on its own belongs, and it means this feature needs
+     * no wiring in the desktop entry point.
+     */
+    private suspend fun maybeRunSwitchCommands(reports: Map<String, ProviderReport>) {
+        if (!switchCommandsSupported) return
+
+        for (config in _state.value.settings.providers) {
+            // Note this does NOT require config.activateCommand: that command
+            // is how you arrive at this provider, and we are looking for
+            // providers to leave.
+            if (config.swapAwayBelowPct <= 0) continue
+
+            val remaining = reports[config.id]?.takeIf { it.available }?.remainingPct
+            val previous = switchTriggerState[config.id] ?: SwitchCommandTrigger.State()
+            val (outcome, next) = SwitchCommandTrigger.evaluate(
+                thresholdPct = config.swapAwayBelowPct,
+                remainingPct = remaining,
+                state = previous,
+                now = epochMillis(),
+            )
+            // Always keep the advanced state: dropping it on a non-firing poll
+            // resets the streak and agreement could never be reached.
+            switchTriggerState[config.id] = next
+
+            val fire = outcome as? SwitchCommandTrigger.Outcome.Fire ?: continue
+
+            // Where to go. Nowhere better to be is a reason to stay put, not a
+            // reason to move — so a missing target holds, exactly like a
+            // refused fleet gate, and the agreement streak is preserved.
+            val target = SwapTarget.choose(
+                fromId = config.id,
+                fromRemaining = remaining,
+                providers = _state.value.settings.providers,
+                // Only readings we actually have: an absent entry is unknown,
+                // which SwapTarget refuses to treat as a usable tank.
+                remainingById = reports.mapNotNull { (id, report) ->
+                    report.takeIf { it.available }?.remainingPct?.let { id to it }
+                }.toMap(),
+            )
+            if (target == null || executeSwitchCommand(
+                    target,
+                    reports[target.id]?.remainingPct,
+                    "${fire.reason} — moving to ${target.resolvedDisplayName()}",
+                ) is SwitchRun.Refused
+            ) {
+                // Roll back only the fire bookkeeping, keeping the agreement
+                // streak. Persisting the fired state here would disarm the
+                // trigger for an action that never happened, and it would not
+                // re-arm until the provider recovered — silently skipping the
+                // switch entirely.
+                switchTriggerState[config.id] = next.copy(
+                    armed = previous.armed,
+                    lastFiredAt = previous.lastFiredAt,
+                )
+            }
+        }
+    }
+
+    /** What [executeSwitchCommand] did, so each caller can do its own bookkeeping. */
+    private sealed interface SwitchRun {
+        /** The fleet gate said no. Nothing ran. */
+        data class Refused(val fleet: ClaudeCodeFleet?) : SwitchRun
+        data class Ran(val result: SwitchCommandResult) : SwitchRun
+    }
+
+    /**
+     * The destructive part — fleet gate, process, decision-log row — in one
+     * place, shared by the automatic trigger and the manual button so the two
+     * can never drift apart on what is safe.
+     *
+     * Wait for quiet. A switch command is assumed destructive: the one this was
+     * built for respawns every pane, killing whatever turn is in flight.
+     * Completed turns are durable on disk; the live one is not, so a pending
+     * action waits rather than interrupting.
+     *
+     * An unreadable fleet blocks too — "we cannot tell" must not read as
+     * "nobody is working". That holds for a manual run as well: clicking a
+     * button does not make someone else's live turn safe to kill.
+     */
+    private suspend fun executeSwitchCommand(
+        config: ProviderConfig,
+        remainingPct: Int?,
+        reason: String,
+        /**
+         * Skip the fleet gate. Only ever true for a manual swap the operator
+         * has already been refused once — the automatic trigger never sets
+         * it, because nobody is there to accept the consequence.
+         */
+        force: Boolean = false,
+    ): SwitchRun {
+        val fleet = fleetReader()
+        if (!force && (fleet == null || !fleet.isQuiet)) return SwitchRun.Refused(fleet)
+        val overrode = force && (fleet == null || !fleet.isQuiet)
+
+        // config is the provider being switched TO, so its activateCommand is
+        // the one to run — for the manual button that is the card you clicked,
+        // for the automatic trigger it is the target chosen by swapTargetFrom.
+        val result = switchRunner(config.activateCommand)
+        onDecisionLogged?.invoke(
+            "switch-command",
+            config.activateCommand.take(120),
+            config.id,
+            "action",
+            if (result.succeeded) "ok" else "failed",
+            (remainingPct ?: 0) / 100.0,
+            remainingPct ?: 0,
+            // An overridden gate is the single most important thing this log
+            // can record: it is the one case where a killed turn was a choice
+            // somebody made rather than something the app prevented.
+            buildString {
+                append(reason)
+                if (overrode) append(" — FLEET GATE OVERRIDDEN")
+                append(" — fleet ${fleet?.describe() ?: "unreadable"}")
+                append(" — ${result.summary()}")
+            },
+        )
+        return SwitchRun.Ran(result)
+    }
+
+    /**
+     * Turns a finished command into an honest status by checking whether it
+     * actually changed anything.
+     *
+     * An exit code says the command ran, not that the provider moved — and
+     * those came apart immediately in practice: a placeholder command exited 0
+     * and the card announced a swap that had not happened while the badge
+     * still showed the old provider two lines above. Claiming success from an
+     * exit code alone is a claim this app can check, so it checks.
+     *
+     * Three outcomes, deliberately distinct. "It did not take effect" and "I
+     * could not tell" are different facts, and reporting the second as the
+     * first would cry wolf every time the routing file is unreadable.
+     */
+    private fun verifiedStatus(target: ProviderConfig, result: SwitchCommandResult): SwitchRunStatus {
+        if (!result.succeeded) {
+            return SwitchRunStatus(ok = false, message = "Swap failed — ${result.summary()}")
+        }
+
+        val route = routeReader() ?: return SwitchRunStatus(
+            ok = true,
+            message = "Command succeeded, but the active provider could not be read to confirm it.",
+        )
+        val activeId = ClaudeCodeRoute.matchProvider(route.baseUrl, _state.value.settings.providers)
+
+        return if (activeId == target.id) {
+            SwitchRunStatus(ok = true, message = "Swapped to ${target.resolvedDisplayName()}.")
+        } else {
+            val activeName = _state.value.settings.providers
+                .firstOrNull { it.id == activeId }
+                ?.resolvedDisplayName()
+                ?: route.label(_state.value.settings.providers)
+            SwitchRunStatus(
+                ok = false,
+                message = "Command succeeded but nothing moved — Claude Code is still on " +
+                    "$activeName. Does the command actually switch provider?",
+            )
+        }
+    }
+
+    /** Why a swap was refused, phrased for the card rather than the log. */
+    private fun refusalMessage(fleet: ClaudeCodeFleet?): String = when {
+        fleet == null -> "Not swapped — could not read the Claude Code session registry."
+        fleet.total == 0 -> "Not swapped — no Claude Code sessions are registered."
+        fleet.busy > 0 -> "Not swapped — ${fleet.busy} of ${fleet.total} sessions still working. Let them finish."
+        else -> "Not swapped — ${fleet.unknown} session(s) in an unknown state."
     }
 }

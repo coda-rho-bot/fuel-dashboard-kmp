@@ -17,3 +17,8 @@ xcode
 **/xcode/**/xcuserdata/
 .kotlin
 android-signing.properties
+
+# hadoku dev-vault: holds a live service key. Never commit.
+
+# Local agent/session state
+.claude/

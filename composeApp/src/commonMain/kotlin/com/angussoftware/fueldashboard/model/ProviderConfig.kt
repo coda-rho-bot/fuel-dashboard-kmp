@@ -27,6 +27,7 @@ enum class ProviderKind(val displayName: String, val category: ProviderCategory)
     QWEN("Qwen (DashScope)", ProviderCategory.LLM_PROVIDER),
     TOGETHER("Together AI", ProviderCategory.LLM_PROVIDER),
     JUNIE("Junie", ProviderCategory.LLM_PROVIDER),
+    CLAUDE_CODE("Claude Code (plan)", ProviderCategory.LLM_PROVIDER),
     CONNECTED_API("Remote Dashboard", ProviderCategory.AGENT_BACKEND),
 }
 
@@ -57,6 +58,48 @@ data class ProviderConfig(
      * omitted from QR sync payloads when false (encodeDefaults=false).
      */
     val dormant: Boolean = false,
+    /**
+     * Opt-in: the command that makes THIS provider the active one.
+     *
+     * Direction matters and is the opposite of what it looks like at first
+     * glance. This is not "what to run when I run dry" — it is "how to switch
+     * TO me". That reading is what lets one field serve both callers:
+     *
+     *  - the manual button on this provider's card means "swap to this one",
+     *    which is simply running this command;
+     *  - the automatic trigger, when some OTHER provider runs dry, runs the
+     *    command belonging to whichever provider it is moving to.
+     *
+     * It also matches how such tools are actually invoked — the target is the
+     * argument (`my-switch backup`, `my-switch primary`), so the command and
+     * the provider it names are naturally paired.
+     *
+     * Blank (the default) disables it entirely, so no existing install gains
+     * behaviour by upgrading. This is the only setting here that can change
+     * the state of the machine, so it is never enabled by default, never
+     * inferred, and the outcome of every run is recorded in the decision log.
+     *
+     * Split on whitespace and executed directly, with no shell, so
+     * `my-script --provider backup` works while pipes, redirects and globs do
+     * not. Point it at a script if you need those. Desktop only.
+     */
+    val activateCommand: String = "",
+    /**
+     * Remaining-percent threshold at which work should move OFF this provider.
+     * 0 disables.
+     *
+     * Note the asymmetry with [activateCommand], which is deliberate: this
+     * says when to leave, that says how to arrive. When this provider falls
+     * below the threshold the trigger runs a *different* provider's
+     * [activateCommand] — the healthiest one that reports a known level and
+     * has more left than this one. A provider whose level is unknown is never
+     * a candidate, so an unreadable gauge cannot be mistaken for a full tank.
+     *
+     * Guarded by agreement across polls, a fire-once-per-excursion rule, a
+     * cooldown and the fleet-idle gate — see
+     * [com.angussoftware.fueldashboard.engine.SwitchCommandTrigger].
+     */
+    val swapAwayBelowPct: Int = 0,
 ) {
     /**
      * Resolved display name: custom name > provider's default.
@@ -81,6 +124,7 @@ data class ProviderConfig(
         ProviderKind.QWEN -> serverUrl.ifBlank { "https://dashscope.aliyuncs.com/api" }
         ProviderKind.TOGETHER -> serverUrl.ifBlank { "https://api.together.xyz" }
         ProviderKind.JUNIE -> ""
+        ProviderKind.CLAUDE_CODE -> serverUrl.ifBlank { "https://api.anthropic.com" }
         ProviderKind.CONNECTED_API -> serverUrl.ifBlank { "http://127.0.0.1:8322" }
     }
 
@@ -92,6 +136,9 @@ data class ProviderConfig(
         get() = when (kind) {
             ProviderKind.CONNECTED_API -> resolvedServerUrl().isNotBlank()
             ProviderKind.JUNIE -> true
+            // Authenticates with the OAuth token Claude Code already stores
+            // locally — there is no key to paste, so adding it is enough.
+            ProviderKind.CLAUDE_CODE -> true
             else -> apiKey.isNotBlank()
         }
 }

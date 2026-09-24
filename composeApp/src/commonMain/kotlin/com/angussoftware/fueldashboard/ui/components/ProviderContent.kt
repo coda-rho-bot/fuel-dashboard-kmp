@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.style.TextDecoration
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.model.ProviderConfig
+import com.angussoftware.fueldashboard.presentation.SwitchRunStatus
 import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
@@ -50,17 +52,65 @@ fun ProviderContent(
     isChecking: Boolean,
     onCheckJunieBalance: (() -> Unit)?,
     boxedCreditBalance: Boolean,
+    /** True when Claude Code is currently routed to this provider. */
+    isServingClaudeCode: Boolean = false,
+    /**
+     * True when this provider answered with nothing, but not often enough yet
+     * to be called unavailable. Renders as "connecting" rather than a badge.
+     */
+    isSettling: Boolean = false,
+    /** True while this provider's switch command is running. */
+    isSwapping: Boolean = false,
+    /** Non-null only when a switch command is configured and runnable here. */
+    onSwapNow: (() -> Unit)? = null,
+    /** Outcome of the last manual swap, or null when there has not been one. */
+    switchStatus: SwitchRunStatus? = null,
+    /** Retries the swap past a fleet-gate refusal. Null when not offered. */
+    onSwapAnyway: (() -> Unit)? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(config.resolvedDisplayName(), style = titleStyle, fontWeight = FontWeight.Bold)
+            // One spacing rule for the whole row rather than a spacer before
+            // some children and none before others. The row's contents are
+            // conditional — the badge and the button each appear only
+            // sometimes — so hand-placed spacers gave a different gap
+            // depending on which happened to render.
+            Row(
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(config.resolvedDisplayName(), style = titleStyle, fontWeight = FontWeight.Bold)
+                // Which provider Claude Code is actually pointed at. Without
+                // this the dashboard shows several gauges and gives no hint
+                // which one your sessions are currently burning.
+                if (isServingClaudeCode) {
+                    Text(
+                        "● IN USE",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                // Inline with the name, because the action belongs to this
+                // provider: "switch to this one". Renders nothing unless a
+                // command is configured and this platform can run one.
+                ProviderSwapButton(
+                    hasActivateCommand = config.activateCommand.isNotBlank(),
+                isSwapping = isSwapping,
+                isActive = isServingClaudeCode,
+                onSwapNow = onSwapNow,
+                )
+            }
             if (error != null) {
                 Text("\u26A0 Error", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-            } else if (report != null && !report.available) {
+            } else if (report != null && !report.available && !isSettling) {
+                // Held back while settling: one empty reading right after
+                // start is a moment, not a verdict, and UNAVAILABLE reads as
+                // "this provider is broken".
                 Text("UNAVAILABLE", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
             }
         }
@@ -77,9 +127,12 @@ fun ProviderContent(
             return@Column
         }
 
-        if (report == null) {
+        // No reading yet: either nothing has come back at all, or what came
+        // back was empty and has not repeated often enough to be a verdict.
+        // Both mean "still waiting", so both spin.
+        if (report == null || isSettling) {
             Spacer(Modifier.height(8.dp))
-            Text("Connecting...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ProviderConnecting()
             return@Column
         }
 
@@ -90,8 +143,8 @@ fun ProviderContent(
                     PrepaidCreditBalance(report)
                 } else report.usedDollars?.let { BudgetBar(it, report.limitDollars, showHelp = showHelp) } ?: if (report.rawDisplay.isBlank()) Text(
                     "No spend data (costs API unavailable — admin key required, or request failed)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 ) else Unit
                 val rateLimitWindows = report.windows.filter { it.name == "Requests/min" || it.name == "Tokens/min" }
                 if (rateLimitWindows.isNotEmpty()) {
@@ -115,8 +168,8 @@ fun ProviderContent(
                     // Remote Dashboard: show custom text instead of "no usage data"
                     Text(
                         "Connected to remote dashboard",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else if (report.windows.isNotEmpty()) {
                     report.windows.forEachIndexed { idx, w ->
@@ -124,7 +177,7 @@ fun ProviderContent(
                         ProviderWindowRow(w, showHelp)
                     }
                 } else if (report.remainingPct != null) {
-                    FuelBar(report.remainingPct, label = "Remaining", showHelp = showHelp)
+                    FuelBar(report.remainingPct, label = "Overall", showHelp = showHelp)
                 } else {
                     Text("No usage data (unlimited or static)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -147,6 +200,13 @@ fun ProviderContent(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+
+        // Outcome of the last swap. The button itself lives in the header row;
+        // only its result belongs down here with the card's other detail.
+        if (switchStatus != null) {
+            Spacer(Modifier.height(6.dp))
+            ProviderSwapStatus(switchStatus, onOverride = onSwapAnyway)
         }
 
         // Gemini: Google exposes no quota/usage API for API keys — limits,
@@ -219,10 +279,10 @@ private fun ProviderConsoleLink(kind: ProviderKind) {
     Column {
         Text(
             "Links (${links.size})",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            textDecoration = TextDecoration.Underline,
-            modifier = Modifier
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier
                 .clickable { expanded = !expanded }
                 .padding(vertical = 2.dp),
         )
@@ -230,10 +290,10 @@ private fun ProviderConsoleLink(kind: ProviderKind) {
             links.forEach { (label, url) ->
                 Text(
                     "  $label",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier
                         .clickable { uriHandler.openUri(url) }
                         .padding(vertical = 1.dp, horizontal = 4.dp)
                         .fillMaxWidth(),
@@ -294,6 +354,10 @@ private fun providerLinks(kind: ProviderKind): List<Pair<String, String>> = when
         "Billing" to "https://api.together.ai/settings/organization/~current/billing",
         "API keys" to "https://api.together.ai/settings/api-keys",
     )
+    ProviderKind.CLAUDE_CODE -> listOf(
+        "Plan usage & limits" to "https://claude.ai/settings/usage",
+        "Manage subscription" to "https://claude.ai/settings/billing",
+    )
     ProviderKind.GEMINI, ProviderKind.JUNIE, ProviderKind.CONNECTED_API -> emptyList()
 }
 
@@ -304,32 +368,32 @@ private fun GeminiStudioLinks() {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             "Limits, billing & spend live in AI Studio:",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.width(8.dp))
         Text(
             "rate limits",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            textDecoration = TextDecoration.Underline,
-            modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/rate-limit") },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/rate-limit") },
         )
         Text(" · ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             "billing",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            textDecoration = TextDecoration.Underline,
-            modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/billing") },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/billing") },
         )
         Text(" · ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             "usage",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            textDecoration = TextDecoration.Underline,
-            modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/usage") },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable { uriHandler.openUri("https://aistudio.google.com/usage") },
         )
     }
 }
@@ -349,25 +413,24 @@ private fun ProviderWindowRow(window: ReportWindow, showHelp: Boolean) {
                 TimerBar(
                     resetsAt = resetTime,
                     windowMs = (window.windowHours * 3_600_000).toLong(),
-                    showHelp = showHelp,
                     modifier = Modifier.weight(1f),
                 )
                 if (window.resetEstimated) {
                     Spacer(Modifier.width(4.dp))
                     Icon(
                         imageVector = Icons.Default.Warning,
-                        contentDescription = "Estimated timer",
-                        tint = Color(0xFFFFC107),
-                        modifier = Modifier.size(14.dp),
+                contentDescription = "Estimated timer",
+                tint = Color(0xFFFFC107),
+                modifier = Modifier.size(14.dp),
                     )
                 }
             }
             if (window.resetEstimated && showHelp) {
                 Text(
                     "Timer estimated — provider did not return a reset value. This may indicate the window resets on next request or a connectivity issue.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFFFC107),
-                    modifier = Modifier.padding(top = 2.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFFFC107),
+                modifier = Modifier.padding(top = 2.dp),
                 )
             }
         }
@@ -442,5 +505,25 @@ private fun formatCredits(n: Int?): String {
             if (i > 0 && (len - i) % 3 == 0) append(',')
             append(s[i])
         }
+    }
+}
+
+/**
+ * "Still waiting for a reading" — a spinner rather than a bare line of text,
+ * so an empty tile is visibly *pending* instead of looking broken or blank.
+ */
+@Composable
+private fun ProviderConnecting() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "Connecting\u2026",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

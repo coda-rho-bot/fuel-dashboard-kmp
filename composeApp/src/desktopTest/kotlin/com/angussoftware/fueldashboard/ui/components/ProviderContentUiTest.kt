@@ -13,6 +13,9 @@ import com.angussoftware.fueldashboard.model.ProviderKind
 import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.model.ReportWindow
+import com.angussoftware.fueldashboard.presentation.SwitchRunStatus
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import kotlin.test.Test
 
 /**
@@ -63,21 +66,32 @@ class ProviderContentUiTest {
     private fun render(
         report: ProviderReport?,
         error: String? = null,
+        providerConfig: ProviderConfig = config,
+        isSettling: Boolean = false,
+        isSwapping: Boolean = false,
+        isServingClaudeCode: Boolean = false,
+        onSwapNow: (() -> Unit)? = null,
+        switchStatus: SwitchRunStatus? = null,
         assertions: androidx.compose.ui.test.ComposeUiTest.() -> Unit,
     ) = runDesktopComposeUiTest {
         setContent {
             MaterialTheme {
                 Surface {
                     ProviderContent(
-                        config = config,
+                        config = providerConfig,
                         report = report,
                         error = error,
                         showHelp = false,
                         titleStyle = MaterialTheme.typography.titleSmall,
                         contentSpacing = 8.dp,
                         isChecking = false,
+                        isServingClaudeCode = isServingClaudeCode,
                         onCheckJunieBalance = null,
                         boxedCreditBalance = false,
+                        isSettling = isSettling,
+                        isSwapping = isSwapping,
+                        onSwapNow = onSwapNow,
+                        switchStatus = switchStatus,
                     )
                 }
             }
@@ -94,8 +108,10 @@ class ProviderContentUiTest {
 
     @Test
     fun windowCredit_showsRemainingPercentage() = render(windowCreditReport()) {
-        // 58% remaining must be rendered somewhere in the card body
-        onAllNodesWithText("58%").assertCountEquals(1)
+        // 58% remaining must be rendered somewhere in the card body, and it
+        // must carry its unit: a bare "58%" reads as 58% *used*, which is the
+        // complement of what this gauge means.
+        onAllNodesWithText("58% left").assertCountEquals(1)
     }
 
     @Test
@@ -132,5 +148,153 @@ class ProviderContentUiTest {
     fun healthyReport_noErrorOrUnavailableBadge() = render(windowCreditReport()) {
         onNodeWithText("UNAVAILABLE").assertDoesNotExist()
         onNodeWithText("\u26A0 Error").assertDoesNotExist()
+    }
+
+    // --- manual swap button -------------------------------------------------
+
+    private val swapConfig = config.copy(activateCommand = "/bin/echo swapped", swapAwayBelowPct = 10)
+
+    @Test
+    fun swapButton_hiddenWhenNoCommandConfigured() = render(
+        windowCreditReport(),
+        onSwapNow = {},
+    ) {
+        // config has a blank activateCommand: the opt-in promise is that an
+        // un-configured provider gains no control here.
+        onAllNodesWithText("Swap").assertCountEquals(0)
+    }
+
+    @Test
+    fun swapButton_hiddenWhenPlatformOffersNoAction() = render(
+        windowCreditReport(),
+        providerConfig = swapConfig,
+        onSwapNow = null,
+    ) {
+        // A command is configured, but the caller passed no action (mobile, or
+        // switchCommandsSupported == false). Nothing must render.
+        onAllNodesWithText("Swap").assertCountEquals(0)
+    }
+
+    @Test
+    fun swapButton_showsWhenConfigured() = render(
+        windowCreditReport(),
+        providerConfig = swapConfig,
+        onSwapNow = {},
+    ) {
+        // The card no longer echoes the command: it is the provider's own
+        // "switch to me", not a script whose text the reader must inspect.
+        onNodeWithText("Swap").assertIsDisplayed()
+        onAllNodesWithText("Runs: /bin/echo swapped").assertCountEquals(0)
+    }
+
+    @Test
+    fun swapButton_disabledOnTheProviderAlreadyInUse() = render(
+        windowCreditReport(),
+        providerConfig = swapConfig,
+        isServingClaudeCode = true,
+        onSwapNow = {},
+    ) {
+        // Disabled rather than hidden: hiding it would make the row jump as
+        // the active provider changes, and "you are already here" is worth
+        // saying.
+        // One label either way; the "● IN USE" badge is what explains the
+        // disabled state, so the button does not repeat it.
+        onNodeWithText("Swap").assertIsNotEnabled()
+    }
+
+    @Test
+    fun swapButton_stillOfferedOnAnErroringCard() = render(
+        windowCreditReport(),
+        providerConfig = swapConfig,
+        error = "429 Too Many Requests",
+        onSwapNow = {},
+    ) {
+        // An erroring provider is when you most want to leave it. The old
+        // full-width block sat below an early return for the error state and
+        // so never rendered here; the header placement fixes that.
+        onNodeWithText("Swap").assertIsDisplayed()
+    }
+
+    @Test
+    fun swapButton_replacedBySpinnerWhileRunning() = render(
+        windowCreditReport(),
+        providerConfig = swapConfig,
+        isSwapping = true,
+        onSwapNow = {},
+    ) {
+        onAllNodesWithText("Swap").assertCountEquals(0)
+        onNodeWithText("Swapping\u2026").assertIsDisplayed()
+    }
+
+    @Test
+    fun swapButton_showsRefusalReason() = render(
+        windowCreditReport(),
+        providerConfig = swapConfig,
+        onSwapNow = {},
+        switchStatus = SwitchRunStatus(ok = false, message = "Not swapped — 3 of 20 sessions still working. Let them finish."),
+    ) {
+        // A refusal must be visible: otherwise "the fleet is busy" and "the
+        // button is broken" look identical from the outside.
+        onNodeWithText("\u26a0 Not swapped — 3 of 20 sessions still working. Let them finish.").assertIsDisplayed()
+    }
+
+    @Test
+    fun swapButton_showsSuccessLine() = render(
+        windowCreditReport(),
+        providerConfig = swapConfig,
+        onSwapNow = {},
+        switchStatus = SwitchRunStatus(ok = true, message = "Switched — ok"),
+    ) {
+        onNodeWithText("\u2713 Switched — ok").assertIsDisplayed()
+    }
+
+    // --- settling vs genuinely unavailable ----------------------------------
+
+    /** Polled successfully, but the payload carried no usable reading. */
+    private fun emptyReport() = ProviderReport(
+        providerId = "p1",
+        displayName = "My z.ai",
+        type = ProviderType.WINDOW_CREDIT,
+        available = false,
+    )
+
+    @Test
+    fun emptyReading_whileSettling_spinsInsteadOfAccusing() = render(
+        emptyReport(),
+        isSettling = true,
+    ) {
+        onNodeWithText("Connecting\u2026").assertIsDisplayed()
+        // The badge is the whole point: one empty reading must not be
+        // announced as a broken provider.
+        onAllNodesWithText("UNAVAILABLE").assertCountEquals(0)
+        onAllNodesWithText("No usage data (unlimited or static)").assertCountEquals(0)
+    }
+
+    @Test
+    fun emptyReading_onceSettled_saysUnavailable() = render(
+        emptyReport(),
+        isSettling = false,
+    ) {
+        // Still honest once it has repeated: a spinner forever would hide a
+        // provider that genuinely has nothing to say.
+        onNodeWithText("UNAVAILABLE").assertIsDisplayed()
+        onAllNodesWithText("Connecting\u2026").assertCountEquals(0)
+    }
+
+    @Test
+    fun noReportAtAll_spins() = render(null) {
+        onNodeWithText("Connecting\u2026").assertIsDisplayed()
+        onAllNodesWithText("UNAVAILABLE").assertCountEquals(0)
+    }
+
+    @Test
+    fun anErrorStillWinsOverSettling() = render(
+        emptyReport(),
+        error = "boom",
+        isSettling = true,
+    ) {
+        // A real failure must never be softened into "connecting".
+        onNodeWithText("\u26A0 Error").assertIsDisplayed()
+        onNodeWithText("boom").assertIsDisplayed()
     }
 }

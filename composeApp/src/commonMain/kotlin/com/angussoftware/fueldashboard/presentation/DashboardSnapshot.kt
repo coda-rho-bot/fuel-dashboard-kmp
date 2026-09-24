@@ -38,6 +38,31 @@ object DashboardSnapshot {
             }
         })
 
+        // ── Claude Code routing: which provider is actually serving ────
+        // Emitted only when known. An absent section means "could not tell",
+        // which must stay distinct from "routed to stock Anthropic".
+        state.claudeCodeRoute?.let { route ->
+            put("claude_code_route", buildJsonObject {
+                put("is_default_anthropic", route.isDefaultAnthropic)
+                route.baseUrl?.let { put("base_url", it) }
+                route.host?.let { put("host", it) }
+                route.matchedProviderId?.let { put("matched_provider_id", it) }
+                route.permissionMode?.let { put("permission_mode", it) }
+                put("label", route.label(state.activeProviders))
+            })
+        }
+
+        // ── Claude Code fleet: the idle signal that gates actions ──────
+        state.claudeCodeFleet?.let { fleet ->
+            put("claude_code_fleet", buildJsonObject {
+                put("busy", fleet.busy)
+                put("idle", fleet.idle)
+                put("unknown", fleet.unknown)
+                put("total", fleet.total)
+                put("quiet", fleet.isQuiet)
+            })
+        }
+
         // ── Fuel: burn rates + projection ──────────────────────────────
         put("fuel", buildJsonObject {
             state.burnRate?.let { put("burn_rate_pct_per_hr", it) }

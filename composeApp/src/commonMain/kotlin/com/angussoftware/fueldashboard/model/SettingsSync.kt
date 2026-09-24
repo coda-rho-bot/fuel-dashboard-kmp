@@ -92,7 +92,10 @@ data class SettingsSyncData(
             junieLicense: String? = null,
             junieLastChecked: Long? = null,
         ): SettingsSyncData = SettingsSyncData(
-            providers = settings.providers,
+            // Switch commands never leave this machine: they are local,
+            // privileged and machine-specific. The receiver strips them too —
+            // this is the belt to that braces.
+            providers = settings.providers.map { it.copy(activateCommand = "", swapAwayBelowPct = 0) },
             themeMode = themeController.themeMode.name,
             lightColorTheme = themeController.lightColorTheme.name,
             darkColorTheme = themeController.darkColorTheme.name,

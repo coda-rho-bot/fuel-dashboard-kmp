@@ -3,6 +3,7 @@ package com.angussoftware.fueldashboard.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -71,33 +72,40 @@ fun HelpIcon(
 ) {
     var isVisible by remember { mutableStateOf(false) }
 
-    Icon(
-        imageVector = Icons.Default.Info,
-        contentDescription = text,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier
-            .clickable { isVisible = !isVisible },
-    )
+    // The icon and its popup must be ONE node in the caller's layout.
+    // Emitted as siblings, the popup becomes an extra child of whatever Row
+    // holds the icon — and an Arrangement that divides space by child count
+    // (SpaceBetween, SpaceAround, SpaceEvenly) then re-spreads the whole row
+    // the moment the tooltip opens. In App.kt's "Updated …" row that moved
+    // the icon 245dp to the left, out from under the cursor that clicked it.
+    Box(modifier = modifier) {
+        Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = text,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.clickable { isVisible = !isVisible },
+        )
 
-    if (isVisible) {
-        Popup(
-            alignment = Alignment.TopStart,
-            offset = IntOffset(0, 20),
-            onDismissRequest = { isVisible = false },
-            properties = PopupProperties(focusable = true),
-        ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.inverseSurface,
-                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                shadowElevation = 4.dp,
-                modifier = Modifier.widthIn(max = 280.dp),
+        if (isVisible) {
+            Popup(
+                alignment = Alignment.TopStart,
+                offset = IntOffset(0, 20),
+                onDismissRequest = { isVisible = false },
+                properties = PopupProperties(focusable = true),
             ) {
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.inverseSurface,
+                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.widthIn(max = 280.dp),
+                ) {
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
             }
         }
     }

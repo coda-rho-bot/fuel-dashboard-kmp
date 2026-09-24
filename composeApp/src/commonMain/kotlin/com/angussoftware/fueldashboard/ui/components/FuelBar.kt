@@ -64,7 +64,7 @@ fun FuelBar(
                     }
                 }
                 Text(
-                    text = "$remainingPct%",
+                    text = "$remainingPct% left",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = animatedColor,

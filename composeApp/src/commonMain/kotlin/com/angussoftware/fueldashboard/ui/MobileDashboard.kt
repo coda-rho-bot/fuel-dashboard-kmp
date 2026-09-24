@@ -147,8 +147,8 @@ fun MobileDashboard(
                 if (!hasUsageData) {
                     EmptyTabState(showHelp = state.showHelp, 
                         title = "Collecting data…",
-                        message = "Usage metrics appear here once the dashboard has polled your providers a few times.",
-                        hint = "Add providers in Settings and wait a few minutes for the first poll cycle.",
+                        message = "Token metering is a separate feed from the provider gauges — it needs a usage source, not just providers.",
+                        hint = "Usage is metered on the desktop app. Connect a Remote Dashboard, or set up a source there.",
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
                 } else {
@@ -411,6 +411,9 @@ private fun MobileFuelContent(
                         report = report,
                         error = error,
                         showHelp = state.showHelp,
+                        isServingClaudeCode =
+                            state.claudeCodeRoute?.matchedProviderId == config.id,
+                        isSettling = config.id in state.settlingProviderIds,
                     )
                 }
                 }
@@ -510,6 +513,8 @@ private fun MobileProviderCard(
     report: ProviderReport?,
     error: String?,
     showHelp: Boolean,
+    isServingClaudeCode: Boolean = false,
+    isSettling: Boolean = false,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -527,8 +532,10 @@ private fun MobileProviderCard(
                 titleStyle = MaterialTheme.typography.titleMedium,
                 contentSpacing = 12.dp,
                 isChecking = false,
+                isSettling = isSettling,
                 onCheckJunieBalance = null,
                 boxedCreditBalance = false,
+                isServingClaudeCode = isServingClaudeCode,
             )
         }
     }
