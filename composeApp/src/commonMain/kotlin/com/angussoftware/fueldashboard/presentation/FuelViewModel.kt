@@ -1545,17 +1545,10 @@ class FuelViewModel(
         // ── Standalone alert generation ──────────────────────────────────
         // If no connected API (orchestrator) is providing alerts, generate
         // them locally from provider fuel percentages.
-        val generatedAlerts = mutableListOf<String>()
-        for ((providerId, report) in reports) {
-            val pct = report.remainingPct
-            if (pct != null && report.available) {
-                val name = report.displayName.ifBlank { providerId }
-                when {
-                    pct < 10 -> generatedAlerts.add("CRITICAL: $name at $pct%")
-                    pct < 25 -> generatedAlerts.add("WARNING: $name at $pct%")
-                }
-            }
-        }
+        val generatedAlerts = generateFuelAlerts(
+            reports = reports,
+            servingProviderId = _state.value.claudeCodeRoute?.matchedProviderId,
+        )
         // Merge: if the orchestrator provided alerts, use those + generated.
         // Otherwise, use generated alone.
         if (generatedAlerts.isNotEmpty()) {
@@ -2022,6 +2015,41 @@ class FuelViewModel(
                 message = "Command succeeded but nothing moved — Claude Code is still on " +
                     "$activeName. Does the command actually switch provider?",
             )
+        }
+    }
+
+    /**
+     * Fuel alerts for the providers we polled.
+     *
+     * Severity follows impact, not just the number. Running dry on the
+     * provider actually serving requests stops work now; the same percentage
+     * on one you are not routed to does not, and shouting equally about both
+     * trains the eye to ignore the panel — with several providers configured,
+     * idle accounts would fill it with CRITICALs that never mattered.
+     *
+     * A provider that is not in use still earns one quiet, unprefixed line
+     * when it is empty, because it is the fallback you would swap to and
+     * finding it gone at that moment is worse than a note beforehand.
+     *
+     * [servingProviderId] is null when we cannot tell which provider is
+     * serving — for anyone not routing Claude Code through this app that is
+     * always, so the original severities apply unchanged rather than being
+     * silently downgraded.
+     */
+    internal fun generateFuelAlerts(
+        reports: Map<String, ProviderReport>,
+        servingProviderId: String?,
+    ): List<String> = buildList {
+        for ((providerId, report) in reports) {
+            val pct = report.remainingPct ?: continue
+            if (!report.available) continue
+            val name = report.displayName.ifBlank { providerId }
+            val inUse = servingProviderId == null || providerId == servingProviderId
+            when {
+                inUse && pct < 10 -> add("CRITICAL: $name at $pct%")
+                inUse && pct < 25 -> add("WARNING: $name at $pct%")
+                pct < 10 -> add("$name is empty ($pct%) — not in use")
+            }
         }
     }
 
