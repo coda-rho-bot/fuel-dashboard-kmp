@@ -298,11 +298,6 @@ data class DashboardState(
     val showAdvisor: Boolean = false, // advisor hidden by default (Harry, Aug 24)
     val checkingProviderIds: Set<String> = emptySet(),
     /**
-     * Providers that answered with nothing, but not yet often enough to call
-     * it unavailable. The tile shows a spinner for these rather than an
-     * alarming badge — see [consecutiveUnavailable].
-     */
-    /**
      * Providers parked after a server asked us to back off, by the epoch
      * millisecond they may be polled again.
      *
@@ -311,6 +306,11 @@ data class DashboardState(
      * changing. That ambiguity is the whole reason this is in state.
      */
     val rateLimitedUntil: Map<String, Long> = emptyMap(),
+    /**
+     * Providers that answered with nothing, but not yet often enough to call
+     * it unavailable. The tile shows a spinner for these rather than an
+     * alarming badge — see [consecutiveUnavailable].
+     */
     val settlingProviderIds: Set<String> = emptySet(),
     /** Providers whose switch command is running right now. */
     val swappingProviderIds: Set<String> = emptySet(),
