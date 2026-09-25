@@ -302,6 +302,15 @@ data class DashboardState(
      * it unavailable. The tile shows a spinner for these rather than an
      * alarming badge — see [consecutiveUnavailable].
      */
+    /**
+     * Providers parked after a server asked us to back off, by the epoch
+     * millisecond they may be polled again.
+     *
+     * Surfaced rather than kept private because a silently parked provider and
+     * a broken one look identical from the outside: the tile simply stops
+     * changing. That ambiguity is the whole reason this is in state.
+     */
+    val rateLimitedUntil: Map<String, Long> = emptyMap(),
     val settlingProviderIds: Set<String> = emptySet(),
     /** Providers whose switch command is running right now. */
     val swappingProviderIds: Set<String> = emptySet(),
@@ -1362,6 +1371,23 @@ class FuelViewModel(
     private val rateLimitedUntil = mutableMapOf<String, Long>()
 
     /**
+     * Longest a server's Retry-After may park a provider — the same
+     * 30-minute ceiling the exponential failure backoff already uses, so the
+     * two agree on how long is too long to go quiet.
+     */
+    internal val maxRateLimitParkMs = 30L * 60 * 1000
+
+    /**
+     * When a provider parked by [retryAfterMs] may be polled again.
+     *
+     * A function rather than an inline expression so the bound is exercised
+     * directly by tests: a test that re-implements the arithmetic only proves
+     * the test can multiply.
+     */
+    internal fun parkUntil(now: Long, retryAfterMs: Long): Long =
+        now + retryAfterMs.coerceAtMost(maxRateLimitParkMs)
+
+    /**
      * Consecutive polls that SUCCEEDED but carried no usable reading, per
      * provider id.
      *
@@ -1475,7 +1501,15 @@ class FuelViewModel(
                     consecutiveUnavailable.remove(providerId)
                     val retryAfter = (it as? ClaudeCodeUsageHttpException)?.retryAfterMs
                     if (retryAfter != null) {
-                        rateLimitedUntil[providerId] = epochMillis() + retryAfter
+                        // Capped at the same ceiling the failure backoff uses.
+                        // An honest Retry-After of hours is plausible for a
+                        // quota reset, but so is a malformed one — seconds
+                        // sent where milliseconds were meant parks a provider
+                        // for a day, which is indistinguishable from a hang.
+                        // Respecting the cap costs at most one request per
+                        // ceiling: if the server really wants longer it
+                        // answers 429 again and we re-park.
+                        rateLimitedUntil[providerId] = parkUntil(epochMillis(), retryAfter)
                     }
                 }
         }
@@ -1737,6 +1771,9 @@ class FuelViewModel(
             alerts = alerts,
             isLoading = false,
             lastUpdated = epochMillis(),
+            // Only parks still in the future: an expired one is not a state
+            // the card should keep announcing.
+            rateLimitedUntil = rateLimitedUntil.filterValues { it > epochMillis() },
             // Re-read each poll: the file is rewritten underneath us whenever
             // the provider is switched, so a cached value would go stale
             // exactly when it matters most. Goes through the fleetReader seam

@@ -40,6 +40,7 @@ import com.angussoftware.fueldashboard.model.ProviderReport
 import com.angussoftware.fueldashboard.model.ProviderType
 import com.angussoftware.fueldashboard.util.formatRoot
 import com.angussoftware.fueldashboard.model.ReportWindow
+import com.angussoftware.fueldashboard.util.epochMillis
 
 @Composable
 fun ProviderContent(
@@ -67,6 +68,11 @@ fun ProviderContent(
     switchStatus: SwitchRunStatus? = null,
     /** Retries the swap past a fleet-gate refusal. Null when not offered. */
     onSwapAnyway: (() -> Unit)? = null,
+    /**
+     * When this provider may be polled again after a server asked us to back
+     * off, or null when it is not parked.
+     */
+    rateLimitedUntil: Long? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -113,6 +119,19 @@ fun ProviderContent(
                 // "this provider is broken".
                 Text("UNAVAILABLE", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
             }
+        }
+
+        // A parked provider stops updating, which on its own is
+        // indistinguishable from a broken one. Say which it is, and for how
+        // long, so waiting looks like waiting.
+        rateLimitedUntil?.let { until ->
+            val minutes = ((until - epochMillis()) / 60_000).coerceAtLeast(0) + 1
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Rate limited — retrying in ${minutes}m",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (error != null) {

@@ -657,6 +657,7 @@ internal fun FuelColumnContent(
                             } else {
                                 null
                             },
+                            rateLimitedUntil = state.rateLimitedUntil[config.id],
                             switchStatus = state.switchResults[config.id],
                         )
                     }
@@ -717,6 +718,7 @@ private fun ProviderSection(
     isSwapping: Boolean,
     onSwapNow: (() -> Unit)?,
     onSwapAnyway: (() -> Unit)?,
+    rateLimitedUntil: Long?,
     switchStatus: com.angussoftware.fueldashboard.presentation.SwitchRunStatus?,
 ) {
     com.angussoftware.fueldashboard.ui.components.ProviderContent(
@@ -734,6 +736,7 @@ private fun ProviderSection(
         isSwapping = isSwapping,
         onSwapNow = onSwapNow,
         onSwapAnyway = onSwapAnyway,
+        rateLimitedUntil = rateLimitedUntil,
         switchStatus = switchStatus,
     )
 }
