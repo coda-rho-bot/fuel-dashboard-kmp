@@ -45,7 +45,7 @@ fun AlertsPanel(
             )
             if (showHelp) {
                 Spacer(Modifier.width(4.dp))
-                HelpIcon("Automatic alerts when providers drop below critical fuel levels (10% = critical, 25% = warning)")
+                HelpIcon("Automatic alerts when the provider serving requests drops below critical fuel levels (10% = critical, 25% = warning). Providers not in use only earn a quiet note when empty — they're your fallback, not your fuel.")
             }
         }
         Spacer(Modifier.height(8.dp))

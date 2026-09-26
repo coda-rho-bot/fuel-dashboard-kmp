@@ -2048,7 +2048,8 @@ class FuelViewModel(
             when {
                 inUse && pct < 10 -> add("CRITICAL: $name at $pct%")
                 inUse && pct < 25 -> add("WARNING: $name at $pct%")
-                pct < 10 -> add("$name is empty ($pct%) — not in use")
+                pct == 0 -> add("$name is empty (0%) — not in use")
+                pct < 10 -> add("$name is nearly empty ($pct%) — not in use")
             }
         }
     }

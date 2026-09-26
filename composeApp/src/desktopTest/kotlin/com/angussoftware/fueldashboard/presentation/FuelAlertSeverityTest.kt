@@ -75,6 +75,14 @@ class FuelAlertSeverityTest {
     }
 
     @Test
+    fun aNearlyEmptyUnusedProviderIsNearlyEmptyNotEmpty() {
+        // 5% is low, not gone — the wording must not claim "empty" when the
+        // gauge still reads.
+        val out = alerts("zai" to report("zai", "z.ai Coding Plan", 5), serving = "cc")
+        assertEquals(listOf("z.ai Coding Plan is nearly empty (5%) — not in use"), out)
+    }
+
+    @Test
     fun anEmptyUnusedProviderIsStillMentionedOnce() {
         // Not silence: it is the fallback you would swap to, and finding it
         // gone at that moment is worse than a quiet note now.
