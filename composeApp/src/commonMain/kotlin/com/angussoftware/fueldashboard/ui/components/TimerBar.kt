@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.angussoftware.fueldashboard.util.epochMillis
@@ -34,7 +33,8 @@ import kotlinx.coroutines.delay
  * A horizontal timer gauge that shows time remaining until quota reset.
  *
  * The bar fills from left to right as time elapses (empty = just reset, full = about to reset).
- * Color interpolates purple → blue → cyan (fresh reset = purple, almost expired = cyan).
+ * Color interpolates along the theme's accents: primary (fresh reset) →
+ * tertiary (almost expired). Theme-derived — see [GaugeColors].
  *
  * @param resetsAt     Epoch ms when the quota window resets
  * @param windowMs     Total window duration in ms (e.g. 5h = 18_000_000)
@@ -115,34 +115,4 @@ fun TimerBar(
             }
         }
     }
-}
-
-/**
- * Timer color: purple (fresh, 0% elapsed) → blue (mid, 50%) → cyan (almost expired, 100%).
- *
- * Uses muted Material-palette-inspired endpoints:
- *   Purple 400 → Blue 400 → Cyan 400
- */
-fun timerColor(elapsedFraction: Float): Color {
-    val purple = floatArrayOf(0.50f, 0.33f, 0.70f)  // muted Purple 400
-    val blue = floatArrayOf(0.20f, 0.45f, 0.75f)    // muted Blue 400
-    val cyan = floatArrayOf(0.15f, 0.55f, 0.60f)    // muted Cyan 400
-
-    val target = if (elapsedFraction <= 0.5f) {
-        val t = elapsedFraction / 0.5f
-        floatArrayOf(
-            purple[0] + (blue[0] - purple[0]) * t,
-            purple[1] + (blue[1] - purple[1]) * t,
-            purple[2] + (blue[2] - purple[2]) * t,
-        )
-    } else {
-        val t = (elapsedFraction - 0.5f) / 0.5f
-        floatArrayOf(
-            blue[0] + (cyan[0] - blue[0]) * t,
-            blue[1] + (cyan[1] - blue[1]) * t,
-            blue[2] + (cyan[2] - blue[2]) * t,
-        )
-    }
-
-    return Color(target[0], target[1], target[2])
 }

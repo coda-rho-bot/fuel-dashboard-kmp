@@ -168,10 +168,10 @@ fun NeedleGauge(remainingPct: Int?, modifier: Modifier = Modifier) {
 fun HourglassGauge(sandFraction: Float?, modifier: Modifier = Modifier) {
     val frameColor = MaterialTheme.colorScheme.outline
     // Sand uses the SAME timerColor system as the list view's TimerBar:
-    // purple (fresh, time remaining) → blue (mid) → cyan (nearly expired).
-    // sandFraction is remaining/total; timerColor takes elapsed fraction,
-    // so we pass (1 - sandFraction). Visually distinct from the needle's
-    // green-amber-red fuel gradient.
+    // theme primary (fresh, time remaining) → tertiary (nearly expired),
+    // both from the theme's accents. sandFraction is remaining/total;
+    // timerColor takes elapsed fraction, so we pass (1 - sandFraction).
+    // Visually distinct from the needle's fuel ramp (primary → error).
     val sandColor = timerColor(1f - (sandFraction ?: 0f))
     Canvas(modifier = modifier) {
         if (sandFraction == null) return@Canvas
