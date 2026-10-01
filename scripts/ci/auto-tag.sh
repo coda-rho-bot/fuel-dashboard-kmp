@@ -47,5 +47,26 @@ git config --global user.email "woodpecker@angussoftware.dev"
 git config --global user.name "Woodpecker CI"
 git tag "$NEWTAG"
 REPO="${REPO:-RhoMancer/Angus-Tasks}"
-git push "https://x-access-token:${GPR_TOKEN}@github.com/${REPO}.git" "$NEWTAG" 2>&1 || echo "Tag push failed"
+# Leak-proof (post-#287): GPR_TOKEN consumed via a Python subprocess — the
+# old x-access-token:${GPR_TOKEN} URL expanded the secret in command text,
+# which Woodpecker's wrapper echoes to logs regardless of set +x. Token is
+# OPTIONAL: absent/dead token skips the push gracefully (same semantics as
+# angus-tasks PR #84); tag creation still happens locally either way.
+if command -v python3 >/dev/null 2>&1; then
+  python3 - "$NEWTAG" "$REPO" << 'PYEOF'
+import os, subprocess, sys
+token = os.environ.get('GPR_TOKEN', '')
+if not token:
+    print('GitHub tag push skipped (no token)')
+    sys.exit(0)
+url = f'https://x-access-token:{token}@github.com/{sys.argv[2]}.git'
+r = subprocess.run(['git', 'push', url, sys.argv[1]], capture_output=True, text=True)
+if r.returncode != 0:
+    print(f'Tag push failed: {r.stderr.strip()[:200]}')
+else:
+    print(f'Pushed {sys.argv[1]} to GitHub')
+PYEOF
+else
+  echo "python3 unavailable — skipping GitHub tag push (leak-proof path requires it)"
+fi
 
