@@ -20,7 +20,7 @@ fun MainViewController() = ComposeUIViewController {
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Fuel Dashboard — iOS coming soon")
+            Text("Agents Fuel — iOS coming soon")
         }
     }
 }

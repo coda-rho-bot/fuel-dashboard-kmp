@@ -82,7 +82,7 @@ internal fun safeProviders(settings: MultiProviderSettings): List<SafeProvider> 
 }
 
 /**
- * MCP server that exposes the Fuel Dashboard's agent registration and fuel state
+ * MCP server that exposes the Agents Fuel app's agent registration and fuel state
  * via the standard Model Context Protocol. Agents can self-register, update their
  * model/status, and read fuel state through MCP tools and resources.
  *
@@ -143,13 +143,13 @@ internal class FuelMcpServer(
     /**
      * Tool: register_agent
      *
-     * Agents call this to self-register with the Fuel Dashboard.
+     * Agents call this to self-register with Agents Fuel.
      * Returns a JSON response with the assigned agentId.
      */
     private fun Server.registerAgentTool() {
         addTool(
             name = "register_agent",
-            description = "Agent self-registers with the Fuel Dashboard. " +
+            description = "Agent self-registers with Agents Fuel. " +
                 "Returns a JSON object with 'status' and 'agentId'.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
@@ -311,7 +311,7 @@ internal class FuelMcpServer(
     private fun Server.addProviderTool() {
         addTool(
             name = "add_provider",
-            description = "Adds an LLM provider to the Fuel Dashboard. Requires 'kind' and 'api_key'.",
+            description = "Adds an LLM provider to Agents Fuel. Requires 'kind' and 'api_key'.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("kind", buildJsonObject {
@@ -439,18 +439,18 @@ internal class FuelMcpServer(
     /**
      * Tool: add_orchestrator
      *
-     * Adds a remote Fuel Dashboard server connection.
+     * Adds a remote Agents Fuel server connection.
      */
     private fun Server.addOrchestratorTool() {
         addTool(
             name = "add_orchestrator",
-            description = "Adds a remote Fuel Dashboard server connection. Requires 'url'. " +
+            description = "Adds a remote Agents Fuel server connection. Requires 'url'. " +
                 "Optional 'api_key' for the remote server's auth.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("url", buildJsonObject {
                         put("type", "string")
-                        put("description", "Remote Fuel Dashboard server URL")
+                        put("description", "Remote Agents Fuel server URL")
                     })
                     put("api_key", buildJsonObject {
                         put("type", "string")
@@ -493,7 +493,7 @@ internal class FuelMcpServer(
      *
      * Returns the full sync payload (server URL, API key, all provider configs,
      * agent settings) as a base64-encoded text code. This can be pasted into
-     * another Fuel Dashboard instance's "Import Sync Code" field to instantly
+     * another Agents Fuel instance's "Import Sync Code" field to instantly
      * replicate all settings including API keys.
      *
      * Useful for agents to programmatically sync dashboard instances across
@@ -545,7 +545,7 @@ internal class FuelMcpServer(
     /**
      * Tool: apply_sync_data
      *
-     * Applies a base64 sync code (from another Fuel Dashboard's get_sync_data)
+     * Applies a base64 sync code (from another Agents Fuel's get_sync_data)
      * to this instance. Imports all providers, agent settings, server URL, and
      * API key. Also adds a Remote Dashboard provider pointing at the source
      * instance.
@@ -553,7 +553,7 @@ internal class FuelMcpServer(
     private fun Server.applySyncDataTool() {
         addTool(
             name = "apply_sync_data",
-            description = "Applies a base64 sync code from another Fuel Dashboard instance. " +
+            description = "Applies a base64 sync code from another Agents Fuel instance. " +
                 "Imports providers, agent settings, and server connection. Requires 'sync_code'.",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {

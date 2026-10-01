@@ -201,7 +201,7 @@ compose.desktop {
             // RPM/Deb forbid dashes in versions — map semver pre-release
             // "0.2.0-beta.1" → "0.2.0~beta.1" (RPM pre-release convention).
             packageVersion = project.version.toString().replace("-beta.", "~beta.")
-            description = "Fuel Dashboard for Letta — AI provider fuel monitoring"
+            description = "Agents Fuel — AI usage tracking for your AI providers"
             vendor = "Angus Software"
             linux {
                 // App icon for the .desktop launcher + hicolor icons the deb

@@ -1668,7 +1668,7 @@ private fun AddProviderDialog(
                             Spacer(Modifier.width(4.dp))
                             HelpIcon(
                                 if (selectedKind == ProviderKind.CONNECTED_API) {
-                                    "Connects to another Fuel Dashboard instance to monitor its providers. Enter the server API key above if the remote dashboard has auth enabled."
+                                    "Connects to another Agents Fuel instance to monitor its providers. Enter the server API key above if the remote dashboard has auth enabled."
                                 } else {
                                     "Optional - only change for self-hosted endpoints."
                                 },

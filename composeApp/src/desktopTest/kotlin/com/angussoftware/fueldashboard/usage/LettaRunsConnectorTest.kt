@@ -244,7 +244,7 @@ class LettaRunsConnectorTest {
         conversationsBody = "[]"
         conversationById = mapOf(
             "conv-missing" to """
-                {"id":"conv-missing","summary":"Fuel Dashboard","agent_id":"agent-a","created_at":"2026-08-12T22:47:23Z"}
+                {"id":"conv-missing","summary":"Agents Fuel","agent_id":"agent-a","created_at":"2026-08-12T22:47:23Z"}
             """.trimIndent(),
         )
 
@@ -252,6 +252,6 @@ class LettaRunsConnectorTest {
         c.refreshMetadata()
 
         val titles = usageRepo.getConversationTitles()
-        assertEquals("Fuel Dashboard", titles["conv-missing"])
+        assertEquals("Agents Fuel", titles["conv-missing"])
     }
 }
