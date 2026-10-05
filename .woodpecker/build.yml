@@ -97,7 +97,8 @@ steps:
         url = f'https://x-access-token:{token}@github.com/RhoMancer/fuel-dashboard-kmp.git'
         r = subprocess.run(['git', 'fetch', '--tags', url], capture_output=True, text=True)
         if r.returncode != 0:
-            print(f'GitHub tag fetch failed (non-fatal): {r.stderr.strip()[:200]}')
+            scrubbed = r.stderr.replace(token, '***').strip()[:200]
+            print(f'GitHub tag fetch failed (non-fatal): {scrubbed}')
         else:
             print('GitHub tags fetched')
         PYEOF

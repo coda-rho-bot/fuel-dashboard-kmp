@@ -62,7 +62,7 @@ if not token:
 url = f'https://x-access-token:{token}@github.com/{sys.argv[2]}.git'
 r = subprocess.run(['git', 'push', url, sys.argv[1]], capture_output=True, text=True)
 if r.returncode != 0:
-    print(f'Tag push failed: {r.stderr.strip()[:200]}')
+    print(f'Tag push failed: {r.stderr.replace(token, "***").strip()[:200]}')
 else:
     print(f'Pushed {sys.argv[1]} to GitHub')
 PYEOF
