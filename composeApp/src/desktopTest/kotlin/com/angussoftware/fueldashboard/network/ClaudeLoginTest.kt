@@ -5,6 +5,7 @@ import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -67,6 +68,39 @@ class ClaudeLoginTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun theDefaultAccountGetsTheVariableUnset() {
+        // Set to ~/.claude, Claude Code reads ~/.claude/.claude.json instead of
+        // the default account's ~/.claude.json and boots as a fresh install.
+        val home = "/home/someone"
+        assertNull(configDirEnvValue(File("$home/.claude"), home))
+        assertNull(configDirEnvValue(File("$home/.claude/"), home), "a trailing slash is the same directory")
+        assertNull(configDirEnvValue(File("$home/x/../.claude"), home), "so is an unnormalised path")
+    }
+
+    @Test
+    fun anyOtherAccountGetsItsDirectory() {
+        val home = "/home/someone"
+        assertEquals(
+            "$home/.claude-accounts/work",
+            configDirEnvValue(File("$home/.claude-accounts/work"), home),
+        )
+        assertEquals("/srv/claude", configDirEnvValue(File("/srv/claude"), home))
+    }
+
+    @Test
+    fun theHintNeverTellsTheDefaultAccountToSetTheVariable() {
+        val home = "/home/someone"
+        assertEquals(
+            "Run this yourself: env -u CLAUDE_CONFIG_DIR $CLAUDE_LOGIN_COMMAND",
+            unsupportedHint(File("$home/.claude"), home),
+        )
+        assertEquals(
+            "Run this yourself: CLAUDE_CONFIG_DIR=$home/.claude-accounts/work $CLAUDE_LOGIN_COMMAND",
+            unsupportedHint(File("$home/.claude-accounts/work"), home),
+        )
     }
 
     @Test

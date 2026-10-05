@@ -59,7 +59,14 @@ internal actual suspend fun launchClaudeLogin(configDir: String?): ClaudeLoginLa
         for (argv in attempts) {
             val started = runCatching {
                 ProcessBuilder(argv)
-                    .apply { environment()["CLAUDE_CONFIG_DIR"] = dir.absolutePath }
+                    .apply {
+                        // Removed, not just left alone, for the default
+                        // account: this app may itself have been started from a
+                        // shell that has another account's value set.
+                        val value = configDirEnvValue(dir)
+                        if (value == null) environment().remove(CLAUDE_CONFIG_DIR_ENV)
+                        else environment()[CLAUDE_CONFIG_DIR_ENV] = value
+                    }
                     .start()
             }.getOrElse { e ->
                 // Almost always "no such terminal on PATH", which is why the
@@ -165,7 +172,35 @@ internal fun terminalCommands(
  */
 internal const val CLAUDE_LOGIN_COMMAND = "claude /login"
 
-private fun unsupportedHint(dir: File): String =
-    "Run this yourself: CLAUDE_CONFIG_DIR=${dir.absolutePath} $CLAUDE_LOGIN_COMMAND"
+private const val CLAUDE_CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR"
+
+/**
+ * The `CLAUDE_CONFIG_DIR` value a login for [dir] needs, or null when the
+ * variable must be UNSET.
+ *
+ * Null for the default `~/.claude`, because setting the variable is not the
+ * same as leaving it unset: with it set, Claude Code reads
+ * `$CLAUDE_CONFIG_DIR/.claude.json`, but the default account's lives at
+ * `~/.claude.json`. Pointing it at `~/.claude` therefore starts Claude Code on
+ * an empty file — a fresh install, onboarding and all — and the login lands
+ * the account's identity in a file nothing else reads.
+ */
+internal fun configDirEnvValue(
+    dir: File,
+    home: String = System.getProperty("user.home"),
+): String? {
+    val default = File(home, ".claude").absoluteFile.normalize()
+    return if (dir.absoluteFile.normalize() == default) null else dir.absolutePath
+}
+
+internal fun unsupportedHint(
+    dir: File,
+    home: String = System.getProperty("user.home"),
+): String {
+    val env = configDirEnvValue(dir, home)
+        ?.let { "$CLAUDE_CONFIG_DIR_ENV=$it" }
+        ?: "env -u $CLAUDE_CONFIG_DIR_ENV"
+    return "Run this yourself: $env $CLAUDE_LOGIN_COMMAND"
+}
 
 internal actual val claudeLoginSupported: Boolean = true
