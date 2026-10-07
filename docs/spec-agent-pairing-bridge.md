@@ -77,3 +77,28 @@ Put the client fetch+apply logic in commonMain (e.g. `PairingClient.kt` next to 
 - CI green (existing suites + new tests).
 - E2E proof: desktop test server + JVM client test redeem roundtrip documented in PR.
 - No new dependencies.
+
+---
+
+## Amendment 1 (Oct 7, research-informed — supersedes details above where conflicting)
+
+Industry research pass complete (protocols + libs). Key findings and resulting changes:
+
+### Validation
+Core design confirmed novel-but-sound: **no standard exists** for "agent triggers a user-installed app to fetch config via one-time-token deep link" (closest: RFC 8628 Device Authorization Grant security model; Tailscale one-off auth keys). Our token design copies RFC 8628 properties explicitly.
+
+### Changes to implementation
+
+1. **Token mint (desktop)**: use `ktor-server-auth` bearer provider + `ktor-server-rate-limit` (requestKey on token) for the redeem endpoint — official plugins, not hand-rolled middleware. Token: SecureRandom 256-bit, ConcurrentHashMap TTL store, consume-on-read (hand-rolled is correct — research confirms NO library exists for this primitive; OTP libs are the wrong shape).
+
+2. **Display confirmation (RFC 8628 borrow)**: `POST /pair` response includes a 6-char human-readable `code` alongside the token. Android shows this code in its success toast. Display-only for v1, not blocking.
+
+3. **Android deep link**: keep `fueldashboard://` scheme for v1 with strict param validation (current spec); note migration path to App Links (autoVerify + assetlinks.json on fuel.angussoftware.dev) in docs/self-hosting.md.
+
+4. **Storage**: do NOT refactor SharedPreferences→DataStore in this PR. Note as follow-up (EncryptedSharedPreferences deprecated; datastore-tink is the successor when we touch key storage).
+
+5. **Explicitly rejected**: Firebase Dynamic Links (shut down Aug 2025), Branch.io (SaaS overkill), A2A (wrong layer), OTP libraries (wrong primitive), AG-UI (agent-UI event streams — revisit if we build agent-facing live UI).
+
+6. **Prior art to cite in PR description**: RFC 8628, Tailscale auth keys (one-off/ephemeral), mobile-next/mobile-mcp mobile_open_url (deep-link tool pattern).
+
+No other changes. Architecture, endpoints, receiver behavior, tests, non-goals unchanged.
