@@ -58,7 +58,7 @@ steps:
       - mkdir -p /tmp/android-sdk
       - echo "sdk.dir=/tmp/android-sdk" > local.properties
       - chmod +x gradlew
-      - ./gradlew --no-daemon :composeApp:compileKotlinDesktop :composeApp:desktopTest
+      - ./gradlew --no-daemon --refresh-dependencies :composeApp:compileKotlinDesktop :composeApp:desktopTest
     environment:
       GRADLE_USER_HOME: /root/.gradle
       FORGEJO_TOKEN:
