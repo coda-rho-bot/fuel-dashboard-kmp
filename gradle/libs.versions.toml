@@ -19,7 +19,7 @@ sqldelight = "2.3.2"
 zxing-android-embedded = "4.3.0"
 acp-kotlin = "0.28.1"
 mcp-kotlin = "0.15.0"
-slf4j = "2.0.18"
+slf4j = "2.0.20"
 
 [libraries]
 # Logging (desktop only) — SLF4J provider writing to file
