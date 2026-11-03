@@ -2,21 +2,11 @@
 # Tag-triggered: Coda tags v* after review+merge; the pipeline builds the
 # signed AAB and uploads it to the Play alpha track.
 #
-# Repos are private on Forgejo — server-side netrc injection does not work
-# with this setup, so clone auth is explicit: CI_NETRC_* env in the clone
-# step, sourced from the repo-level FUEL_CLONE_TOKEN secret.
-#
-# NOTE: the repo-level FORGE_CLONE_TOKEN secret (push/PR/manual scope only)
-# shadows the same-named global secret on from_secret lookups, so this
-# workflow uses a dedicated FUEL_CLONE_TOKEN secret with tag scope.
-clone:
-  git:
-    image: woodpeckerci/plugin-git
-    environment:
-      CI_NETRC_MACHINE: git.angussoftware.dev
-      CI_NETRC_USERNAME: coda
-      CI_NETRC_PASSWORD:
-        from_secret: FUEL_CLONE_TOKEN
+# Clone: default plugin + server-side netrc auth (explicit CI_NETRC clone blocks
+# broke on Woodpecker 3.20.1 pull_request events; proven via ci-scripts probes
+# Nov 3 2026, todo 09ed1bc97e33 — mirrors angus-bot/angus-gradle-tools#52).
+# The old dedicated FUEL_CLONE_TOKEN secret is now unused at workflow level;
+# repo-level secret cleanup is a separate follow-up.
 
 when:
   - event: tag
