@@ -56,9 +56,6 @@ steps:
       GRADLE_USER_HOME: /root/.gradle
       FORGEJO_TOKEN:
         from_secret: FORGEJO_TOKEN
-    volumes:
-      - gradle-cache-fuel-dashboard:/root/.gradle/caches
-      - gradle-wrapper-fuel-dashboard:/root/.gradle/wrapper
 
   commitlint:
     image: alpine:latest

@@ -206,7 +206,3 @@ steps:
         echo "Play Store upload and publish successful"
         # Cleanup
         rm -f /tmp/upload-play.py /tmp/keystore.jks /tmp/signing-setup.py /tmp/write-gradle-props.py
-    volumes:
-      - gradle-cache-fuel-release:/root/.gradle/caches
-      - gradle-wrapper-fuel-release:/root/.gradle/wrapper
-      - android-sdk-fuel-release:/opt/android-sdk
